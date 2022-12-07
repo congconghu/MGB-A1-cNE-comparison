@@ -1,9 +1,11 @@
-from scipy.io import loadmat
-import os
-import re
-import mat73
 import pickle
+import json
+import re
+
+import mat73
 import numpy as np
+from scipy.io import loadmat
+import ne_toolbox as netools
 
 
 class Stimulus:
@@ -54,8 +56,8 @@ class Stimulus:
         self.MaxRD = params['MaxRD'][0][0]
 
     def save_pkl_file(self, savefile_path):
-        with open(savefile_path, 'wb') as output:
-            pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
+        with open(savefile_path, 'wb') as outfile:
+            pickle.dump(self, outfile, pickle.HIGHEST_PROTOCOL)
 
 
 class SingleUnit:
@@ -80,7 +82,8 @@ class SingleUnit:
 
 class Session:
 
-    def __init__(self, exp=None, site=None, depth=None, filt_params=None, fs=None, probe=None, probdata=None, units=[]):
+    def __init__(self, exp=None, site=None, depth=None, filt_params=None, fs=None, probe=None, probdata=None, units=[],
+                 trigger=None):
         """Initiate empty object of Stimulus (can be later modified to create Stimulus from scratch)
 
         INPUT:
@@ -100,6 +103,7 @@ class Session:
         self.probe = probe
         self.probdata = probdata
         self.units = units
+        self.trigger = trigger
 
     def read_mat_file(self, datafile_path):
         """Read .mat files of the recording and convert data to Session object"""
@@ -112,6 +116,7 @@ class Session:
         self.fs = int(data_dict['spk']['fs'])
         self.probe = data_dict['spk']['probe']
         self.probdata = data_dict['spk']['probdata']
+        self.trigger = data_dict['trigger']
         self.units = []
         for unit in data_dict['spk']['spk']:
             su = SingleUnit(unit=int(unit['unit']), chan=int(unit['chan']), spiketimes=unit['spiketimes'],
@@ -123,5 +128,84 @@ class Session:
             self.units.append(su)
 
     def save_pkl_file(self, savefile_path):
+        self.file_path = savefile_path
         with open(savefile_path, 'wb') as output:
             pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
+
+    def save_spktrain_from_stim(self, stim_len):
+        trigger = self.trigger
+        trigger_ms = trigger / self.fs * 1e3
+        nt = int(stim_len / len(trigger_ms))  # number of time points between 2 triggers
+        trigger_ms = np.append(trigger_ms, [trigger_ms[-1] + max(np.diff(trigger_ms))])
+        edges = np.array(
+            [np.linspace(trigger_ms[i], trigger_ms[i + 1], nt + 1)[:-1] for i in range(len(trigger_ms) - 1)])
+        edges = edges.flatten()
+        edges = np.append(edges, trigger_ms[-1])
+
+        # get spktrain under dmr
+        spktrain = np.zeros([len(self.units), stim_len], 'int8')
+        for idx, unit in enumerate(self.units):
+            spktrain[idx], _ = np.histogram(unit.spiketimes, edges)
+        spktrain[spktrain > 0] = 1
+        self.spktrain_dmr = spktrain
+        self.edges_dmr = edges
+
+        # get spktrain under spon
+        if trigger_ms[0] / 1e3 / 60 > 5:  # first trigger happens 5minutes after the start of recording -> spon first
+            self.dmr_first = False
+            edges = np.arange(0, trigger_ms[0], 0.5)
+        else:
+            self.dmr_first = True
+            spiketimes_max = max([unit.spiketimes[-1] for unit in self.units])
+            edges = np.arange(trigger_ms[-1], spiketimes_max + 0.5, 0.5)
+
+        if len(
+                edges) * 0.5 / 1e3 / 60 > 5:  # save spon train when recording of spontanous activity lasts more than 5 minutes
+            spktrain = np.zeros([len(self.units), len(edges) - 1], 'int8')
+            for idx, unit in enumerate(self.units):
+                spktrain[idx], _ = np.histogram(unit.spiketimes, edges)
+            spktrain[spktrain > 0] = 1
+            self.spktrain_spon = spktrain
+            self.edges_spon = edges
+        self.save_pkl_file(self.file_path)
+
+    def downsample_spktrain(self, df=20, stim=None):
+        """down sample the time resolution of spike trains"""
+        if stim == 'dmr':
+            spktrain = self.spktrain_dmr
+        elif stim == 'spon':
+            spktrain = self.spktrain_spon
+        else:
+            spktrain = self.spktrain
+        # down sample spktrain
+        nt = spktrain.shape[1] // df
+        spktrain = spktrain[:, :nt * df]
+        spktrain = np.resize(spktrain, (spktrain.shape[0], nt, df))
+        return np.sum(spktrain, axis=2)
+
+    def get_ne(self, df):
+        """get cNEs in each recording session, under dmr and spon"""
+        # get cNE for dmr-evoked activity
+        spktrain = self.downsample_spktrain(df, 'dmr')
+        patterns = netools.detect_cell_assemblies(spktrain)
+        ne = NE(self.exp, self.depth, self.probe, df, spktrain_dmr=spktrain, patterns_dmr=patterns)
+        if hasattr(self, 'spktrain_spon'):
+            spktrain = self.downsample_spktrain(df, 'spon')
+            patterns = netools.detect_cell_assemblies(spktrain)
+            ne.spktrain_spon = spktrain
+            ne.patterns_spon = patterns
+
+        return ne
+
+
+class NE(Session):
+    def __init__(self, exp, depth, probe, df, spktrain_dmr=None, patterns_dmr=None, spktrain_spon=None,
+                 patterns_spon=None):
+        self.exp = exp
+        self.depth = depth
+        self.probe = probe
+        self.df = df
+        self.spktrain_dmr = spktrain_dmr
+        self.patterns_dmr = patterns_dmr
+        self.spktrain_spon = spktrain_spon
+        self.patterns_spon = patterns_spon

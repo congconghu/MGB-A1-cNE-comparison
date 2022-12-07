@@ -4,7 +4,7 @@ import pickle
 import re
 import mat73
 
-import data_from_mat_to_pkl as mtp
+import session_toolbox as mtp
 import helper
 
 # ------------------------------------------- pickle single units-------------------------------------------------------
@@ -17,7 +17,7 @@ for idx, file in enumerate(files):
     session.read_mat_file(file)
     file_pkl = re.sub('-spk-curated-split.mat', '.pkl', file)
     file_pkl = re.sub('Matlab', 'pkl', file_pkl)
-    session.save_pkl_file(file_pkl)
+    session.save_json_file(file_pkl)
 
 # load pickle file
 with open(file_pkl, 'rb') as f:
