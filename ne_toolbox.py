@@ -1,6 +1,7 @@
 from scipy.stats import zscore
 from sklearn.decomposition import PCA, FastICA
 import numpy as np
+import itertools
 
 
 def detect_cell_assemblies(spktrain):
@@ -39,3 +40,54 @@ def normalize_pattern(patterns):
     patterns = [x / np.sqrt(np.sum(x ** 2)) for x in patterns]
     patterns = [-x if x[abs(x).argmax()] < 0 else x for x in patterns]
     return np.array(patterns)
+
+
+def get_activity(spktrain, pattern, member_only=False, members=[]):
+    # when only considering member neurons, set nonmember weights to 0
+    if member_only:
+        pattern = np.array([pattern[x] for x in members])
+        spktrain = np.array([spktrain[x] for x in members])
+
+    spktrain_z = zscore(spktrain, 1)
+    projector = np.outer(pattern, pattern)
+    np.fill_diagonal(projector, 0)
+    activity = np.zeros(spktrain.shape[1])
+    for i in range(spktrain.shape[1]):
+        if np.sum(spktrain[:, i]) > 1:
+            spike_pattern = spktrain_z[:, i]
+            activity[i] = spike_pattern @ projector @ np.transpose(spike_pattern)
+    return activity
+
+
+def get_ne_spikes(activity, thresh, spiketimes, edges):
+    idx_event = np.where(activity > thresh)[0]  # get index of time bins when activities cross threshold
+    n_member = len(spiketimes)
+    for i in range(n_member):
+        spiketimes[i] = get_binned_spiketimes(spiketimes[i], edges)
+
+    ne_spikes = np.array([])
+    ne_spikes_member = [np.array([]) for i in range(n_member)]
+    for idx in idx_event:
+        ne_spikes_tmp = [spiketimes[i][idx] for i in range(n_member)]
+        for i in range(n_member):
+            ne_spikes_member[i] = np.append(ne_spikes_member[i], ne_spikes_tmp[i])
+        ne_spikes_tmp = np.concatenate(ne_spikes_tmp)
+        ne_spikes = np.append(ne_spikes, ne_spikes_tmp.max())
+    return ne_spikes, ne_spikes_member
+
+
+def get_binned_spiketimes(spiketimes, edges):
+    nbins = len(edges)-1
+    dig = np.digitize(spiketimes, edges)
+    idx_bin, idx_spiketimes = np.unique(dig, return_index=True)
+    spiketimes_binned = [[] for i in range(nbins)]
+    for i, ibin in enumerate(idx_bin):
+        if 0 < ibin <= nbins:
+            try:
+                spiketimes_binned[ibin-1] = spiketimes[idx_spiketimes[i]: idx_spiketimes[i+1]]
+            except IndexError:  # when there is no spike after the last bin
+                spiketimes_binned[ibin-1] = spiketimes[idx_spiketimes[i]: ]
+    return spiketimes_binned
+
+def calc_strf(stim_mat, spktrain, nlag, nlead=0):
+    pass
