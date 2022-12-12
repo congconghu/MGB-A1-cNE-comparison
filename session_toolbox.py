@@ -60,6 +60,12 @@ class Stimulus:
         with open(savefile_path, 'wb') as outfile:
             pickle.dump(self, outfile, pickle.HIGHEST_PROTOCOL)
 
+    def down_sample(self, df=10):
+        self.stim_mat = self.stim_mat[:, (df-1)::df]
+        self.df = df
+        self.taxis = self.taxis[::10]
+
+
 
 class SingleUnit:
 
@@ -67,9 +73,9 @@ class SingleUnit:
         self.unit = unit
         self.spiketimes = spiketimes
 
-    def add_properties(self, chan=None,  isolation=None, peak_snr=None, isi_bin=None, isi_vio=None,
-                 waveforms=None, waveforms_mean=None, waveforms_std=None, amps=None,
-                 adjacent_chan=None, template=None):
+    def add_properties(self, chan=None, isolation=None, peak_snr=None, isi_bin=None, isi_vio=None,
+                       waveforms=None, waveforms_mean=None, waveforms_std=None, amps=None,
+                       adjacent_chan=None, template=None):
         self.chan = chan
         self.isolation = isolation
         self.peak_snr = peak_snr
@@ -81,13 +87,14 @@ class SingleUnit:
         self.amps = amps
         self.adjacent_chan = adjacent_chan
         self.template = template
-    def get_strf(self, stim, edges, nlag, nlead):
+
+    def get_strf(self, stim, edges, nlead=20, nlag=0):
         spiketimes = self.spiketimes
-        spktrain = np.histogram(spiketimes, edges)
+        spktrain, _ = np.histogram(spiketimes, edges)
         stim_mat = stim.stim_mat
-        taxis = stim.taxis
+        taxis = (stim.taxis[1] - stim.taxis[0]) * np.array(range(nlead-1, -nlag-1, -1)) * 1000
         faxis = stim.faxis
-        strf = netools.calc_strf(stim_mat, spktrain, nlag, nlead)
+        strf = netools.calc_strf(stim_mat, spktrain, nlag=nlag, nlead=nlead)
         self.strf = strf
         self.strf_taxis = taxis
         self.strf_faxis = faxis
@@ -132,11 +139,12 @@ class Session:
         self.trigger = data_dict['trigger']
         self.units = []
         for unit in data_dict['spk']['spk']:
-            su = SingleUnit(unit=int(unit['unit']),  spiketimes=unit['spiketimes'])
+            su = SingleUnit(unit=int(unit['unit']), spiketimes=unit['spiketimes'])
             su.add_properties(chan=int(unit['chan']), isolation=float(unit['isolation']), peak_snr=unit['peak_snr'],
-                            isi_bin=float(unit['isibin']), isi_vio=float(unit['isi_vio']), template=unit['template'],
-                            waveforms=unit['waveforms'], waveforms_mean=unit['waveforms_mean'],
-                            waveforms_std=unit['waveforms_std'], amps=unit['amps'], adjacent_chan=unit['adjacent_chan'])
+                              isi_bin=float(unit['isibin']), isi_vio=float(unit['isi_vio']), template=unit['template'],
+                              waveforms=unit['waveforms'], waveforms_mean=unit['waveforms_mean'],
+                              waveforms_std=unit['waveforms_std'], amps=unit['amps'],
+                              adjacent_chan=unit['adjacent_chan'])
             self.units.append(su)
 
     def save_pkl_file(self, savefile_path):
@@ -171,7 +179,8 @@ class Session:
             spiketimes_max = max([unit.spiketimes[-1] for unit in self.units])
             edges = np.arange(trigger_ms[-1], spiketimes_max + 0.5, 0.5)
 
-        if len(edges) * 0.5 / 1e3 / 60 > 5:  # save spon train when recording of spontanous activity lasts more than 5 minutes
+        if len(
+                edges) * 0.5 / 1e3 / 60 > 5:  # save spon train when recording of spontanous activity lasts more than 5 minutes
             spktrain = np.zeros([len(self.units), len(edges) - 1], 'int8')
             for idx, unit in enumerate(self.units):
                 spktrain[idx], _ = np.histogram(unit.spiketimes, edges)
@@ -190,7 +199,7 @@ class Session:
         # down sample spktrain
         nt = spktrain.shape[1] // df
         spktrain = spktrain[:, :nt * df]
-        edges = edges[0:nt * df+1:df]
+        edges = edges[0:nt * df + 1:df]
         spktrain = np.resize(spktrain, (spktrain.shape[0], nt, df))
         return np.sum(spktrain, axis=2), edges
 
@@ -204,6 +213,14 @@ class Session:
             return ne
         else:
             return None
+
+    def get_strf(self, stim, nlead=20, nlag=0):
+        edges = self.edges_dmr
+        if hasattr(stim, 'df'):
+            df = stim.df
+            edges = edges[::df]
+        for unit in self.units:
+            unit.get_strf(stim, edges, nlag=nlag, nlead=nlead)
 
 
 class NE(Session):
@@ -304,7 +321,7 @@ class NE(Session):
             spiketimes_member = [spiketimes[x] for x in members]
             ne_spikes, ne_spikes_member = \
                 netools.get_ne_spikes(activity=self.ne_activity[idx], thresh=self.activity_thresh[idx][idx_alpha],
-                                    spiketimes=spiketimes_member, edges=self.edges)
+                                      spiketimes=spiketimes_member, edges=self.edges)
             ne_units.append(SingleUnit(unit=idx, spiketimes=ne_spikes))
             member_ne_spikes[idx] = []
             for i, member in enumerate(members):
@@ -313,8 +330,19 @@ class NE(Session):
         self.ne_units = ne_units
         self.member_ne_spikes = member_ne_spikes
 
+    def get_strf(self, stim, nlead=20, nlag=0):
 
+        session_file_path = re.sub('-ne-.*.pkl', r'.pkl', self.file_path)
+        with open(session_file_path, 'rb') as f:
+            session = pickle.load(f)
 
+        edges = session.edges_dmr
+        if hasattr(stim, 'df'):
+            df = stim.df
+            edges = edges[::df]
+        for unit in self.ne_units:
+            unit.get_strf(stim, edges, nlag=nlag, nlead=nlead)
 
-
-
+        for _, members in self.member_ne_spikes.items():
+            for unit in members:
+                unit.get_strf(stim, edges, nlag=nlag, nlead=nlead)

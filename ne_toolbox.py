@@ -89,5 +89,9 @@ def get_binned_spiketimes(spiketimes, edges):
                 spiketimes_binned[ibin-1] = spiketimes[idx_spiketimes[i]: ]
     return spiketimes_binned
 
-def calc_strf(stim_mat, spktrain, nlag, nlead=0):
-    pass
+
+def calc_strf(stim_mat, spktrain, nlag, nlead):
+    strf = np.zeros((stim_mat.shape[0], nlag+nlead))
+    for i in range(nlead):
+        strf[:, i] = stim_mat @ np.roll(spktrain, i-nlead)
+    return strf
