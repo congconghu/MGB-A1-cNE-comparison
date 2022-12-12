@@ -267,7 +267,7 @@ class NE(Session):
         """get threshold for significant activities with circular shift"""
         random.seed(random_state)
         alpha = np.arange(99, 100, 0.1)
-        spktrain = self.spktrain
+        spktrain = np.copy(self.spktrain)
         patterns = self.patterns
 
         if member_only:
