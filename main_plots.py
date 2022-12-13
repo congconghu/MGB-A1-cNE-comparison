@@ -22,5 +22,18 @@ for idx, file in enumerate(files):
     with open(file, 'rb') as f:
         ne = pickle.load(f)
     plots.plot_5ms_strf_ne_and_members(ne, figpath)
+
+# -------------------plot cNE construction procedure --------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+figpath = r'E:\Congcong\Documents\data\comparison\figure\cNE-construction'
+files = glob.glob(datafolder + r'\*20dft-dmr.pkl', recursive=False)
+
+file = files[0]
+for idx, file in enumerate(files):
+    print('({}/{}) plot 5ms STRFs for {}'.format(idx+1, len(files), file))
+    with open(file, 'rb') as f:
+        ne = pickle.load(f)
+    plots.plot_ne_construction(ne, figpath)
+
                 
     

@@ -10,8 +10,7 @@ def detect_cell_assemblies(spktrain):
     pca.fit(np.transpose(spktrain_z))
 
     # get threshold for significant PCs (based on Marcenko-Patur distribution)
-    q = spktrain.shape[1] / spktrain.shape[0]
-    thresh = (1 + np.sqrt(1 / q)) ** 2
+    thresh = get_pc_thresh(spktrain)
     num_ne = sum(pca.explained_variance_ > thresh)
     patterns = fast_ica(spktrain_z, num_ne)
     return normalize_pattern(patterns)
@@ -95,3 +94,8 @@ def calc_strf(stim_mat, spktrain, nlag, nlead):
     for i in range(nlead):
         strf[:, i] = stim_mat @ np.roll(spktrain, i-nlead)
     return strf
+
+def get_pc_thresh(spktrain):
+    q = spktrain.shape[1] / spktrain.shape[0]
+    thresh = (1 + np.sqrt(1 / q)) ** 2
+    return thresh
