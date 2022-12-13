@@ -1,8 +1,14 @@
+import re
+import glob
+import pickle
+from itertools import combinations
+from scipy.stats import zscore
+
+import numpy as np
+import pandas as pd
+
 from scipy.stats import zscore
 from sklearn.decomposition import PCA, FastICA
-import numpy as np
-import itertools
-
 
 def detect_cell_assemblies(spktrain):
     spktrain_z = zscore(spktrain, 1)
@@ -76,26 +82,80 @@ def get_ne_spikes(activity, thresh, spiketimes, edges):
 
 
 def get_binned_spiketimes(spiketimes, edges):
-    nbins = len(edges)-1
+    nbins = len(edges) - 1
     dig = np.digitize(spiketimes, edges)
     idx_bin, idx_spiketimes = np.unique(dig, return_index=True)
     spiketimes_binned = [[] for i in range(nbins)]
     for i, ibin in enumerate(idx_bin):
         if 0 < ibin <= nbins:
             try:
-                spiketimes_binned[ibin-1] = spiketimes[idx_spiketimes[i]: idx_spiketimes[i+1]]
+                spiketimes_binned[ibin - 1] = spiketimes[idx_spiketimes[i]: idx_spiketimes[i + 1]]
             except IndexError:  # when there is no spike after the last bin
-                spiketimes_binned[ibin-1] = spiketimes[idx_spiketimes[i]: ]
+                spiketimes_binned[ibin - 1] = spiketimes[idx_spiketimes[i]:]
     return spiketimes_binned
 
 
 def calc_strf(stim_mat, spktrain, nlag, nlead):
-    strf = np.zeros((stim_mat.shape[0], nlag+nlead))
+    strf = np.zeros((stim_mat.shape[0], nlag + nlead))
     for i in range(nlead):
-        strf[:, i] = stim_mat @ np.roll(spktrain, i-nlead)
+        strf[:, i] = stim_mat @ np.roll(spktrain, i - nlead)
     return strf
+
 
 def get_pc_thresh(spktrain):
     q = spktrain.shape[1] / spktrain.shape[0]
     thresh = (1 + np.sqrt(1 / q)) ** 2
     return thresh
+
+
+def get_member_nonmember_xcorr(files, df=2, maxlag=200):
+    xcorr = {'xcorr': [], 'member': [], 'stim': [], 'region': []}
+    for idx, file in enumerate(files):
+        print('({}/{}) get member and nonmmebers xcorr for {}'.format(idx + 1, len(files), file))
+
+        with open(file, 'rb') as f:
+            session = pickle.load(f)
+
+        n_neuron = len(session.units)
+        all_pairs = set(combinations(range(n_neuron), 2))
+
+        ne_file_path = re.sub('fs20000', 'fs20000-ne-20dft*', session.file_path)
+        nefiles = glob.glob(ne_file_path)
+        for nefile in nefiles:
+
+            # get region of the recording
+            if session.depth > 2000:
+                region = 'MGB'
+            else:
+                region = 'A1'
+            with open(nefile, 'rb') as f:
+                ne = pickle.load(f)
+
+            # get stimulus condition of the cNEs
+            if 'dmr' in nefile:
+                stim = 'dmr'
+            else:
+                stim = 'spon'
+
+            member_pairs = set()
+            for members in ne.ne_members.values():
+                member_pairs.update(set(combinations(members, 2)))
+            nonmember_pairs = all_pairs.difference(member_pairs)
+
+            spktrain, _ = session.downsample_spktrain(df=df, stim=stim)
+            spktrain_shift = np.roll(spktrain, -maxlag, axis=1)
+            spktrain_shift = spktrain_shift[:, :-2*maxlag]
+            for u1, u2 in member_pairs:
+                c = np.correlate(spktrain[u1], spktrain_shift[u2], mode='valid')
+                xcorr['xcorr'].append(np.array(c).astype('int16'))
+                xcorr['member'].append(True)
+                xcorr['stim'].append(stim == 'dmr')
+                xcorr['region'].append(region)
+            for u1, u2 in nonmember_pairs:
+                c = np.correlate(spktrain[u1], spktrain_shift[u2], mode='valid')
+                xcorr['xcorr'].append(c)
+                xcorr['member'].append(False)
+                xcorr['stim'].append( stim == 'dmr')
+                xcorr['region'].append(region)
+    xcorr = pd.DataFrame(xcorr)
+    return xcorr
