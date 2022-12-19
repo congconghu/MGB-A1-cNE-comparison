@@ -79,4 +79,4 @@ for idx, file in enumerate(files):
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 files = glob.glob(datafolder + r'\*fs20000.pkl', recursive=False)
 xcorr = netools.get_member_nonmember_xcorr(files, df=2, maxlag=200)
-xcorr.to_csv(r'E:\Congcong\Documents\data\comparison\data-summary\member_nonmember_pair_xcorr.csv')
+xcorr.to_json(r'E:\Congcong\Documents\data\comparison\data-summary\member_nonmember_pair_xcorr.json')

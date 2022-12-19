@@ -109,7 +109,7 @@ def get_pc_thresh(spktrain):
 
 
 def get_member_nonmember_xcorr(files, df=2, maxlag=200):
-    xcorr = {'xcorr': [], 'member': [], 'stim': [], 'region': []}
+    xcorr = {'xcorr': [], 'corr': [], 'member': [], 'stim': [], 'region': [], 'exp': []}
     for idx, file in enumerate(files):
         print('({}/{}) get member and nonmmebers xcorr for {}'.format(idx + 1, len(files), file))
 
@@ -123,18 +123,20 @@ def get_member_nonmember_xcorr(files, df=2, maxlag=200):
         nefiles = glob.glob(ne_file_path)
         for nefile in nefiles:
 
+            # load ne data
+            with open(nefile, 'rb') as f:
+                ne = pickle.load(f)
+
             # get region of the recording
             if session.depth > 2000:
                 region = 'MGB'
             else:
                 region = 'A1'
-            with open(nefile, 'rb') as f:
-                ne = pickle.load(f)
 
             # get stimulus condition of the cNEs
-            if 'dmr' in nefile:
+            if nefile.endswith('dmr.pkl'):
                 stim = 'dmr'
-            else:
+            elif nefile.endswith('spon.pkl'):
                 stim = 'spon'
 
             member_pairs = set()
@@ -145,17 +147,23 @@ def get_member_nonmember_xcorr(files, df=2, maxlag=200):
             spktrain, _ = session.downsample_spktrain(df=df, stim=stim)
             spktrain_shift = np.roll(spktrain, -maxlag, axis=1)
             spktrain_shift = spktrain_shift[:, :-2*maxlag]
+            corr_mat = np.corrcoef(ne.spktrain)
             for u1, u2 in member_pairs:
                 c = np.correlate(spktrain[u1], spktrain_shift[u2], mode='valid')
                 xcorr['xcorr'].append(np.array(c).astype('int16'))
+                xcorr['corr'].append(corr_mat[u1][u2])
                 xcorr['member'].append(True)
-                xcorr['stim'].append(stim == 'dmr')
+                xcorr['stim'].append(stim)
                 xcorr['region'].append(region)
+                xcorr['exp'].append(session.exp)
             for u1, u2 in nonmember_pairs:
                 c = np.correlate(spktrain[u1], spktrain_shift[u2], mode='valid')
                 xcorr['xcorr'].append(c)
+                xcorr['corr'].append(corr_mat[u1][u2])
                 xcorr['member'].append(False)
-                xcorr['stim'].append( stim == 'dmr')
+                xcorr['stim'].append(stim)
                 xcorr['region'].append(region)
+                xcorr['exp'].append(session.exp)
+
     xcorr = pd.DataFrame(xcorr)
     return xcorr

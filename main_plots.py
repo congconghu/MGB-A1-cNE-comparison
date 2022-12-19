@@ -5,8 +5,11 @@ Created on Fri Dec  9 13:48:38 2022
 @author: Congcong
 """
 import re
+import os
 import glob
 import pickle
+import pandas as pd
+import numpy as np
 
 import plot_box as plots
 
@@ -35,5 +38,10 @@ for idx, file in enumerate(files):
         ne = pickle.load(f)
     plots.plot_ne_construction(ne, figpath)
 
+# -----------------------plot stack of xcorr ----------------------------------
+datafolder = 'E:\Congcong\Documents\data\comparison\data-summary'
+xcorr = pd.read_json(os.path.join(datafolder, 'member_nonmember_pair_xcorr.json'))
+xcorr['xcorr'] = xcorr['xcorr'].apply(lambda x: np.array(x))
+plots.plot_xcorr(xcorr)
                 
     
