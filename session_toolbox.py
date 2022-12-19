@@ -190,7 +190,11 @@ class Session:
         self.save_pkl_file(self.file_path)
 
     def downsample_spktrain(self, df=20, stim=None):
-        """down sample the time resolution of spike trains"""
+        """down sample the time resolution of spike trains
+        input:
+        df: down sample factor
+        stim: 'dmr' or 'spon'
+        """
         try:
             spktrain = eval('self.spktrain_{}'.format(stim))
             edges = eval('self.edges_{}'.format(stim))
@@ -267,7 +271,7 @@ class NE(Session):
         """get threshold for significant activities with circular shift"""
         random.seed(random_state)
         alpha = np.arange(99, 100, 0.1)
-        spktrain = self.spktrain
+        spktrain = np.copy(self.spktrain)
         patterns = self.patterns
 
         if member_only:
