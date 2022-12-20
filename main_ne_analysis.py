@@ -80,3 +80,34 @@ datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 files = glob.glob(datafolder + r'\*fs20000.pkl', recursive=False)
 xcorr = netools.get_member_nonmember_xcorr(files, df=2, maxlag=200)
 xcorr.to_json(r'E:\Congcong\Documents\data\comparison\data-summary\member_nonmember_pair_xcorr.json')
+
+# ---------------------------------------get ne of split activities -------------------------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+files = glob.glob(datafolder + r'\*fs20000.pkl', recursive=False)
+for idx, file in enumerate(files):
+    with open(file, 'rb') as f:
+        session = pickle.load(f)
+    print('({}/{}) get cNEs of split activities for {}'.format(idx + 1, len(files), file))
+    ne_split = session.get_ne_split(df=20)
+    if 'dmr1' in ne_split:
+        # get split cNE members
+        for key, ne in ne_split.items():
+            if key == 'dmr_first':
+                continue
+            ne.get_members()
+        savefile_path = re.sub(r'fs20000.pkl', r'fs20000-ne-20dft-split.pkl', session.file_path)
+        with open(savefile_path, 'wb') as output:
+            pickle.dump(ne_split, output, pickle.HIGHEST_PROTOCOL)
+
+# -----------------------------------------match split cNEs------------------------------------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+files = glob.glob(datafolder + r'\*split.pkl', recursive=False)
+for idx, file in enumerate(files):
+    with open(file, 'rb') as f:
+        ne_split = pickle.load(f)
+    print('({}/{}) match ICweights of split cNEs for {}'.format(idx + 1, len(files), file))
+    ne_split = netools.get_split_ne_ic_weight_match(ne_split)
+    with open(file, 'wb') as output:
+        pickle.dump(ne_split, output, pickle.HIGHEST_PROTOCOL)
+
+

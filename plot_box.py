@@ -27,6 +27,44 @@ colors = sns.color_palette("Paired")
 A1_color = (colors[1], colors[0])
 MGB_color = (colors[5], colors[4])
 
+
+
+def plot_ne_split_ic_weight_corr(ne_split, figpath):
+    corr_mat = ne_split['corr_mat']
+    n_dmr = len(ne_split['order']['dmr'][0])
+    n_spon = len(ne_split['order']['spon'][0])
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
+    im = ax.imshow(corr_mat, aspect='auto', cmap='Greys', vmin=0, vmax=1)
+    plt.colorbar(im)
+    # draw boundary for correlation matrix of dmr-evoked activities
+    p = mpl.patches.Rectangle((-0.48, -0.48), n_dmr-.04, n_dmr-.04, 
+                              facecolor='none', edgecolor='green', linewidth=5)
+    ax.add_patch(p)
+    # draw boundary for correlation matrix of spontanoues activities
+    p = mpl.patches.Rectangle((n_dmr-0.48, n_dmr-0.48), n_spon-.04, n_spon-.04, 
+                              facecolor='none', edgecolor='orange', linewidth=5)
+    ax.add_patch(p)
+    # draw boundary for correlation matrix of corss conditions
+    if ne_split['dmr_first']:
+        xy = (-0.48, n_dmr-0.48)
+        x, y = n_dmr-.04, n_spon-.04
+    else:
+        xy = (n_dmr-0.48, -0.48)
+        x, y = n_spon-.04, n_dmr-.04
+    p = mpl.patches.Rectangle(xy, x, y, 
+                              facecolor='none', edgecolor='purple', linewidth=5)
+    ax.add_patch(p)
+    order = ne_split['order']['dmr'][0] + ne_split['order']['spon'][0]
+    ax.set_yticks(range(len(order)))
+    ax.set_yticklabels(order)
+    order = ne_split['order']['dmr'][1] + ne_split['order']['spon'][1]
+    ax.set_xticks(range(len(order)))
+    ax.set_xticklabels(order)
+    fig.savefig(figpath)
+    plt.close(fig)
+    
+    
 def plot_ne_construction(ne, savepath):
     
     # load seesion file
@@ -564,8 +602,9 @@ def figure1(datafolder, figfolder):
     ax.set_ylim([-0.05, 0.3])
     ax.set_xlabel('')
     
-    fig.savefig(os.path.join(figfolder, 'fig1.png'), format='png')
-    fig.savefig(os.path.join(figfolder, 'fig1.pdf'), format='pdf')
+    fig.savefig(os.path.join(figfolder, 'fig1.png'))
+    fig.savefig(os.path.join(figfolder, 'fig1.svg'))
+    fig.savefig(os.path.join(figfolder, 'fig1.pdf'))
 
 
 def plot_xcorr(fig, ax, xcorr, savepath=None):
@@ -666,7 +705,7 @@ def boxplot_scatter(ax, x, y, data, order, hue, palette, hue_order,
     bplot = sns.boxplot(ax=ax, x=x, y=y, data=data, 
                         order=order, notch=notch, flierprops={'marker': ''}, 
                         linewidth=linewidth)
-    for i,box_col in enumerate(palette):
+    for i, box_col in enumerate(palette):
     
         mybox = bplot.patches[i]   
         mybox.set_edgecolor(box_col)

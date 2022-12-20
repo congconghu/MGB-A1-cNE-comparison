@@ -15,7 +15,6 @@ import plot_box as plots
 
 
 # -------------------plot 5ms binned strfs of cNEs and member neurons----------
-
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 figpath = r'E:\Congcong\Documents\data\comparison\figure\cNE-5ms-strf'
 files = glob.glob(datafolder + r'\*20dft-dmr.pkl', recursive=False)
@@ -31,7 +30,6 @@ datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 figpath = r'E:\Congcong\Documents\data\comparison\figure\cNE-construction'
 files = glob.glob(datafolder + r'\*20dft-dmr.pkl', recursive=False)
 
-file = files[0]
 for idx, file in enumerate(files):
     print('({}/{}) plot 5ms STRFs for {}'.format(idx+1, len(files), file))
     with open(file, 'rb') as f:
@@ -43,5 +41,16 @@ datafolder = 'E:\Congcong\Documents\data\comparison\data-summary'
 xcorr = pd.read_json(os.path.join(datafolder, 'member_nonmember_pair_xcorr.json'))
 xcorr['xcorr'] = xcorr['xcorr'].apply(lambda x: np.array(x))
 plots.plot_xcorr(xcorr)
-                
-    
+
+# ----------------------plot ICweight correlation for split cNEs-----------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+figfolder = r'E:\Congcong\Documents\data\comparison\figure\cNE-split-corr'
+files = glob.glob(datafolder + r'\*split.pkl', recursive=False)
+for idx, file in enumerate(files):
+    print('({}/{}) plot ICweight match for {}'.format(idx + 1, len(files), file))
+    with open(file, 'rb') as f:
+        ne_split = pickle.load(f)
+    filename = re.findall('\d{6}_\d{6}.*', file)[0]
+    figpath = os.path.join(figfolder, re.sub('pkl', 'jpg', filename))
+    plots.plot_ne_split_ic_weight_corr(ne_split, figpath)
+

@@ -218,6 +218,29 @@ class Session:
         else:
             return None
 
+    def get_ne_split(self, df):
+        """split sensory-evoked and spontaneous activities in 2 blocks respectively and get cNEs on each block"""
+        ne_split = dict()
+        if hasattr(self, 'spktrain_dmr') and hasattr(self, 'spktrain_spon'):
+            stims = ('dmr', 'spon')
+            for stim in stims:
+                spktrain, edges = self.downsample_spktrain(df, stim)
+                midpoint = spktrain.shape[1] // 2
+                spktrains = [spktrain[:, :midpoint], spktrain[:, midpoint:]]
+                edges = [edges[:midpoint+1], edges[midpoint:]]
+                for idx, spktrain in enumerate(spktrains):
+                    patterns = netools.detect_cell_assemblies(spktrain)
+                    ne = NE(self.exp, self.depth, self.probe, df, stim=stim+str(idx), spktrain=spktrain,
+                            patterns=patterns, edges=edges[idx])
+                    ne_split[stim+str(idx)] = ne
+            ne_split['dmr_first'] = self.dmr_first
+
+        elif not hasattr(self, 'spktrain_spon'):
+            print('Spontaneous activities not recorded')
+        else:
+            print('Sensory-evoked activities not recorded')
+        return ne_split
+
     def get_strf(self, stim, nlead=20, nlag=0):
         edges = self.edges_dmr
         if hasattr(stim, 'df'):
