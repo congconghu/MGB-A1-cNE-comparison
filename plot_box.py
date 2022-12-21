@@ -28,7 +28,93 @@ A1_color = (colors[1], colors[0])
 MGB_color = (colors[5], colors[4])
 
 
+def plot_ne_split_ic_weight_match(ne_split, figpath):
+    colors = sns.color_palette("Paired")
+    color_idx = [3, 2, 7, 6, 9, 8]
+    colors = [colors[x] for x in color_idx]
+    
+    corr_mat = ne_split['corr_mat']
+    dmr_first = ne_split['dmr_first']
+    n_dmr = len(ne_split['order']['dmr'][0])
+    n_spon = len(ne_split['order']['spon'][0])
+    n_match = min([n_dmr, n_spon])
+    
+       
+        
+    for i in range(n_match):
+        
+        fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(6, 9))
 
+        if dmr_first:
+            order = ne_split['order']['dmr'][1][i]
+            ic_dmr = ne_split['dmr1'].patterns[order]
+            order = ne_split['order']['spon'][0][i]
+            ic_spon = ne_split['spon0'].patterns[order]
+        else:
+            order = ne_split['order']['dmr'][0][i]
+            ic_dmr = ne_split['dmr0'].patterns[order]
+            order = ne_split['order']['spon'][1][i]
+            ic_spon = ne_split['spon1'].patterns[order]
+        
+        plot_matching_ic(axes[0], ic_dmr, ic_spon, colors[0], colors[2])
+        order0 = ne_split['order']['dmr'][0][i]
+        order1 = ne_split['order']['dmr'][1][i] 
+        plot_matching_ic(axes[1], 
+                         ne_split['dmr0'].patterns[order0],
+                         ne_split['dmr1'].patterns[order1],
+                         colors[0], colors[1])
+        order0 = ne_split['order']['spon'][0][i]
+        order1 = ne_split['order']['spon'][1][i] 
+        plot_matching_ic(axes[2], 
+                         ne_split['spon0'].patterns[order0],
+                         ne_split['spon1'].patterns[order1],
+                         colors[2], colors[3])
+        
+        plt.tight_layout()
+        fig.savefig(re.sub('.jpg', '-{}.jpg'.format(i), figpath))
+        plt.close()
+    
+def plot_matching_ic(ax1, ic1, ic2, color1, color2):
+    markersize = 10
+    # get ylimit for the plot
+    ymax = max(ic1.max(), ic2.max())*1.1
+    # plot threshold for ne members
+    n_neuron = len(ic1)
+    thresh = 1/np.sqrt(n_neuron)
+    ax1.plot([0, len(ic1)+1], [thresh, thresh], 'k--')
+    ax1.plot([0, len(ic1)+1], [0, 0], 'k')
+    ax1.plot([0, len(ic1)+1], [-thresh, -thresh], 'k--')
+
+    x = range(n_neuron)
+    ax2 = ax1.twinx()
+    
+    # plot on the left axes
+    markerline, stemline, baseline = ax1.stem(
+        range(1, n_neuron+1), ic1, 
+        markerfmt='o', basefmt='k')
+    plt.setp(markerline, markersize = markersize, color=color1)
+    plt.setp(stemline,color=color1)
+    ax1.set_xlim([0, n_neuron + 1])
+    ax1.set_ylim([-ymax, ymax])
+    ax1.spines['left'].set_color(color1)
+    ax1.spines.top.set_visible(False)
+    ax1.spines.right.set_visible(False)
+    ax1.tick_params(axis='y', colors=color1)
+    
+    # plot on the right axes
+    markerline, stemline, baseline = ax2.stem(
+        range(1, n_neuron+1), ic2, 
+        markerfmt='o', basefmt='k')
+    plt.setp(markerline, markersize = markersize, color=color2)
+    plt.setp(stemline,color=color2)
+    ax2.set_xlim([0, n_neuron + 1])
+    ax2.set_ylim([-ymax, ymax])
+    ax2.invert_yaxis()
+    ax2.spines.top.set_visible(False)
+    ax2.spines.left.set_visible(False)
+    ax2.spines['right'].set_color(color2)
+    ax2.tick_params(axis='y', colors=color2)
+    
 def plot_ne_split_ic_weight_corr(ne_split, figpath):
     corr_mat = ne_split['corr_mat']
     n_dmr = len(ne_split['order']['dmr'][0])

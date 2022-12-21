@@ -42,7 +42,7 @@ xcorr = pd.read_json(os.path.join(datafolder, 'member_nonmember_pair_xcorr.json'
 xcorr['xcorr'] = xcorr['xcorr'].apply(lambda x: np.array(x))
 plots.plot_xcorr(xcorr)
 
-# ----------------------plot ICweight correlation for split cNEs-----------------------------
+# ----------------------plot ICweight correlation and matching ICs for split cNEs-----------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 figfolder = r'E:\Congcong\Documents\data\comparison\figure\cNE-split-corr'
 files = glob.glob(datafolder + r'\*split.pkl', recursive=False)
@@ -53,4 +53,4 @@ for idx, file in enumerate(files):
     filename = re.findall('\d{6}_\d{6}.*', file)[0]
     figpath = os.path.join(figfolder, re.sub('pkl', 'jpg', filename))
     plots.plot_ne_split_ic_weight_corr(ne_split, figpath)
-
+    plots.plot_ne_split_ic_weight_match(ne_split, figpath)
