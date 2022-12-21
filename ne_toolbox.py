@@ -254,3 +254,10 @@ def swap_lines(corr_mat, idx1, idx2, orders):
     orders['dmr'][1] = order_combined[:n_dmr]
     orders['spon'][1] = order_combined[n_dmr:]
     return corr_mat, orders
+
+
+def get_split_ne_null_ic_weight(ne_split, nshift=1000):
+    stims = ['dmr0', 'dmr1', 'spon0', 'spon1']
+    for stim in stims:
+        ne = ne_split[stim]
+        ne.get_sham_patterns(nshift=nshift)

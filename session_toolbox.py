@@ -66,7 +66,6 @@ class Stimulus:
         self.taxis = self.taxis[::10]
 
 
-
 class SingleUnit:
 
     def __init__(self, unit, spiketimes):
@@ -373,3 +372,17 @@ class NE(Session):
         for _, members in self.member_ne_spikes.items():
             for unit in members:
                 unit.get_strf(stim, edges, nlag=nlag, nlead=nlead)
+
+    def get_sham_patterns(self, nshift=1000):
+        sham_patterns = []
+        n_neuron, nt = self.spktrain.shape
+        num_ne = self.patterns.shape[0]
+        for shift in range(nshift):
+            shift_size = np.random.randint(low=1, high=nt-1, size=n_neuron)
+            spktrain_z = zscore(self.spktrain, axis=1)
+            for i in range(n_neuron):
+                spktrain_z[i] = np.roll(spktrain_z[i], shift_size[i])
+
+            sham_patterns.extend(netools.fast_ica(spktrain_z, num_ne, niter=500))
+        sham_patterns = np.array(sham_patterns)
+        self.patterns_sham = sham_patterns

@@ -110,4 +110,15 @@ for idx, file in enumerate(files):
     with open(file, 'wb') as output:
         pickle.dump(ne_split, output, pickle.HIGHEST_PROTOCOL)
 
+# -------------------------------get null distribution of ICweight correlations ---------------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+files = glob.glob(datafolder + r'\*split.pkl', recursive=False)
+for idx, file in enumerate(files):
+    with open(file, 'rb') as f:
+        ne_split = pickle.load(f)
+    print('({}/{}) get null ICweights of split cNEs for {}'.format(idx + 1, len(files), file))
+    ne_split = netools.get_split_ne_null_ic_weight(ne_split, nshift=10)
+    with open(file, 'wb') as output:
+        pickle.dump(ne_split, output, pickle.HIGHEST_PROTOCOL)
+
 
