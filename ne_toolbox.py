@@ -261,3 +261,6 @@ def get_split_ne_null_ic_weight(ne_split, nshift=1000):
     for stim in stims:
         ne = ne_split[stim]
         ne.get_sham_patterns(nshift=nshift)
+
+def get_null_ic_weight_corr(ne_split):
+    pass

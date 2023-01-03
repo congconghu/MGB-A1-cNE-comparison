@@ -8,6 +8,7 @@ import re
 import pickle
 import os
 import glob
+import random
 
 import pandas as pd
 import numpy as np
@@ -18,6 +19,7 @@ import scipy.stats as stats
 from scipy.stats import zscore
 import ne_toolbox as netools
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from helper import get_A1_MGB_files, get_distance
 
 plt.rcParams['font.size'] = 18
 plt.rcParams['axes.linewidth'] = 2
@@ -471,76 +473,6 @@ def plot_raster(ax, units, offset='idx', color='k', new_order=[]):
         ax.eventplot(unit.spiketimes, lineoffsets=idx + 1, linelengths=0.8, colors=color)
 
 
-def plot_xcorr(fig, ax, xcorr, savepath=None):
-    """
-    Summary plot of cross correlation of member and nonmember pairs under 2 stimulus conditions ans in 2 regions
-
-    Input:
-        fig: handle for the figure to be plotted on
-        ax: list of axes
-        xcorr: groupby object containing (region,member) conditions and cross correlation data
-        savepath: folder path to save the summary plot
-    Return:
-        None
-    """
-    for key, data in xcorr:
-        region, member = key
-        row = 0 if region == 'MGB' else 2
-        col = 0 if member == '(w)' else 1
-        corr, im = plot_xcorr_imshow(ax[row][col], data)
-        plot_xcorr_avg(ax[row + 1][col], corr)
-    for row in range(4):
-        for col in range(2):
-            if col > 0:
-                ax[row][col].set_ylabel('')
-
-            if row == 3:
-                ax[row][col].set_xticks(range(-200, 201, 100))
-                ax[row][col].set_xticklabels(["", '', 0, '', ""])
-                ax[row][col].set_xticks([-180, 180], minor=True)
-                ax[row][col].set_xticklabels([-200, 200], minor=True)
-                for line in ax[row][col].xaxis.get_minorticklines():
-                    line.set_visible(False)
-                ax[row][col].set_xlabel('lag (ms)')
-            else:
-                ax[row][col].set_xlabel('')
-
-                if row in (0, 2):
-                    ax[row][col].set_xlabel('')
-                    ax[row][col].set_xticks(range(0, 401, 100))
-                    t = ax[row][col].yaxis.get_offset_text()
-                    t.set_x(-0.05)
-                else:
-                    ax[row][col].set_ylim([-1, 3])
-                    ax[row][col].set_xticks(range(-200, 201, 100))
-                ax[row][col].set_xticklabels([''] * 5)
-
-    # titles
-    ax[0][0].set_title('MGB (within cNE)', fontsize=16, color=MGB_color[0], fontweight="bold")
-    ax[0][1].set_title('MGB (outside cNE)', fontsize=16, color=MGB_color[1], fontweight="bold")
-    ax[2][0].set_title('A1 (within cNE)', fontsize=16, color=A1_color[0], fontweight="bold")
-    ax[2][1].set_title('A1 (outside cNE)', fontsize=16, color=A1_color[1], fontweight="bold")
-    # colorbar
-    axins = inset_axes(
-        ax[2][1],
-        width="5%",  # width: 5% of parent_bbox width
-        height="80%",  # height: 50%
-        loc="center left",
-        bbox_to_anchor=(1.05, 0., 1, 1),
-        bbox_transform=ax[2][1].transAxes,
-        borderpad=0
-    )
-    cb = fig.colorbar(im, cax=axins)
-    cb.ax.tick_params(axis='y', direction='in')
-    axins.set_title('z-scored\ncorr\n', fontsize=16, linespacing=0.8)
-    cb.ax.set_yticks([-5, 0, 5])
-    cb.ax.set_yticklabels(['-5', '0', '5'])
-    axins.tick_params(axis='both', which='major', labelsize=16)
-    if savepath:
-        fig.savefig(os.path.join(savepath, 'xcorr_member_nonmember.jpg'))
-        plt.close(fig)
-
-
 def figure1(datafolder, figfolder):
     """
     Figure1: groups of neurons with coordinated activities exist in A1 and MGB
@@ -778,6 +710,74 @@ def figure1(datafolder, figfolder):
     fig.savefig(os.path.join(figfolder, 'fig1.pdf'))
 
 
+def plot_xcorr(fig, ax, xcorr, savepath=None):
+    """
+    Summary plot of cross correlation of member and nonmember pairs under 2 stimulus conditions ans in 2 regions
+
+    Input:
+        fig: handle for the figure to be plotted on
+        ax: list of axes
+        xcorr: groupby object containing (region,member) conditions and cross correlation data
+        savepath: folder path to save the summary plot
+    Return:
+        None
+    """
+    for key, data in xcorr:
+        region, member = key
+        row = 0 if region == 'MGB' else 2
+        col = 0 if member == '(w)' else 1
+        corr, im = plot_xcorr_imshow(ax[row][col], data)
+        plot_xcorr_avg(ax[row + 1][col], corr)
+    for row in range(4):
+        for col in range(2):
+            if col > 0:
+                ax[row][col].set_ylabel('')
+
+            if row == 3:
+                ax[row][col].set_xticks(range(-200, 201, 100))
+                ax[row][col].set_xticklabels(["", '', 0, '', ""])
+                ax[row][col].set_xticks([-180, 180], minor=True)
+                ax[row][col].set_xticklabels([-200, 200], minor=True)
+                for line in ax[row][col].xaxis.get_minorticklines():
+                    line.set_visible(False)
+                ax[row][col].set_xlabel('lag (ms)')
+            else:
+                ax[row][col].set_xlabel('')
+
+                if row in (0, 2):
+                    ax[row][col].set_xlabel('')
+                    ax[row][col].set_xticks(range(0, 401, 100))
+                    t = ax[row][col].yaxis.get_offset_text()
+                    t.set_x(-0.05)
+                else:
+                    ax[row][col].set_ylim([-1, 3])
+                    ax[row][col].set_xticks(range(-200, 201, 100))
+                ax[row][col].set_xticklabels([''] * 5)
+
+    # titles
+    ax[0][0].set_title('MGB (within cNE)', fontsize=16, color=MGB_color[0], fontweight="bold")
+    ax[0][1].set_title('MGB (outside cNE)', fontsize=16, color=MGB_color[1], fontweight="bold")
+    ax[2][0].set_title('A1 (within cNE)', fontsize=16, color=A1_color[0], fontweight="bold")
+    ax[2][1].set_title('A1 (outside cNE)', fontsize=16, color=A1_color[1], fontweight="bold")
+    # colorbar
+    axins = inset_axes(
+        ax[2][1],
+        width="5%",  # width: 5% of parent_bbox width
+        height="80%",  # height: 50%
+        loc="center left",
+        bbox_to_anchor=(1.05, 0., 1, 1),
+        bbox_transform=ax[2][1].transAxes,
+        borderpad=0
+    )
+    cb = fig.colorbar(im, cax=axins)
+    cb.ax.tick_params(axis='y', direction='in')
+    axins.set_title('z-scored\ncorr\n', fontsize=16, linespacing=0.8)
+    cb.ax.set_yticks([-5, 0, 5])
+    cb.ax.set_yticklabels(['-5', '0', '5'])
+    axins.tick_params(axis='both', which='major', labelsize=16)
+    if savepath:
+        fig.savefig(os.path.join(savepath, 'xcorr_member_nonmember.jpg'))
+        plt.close(fig)
 def plot_xcorr_imshow(ax, data):
     """Stack cross correlation curves and plot as heatmap"""
     ax.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
@@ -813,10 +813,7 @@ def plot_xcorr_avg(ax, corr):
 # ---------------------cNE properties ---------------------------------------------------
 def num_ne_vs_num_neuron(ax, datafolder, stim):
     # get files for recordings in A1 and MGB
-    files_all = glob.glob(os.path.join(datafolder, '*' + stim + '.pkl'))
-    files = {'A1': [], 'MGB': []}
-    files['A1'] = [x for x in files_all if 'H22x32' in x]
-    files['MGB'] = [x for x in files_all if 'H31x64' in x]
+    files = get_A1_MGB_files(datafolder, stim)
 
     # get the number of neurons and the number of cNEs in each recording
     n_neuron = {'A1': [], 'MGB': []}
@@ -847,10 +844,7 @@ def ne_size_vs_num_neuron(ax, datafolder, stim, plot_type='mean', relative=False
         e.g. (10, 30) to only include recordings with >= 10 neurons and <= 30 neurons
     """
     # get files for recordings in A1 and MGB
-    files_all = glob.glob(os.path.join(datafolder, '*' + stim + '.pkl'))
-    files = {'A1': [], 'MGB': []}
-    files['A1'] = [x for x in files_all if 'H22x32' in x]
-    files['MGB'] = [x for x in files_all if 'H31x64' in x]
+    files = get_A1_MGB_files(datafolder, stim)
 
     # get the number of neurons and the number of cNEs in each recording
     n_neuron = {'A1': [], 'MGB': []}
@@ -899,6 +893,157 @@ def ne_size_vs_num_neuron(ax, datafolder, stim, plot_type='mean', relative=False
         ax.set_xlabel('# of neurons')
         ax.set_ylabel('{} cNE size'.format(plot_type))
 
+
+def num_ne_participate(ax, datafolder, stim, n_neuron_filter=()):
+    files = get_A1_MGB_files(datafolder, stim)
+    n_participation = {'A1': [], 'MGB': []}
+    for region, filepaths in files.items():
+        for file in filepaths:
+            with open(file, 'rb') as f:
+                ne = pickle.load(f)
+            if any(n_neuron_filter):
+                if ne.patterns.shape[1] > n_neuron_filter[1] or ne.patterns.shape[1] < n_neuron_filter[0]:
+                    continue
+            n_neuron = ne.patterns.shape[1]
+            participate = np.concatenate(list(ne.ne_members.values()))
+            unique, counts = np.unique(participate, return_counts=True)
+            participate = dict(zip(unique, counts))
+            for i in range(n_neuron):
+                if i in participate:
+                    n_participation[region].append(participate[i])
+                else:
+                    n_participation[region].append(0)
+    for region, participate in n_participation.items():
+        ax.hist(n_participation[region], bins=range(6), alpha=0.5,
+                label=region, density=True, align='left', color=eval(region+'_color[0]'))
+    ax.legend()
+    ax.set_xlabel('number of cNEs each neuron belonged to')
+    ax.set_ylabel('ratio')
+
+
+def ne_member_distance(ax, datafolder, stim, probe, direction='vertical'):
+    files = glob.glob(os.path.join(datafolder, '*' + stim + '.pkl'))
+    files = [x for x in files if probe in x]
+    dist_member = []
+    dist_nonmember = []
+    for file in files:
+        with open(file, 'rb') as f:
+            ne = pickle.load(f)
+        member_pairs, nonmember_pairs = ne.get_member_pairs()
+        session_file = re.sub('-ne-20dft-'+stim, '', file)
+        with open(session_file, 'rb') as f:
+            session = pickle.load(f)
+        for pair in member_pairs:
+            p1 = session.units[pair[0]].position
+            p2 = session.units[pair[1]].position
+            dist_member.append(get_distance(p1, p2, direction))
+        for pair in nonmember_pairs:
+            p1 = session.units[pair[0]].position
+            p2 = session.units[pair[1]].position
+            dist_nonmember.append(get_distance(p1, p2, direction))
+    if probe == 'H31x64':
+        color = MGB_color[0]
+        step = 20
+    else:
+        color = A1_color[0]
+        step = 25
+
+    if direction == 'vertical':
+        ax.hist(dist_member, range(0, 601, step), color=color,
+                weights=np.repeat([1/len(dist_member)], len(dist_member)))
+        ax.hist(dist_nonmember, range(0, 601, step), color='k',
+                weights=np.repeat([1/len(dist_nonmember)], len(dist_nonmember)),
+                fill=False, histtype='step')
+        ax.set_xlabel('pairwise distance (um)')
+        ax.set_xlim([0, 600])
+    elif direction == 'horizontal':
+        ax.hist(dist_member, 2, color=color, align='left', rwidth=0.8,
+                weights=np.repeat([1 / len(dist_member)], len(dist_member)))
+        ax.hist(dist_nonmember, 2, color='k', align='left', rwidth=0.8,
+                weights=np.repeat([1 / len(dist_nonmember)], len(dist_nonmember)),
+                fill=False)
+        ax.set_xticks([0, 125])
+        ax.set_xticklabels(['same shank', 'across shank'])
+    ax.set_ylabel('ratio')
+
+
+
+def ne_member_span(ax, datafolder, stim, probe):
+    random.seed(0)
+    files = glob.glob(os.path.join(datafolder, '*' + stim + '.pkl'))
+    files = [x for x in files if probe in x]
+    span_member = []
+    span_random = []
+    for file in files:
+        with open(file, 'rb') as f:
+            ne = pickle.load(f)
+        session_file = re.sub('-ne-20dft-' + stim, '', file)
+        n_neuron = ne.patterns.shape[1]
+        with open(session_file, 'rb') as f:
+            session = pickle.load(f)
+
+        for members in ne.ne_members.values():
+            # get cNE span
+            span_member.append(session.get_cluster_span(members))
+            # get span of random neurons
+            n_member = len(members)
+            for _ in range(10):
+                members_sham = random.sample(range(n_neuron), n_member)
+                span_random.append(session.get_cluster_span(members_sham))
+
+    if probe == 'H31x64':
+        color = MGB_color[0]
+        step = 20
+    else:
+        color = A1_color[0]
+        step = 25
+    ax.hist(span_member, range(0, 1001, step*2), color=color,
+            weights=np.repeat([1/len(span_member)], len(span_member)))
+    ax.hist(span_random, range(0, 1001, step*2), color='k',
+            weights=np.repeat([1/len(span_random)], len(span_random)),
+            fill=False, histtype='step')
+    ax.set_ylabel('ratio')
+    ax.set_xlabel('cNE span (um)')
+    ax.set_xlim([0, 1000])
+
+
+def ne_member_shank_span(ax, datafolder, stim, probe):
+    random.seed(0)
+    files = glob.glob(os.path.join(datafolder, '*' + stim + '.pkl'))
+    files = [x for x in files if probe in x]
+    span_member = []
+    span_random = []
+    for file in files:
+        with open(file, 'rb') as f:
+            ne = pickle.load(f)
+        session_file = re.sub('-ne-20dft-' + stim, '', file)
+        n_neuron = ne.patterns.shape[1]
+        with open(session_file, 'rb') as f:
+            session = pickle.load(f)
+
+        for members in ne.ne_members.values():
+            # get cNE span
+            span_member.append(session.get_cluster_span(members, 'horz'))
+            # get span of random neurons
+            n_member = len(members)
+            for _ in range(10):
+                members_sham = random.sample(range(n_neuron), n_member)
+                span_random.append(session.get_cluster_span(members_sham, 'horz'))
+
+    if probe == 'H31x64':
+        color = MGB_color[0]
+        step = 20
+    else:
+        color = A1_color[0]
+        step = 25
+    ax.hist(span_member, 2, color=color, align='left', rwidth=0.8,
+            weights=np.repeat([1/len(span_member)], len(span_member)))
+    ax.hist(span_random, 2, color='k', align='left', rwidth=0.8,
+            weights=np.repeat([1/len(span_random)], len(span_random)),
+            fill=False)
+    ax.set_ylabel('ratio')
+    ax.set_xticks([0, 125])
+    ax.set_xticklabels(['same shank', 'across shank'])
 
 # ----------------------plot formatting tools -------------------------------------------
 def boxplot_scatter(ax, x, y, data, order, hue, palette, hue_order,
@@ -966,3 +1111,4 @@ def plot_strf(ax, strf, taxis, faxis):
     ax.set_yticks(yticks)
     ax.set_yticklabels(flabels)
     ax.set_ylabel('frequency (kHz)', labelpad=-2)
+

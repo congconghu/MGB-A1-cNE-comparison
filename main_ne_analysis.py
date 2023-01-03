@@ -5,6 +5,18 @@ import re
 import ne_toolbox as netools
 
 
+# ++++++++++++++++++++++++++++++++++++++++++++ single unit properties ++++++++++++++++++++++++++++++++++++++++++++++++
+# get unit positions
+datafolder = '/Users/hucongcong/Documents/UCSF/data/data-pkl'
+files = glob.glob(os.path.join(datafolder, '*fs20000.pkl'))
+for file in files:
+    with open(file, 'rb') as f:
+        session = pickle.load(f)
+    session.get_unit_position()
+    with open(file, 'wb') as f:
+        pickle.dump(session, f)
+
+# ++++++++++++++++++++++++++++++++++++++++++++++ cNE properties  ++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ------------------------------------------------ get cNEs-------------------------------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 
@@ -81,6 +93,8 @@ files = glob.glob(datafolder + r'\*fs20000.pkl', recursive=False)
 xcorr = netools.get_member_nonmember_xcorr(files, df=2, maxlag=200)
 xcorr.to_json(r'E:\Congcong\Documents\data\comparison\data-summary\member_nonmember_pair_xcorr.json')
 
+
+# ++++++++++++++++++++++++++++++++++++ cNE spon/stim stability analysis  +++++++++++++++++++++++++++++++++++++++++++++++
 # ---------------------------------------get ne of split activities -------------------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 files = glob.glob(datafolder + r'\*fs20000.pkl', recursive=False)
@@ -110,15 +124,16 @@ for idx, file in enumerate(files):
     with open(file, 'wb') as output:
         pickle.dump(ne_split, output, pickle.HIGHEST_PROTOCOL)
 
-# -------------------------------get null distribution of ICweight correlations ---------------------------------------
+# ----------------------------------------------get sham ICweight -----------------------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 files = glob.glob(datafolder + r'\*split.pkl', recursive=False)
 for idx, file in enumerate(files):
     with open(file, 'rb') as f:
         ne_split = pickle.load(f)
     print('({}/{}) get null ICweights of split cNEs for {}'.format(idx + 1, len(files), file))
-    ne_split = netools.get_split_ne_null_ic_weight(ne_split, nshift=10)
+    netools.get_split_ne_null_ic_weight(ne_split, nshift=10)
     with open(file, 'wb') as output:
         pickle.dump(ne_split, output, pickle.HIGHEST_PROTOCOL)
 
+# -------------------------------get null distribution of ICweight correlations ---------------------------------------
 

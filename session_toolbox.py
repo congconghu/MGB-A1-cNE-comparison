@@ -7,6 +7,7 @@ import mat73
 import numpy as np
 from scipy.io import loadmat
 import ne_toolbox as netools
+from itertools import combinations
 
 
 class Stimulus:
@@ -240,6 +241,14 @@ class Session:
             print('Sensory-evoked activities not recorded')
         return ne_split
 
+    def get_unit_position(self):
+        probdata = self.probdata
+        depth = self.depth
+        for unit in self.units:
+            chan = unit.chan
+            idx_chan = np.where(probdata['chanMap'] == chan)[0][0]
+            unit.position = [int(probdata['xcoords'][idx_chan]), int(depth - probdata['ycoords'][idx_chan])]
+
     def get_strf(self, stim, nlead=20, nlag=0):
         edges = self.edges_dmr
         if hasattr(stim, 'df'):
@@ -248,7 +257,14 @@ class Session:
         for unit in self.units:
             unit.get_strf(stim, edges, nlag=nlag, nlead=nlead)
 
-
+    def get_cluster_span(self, members, direction='vert'):
+        position = []
+        for member in members:
+            if direction == 'vert':
+                position.append(self.units[member].position[1])
+            elif direction == 'horz':
+                position.append(self.units[member].position[0])
+        return np.max(position) - np.min(position)
 class NE(Session):
     def __init__(self, exp, depth, probe, df, stim=None, spktrain=None, patterns=None, edges=None):
         self.exp = exp
@@ -386,3 +402,12 @@ class NE(Session):
             sham_patterns.extend(netools.fast_ica(spktrain_z, num_ne, niter=500))
         sham_patterns = np.array(sham_patterns)
         self.patterns_sham = sham_patterns
+
+    def get_member_pairs(self):
+        n_neuron = self.patterns.shape[1]
+        all_pairs = set(combinations(range(n_neuron), 2))
+        member_pairs = set()
+        for members in self.ne_members.values():
+            member_pairs.update(set(combinations(members, 2)))
+        nonmember_pairs = all_pairs.difference(member_pairs)
+        return member_pairs, nonmember_pairs
