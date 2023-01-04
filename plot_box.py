@@ -31,147 +31,6 @@ A1_color = (colors[1], colors[0])
 MGB_color = (colors[5], colors[4])
 
 
-def plot_ne_split_ic_weight_match(ne_split, figpath):
-    """
-    plot matching patterns for each cNE under 3 conditions: cross condition, spon and dmr
-
-    Inputs:
-        ne_split: dictionary containing ne data on 4 blocks
-        figpath: file path to save figures
-    """
-    colors = sns.color_palette("Paired")
-    color_idx = [3, 2, 7, 6, 9, 8]
-    colors = [colors[x] for x in color_idx]
-
-    corr_mat = ne_split['corr_mat']
-    dmr_first = ne_split['dmr_first']
-    n_dmr = len(ne_split['order']['dmr'][0])
-    n_spon = len(ne_split['order']['spon'][0])
-    n_match = min([n_dmr, n_spon])
-
-    for i in range(n_match):
-
-        fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(6, 9))
-
-        if dmr_first:
-            order = ne_split['order']['dmr'][1][i]
-            ic_dmr = ne_split['dmr1'].patterns[order]
-            order = ne_split['order']['spon'][0][i]
-            ic_spon = ne_split['spon0'].patterns[order]
-        else:
-            order = ne_split['order']['dmr'][0][i]
-            ic_dmr = ne_split['dmr0'].patterns[order]
-            order = ne_split['order']['spon'][1][i]
-            ic_spon = ne_split['spon1'].patterns[order]
-
-        plot_matching_ic(axes[0], ic_dmr, ic_spon, colors[0], colors[2])
-        order0 = ne_split['order']['dmr'][0][i]
-        order1 = ne_split['order']['dmr'][1][i]
-        plot_matching_ic(axes[1],
-                         ne_split['dmr0'].patterns[order0],
-                         ne_split['dmr1'].patterns[order1],
-                         colors[0], colors[1])
-        order0 = ne_split['order']['spon'][0][i]
-        order1 = ne_split['order']['spon'][1][i]
-        plot_matching_ic(axes[2],
-                         ne_split['spon0'].patterns[order0],
-                         ne_split['spon1'].patterns[order1],
-                         colors[2], colors[3])
-
-        plt.tight_layout()
-        fig.savefig(re.sub('.jpg', '-{}.jpg'.format(i), figpath))
-        plt.close()
-
-
-def plot_matching_ic(ax1, ic1, ic2, color1, color2):
-    """
-    stem plot of matching patterns
-
-    Input:
-        ax1: axes to plot on
-        ic1, ic2: cNE patterns
-        color1, color2: color for the 2 patterns
-    """
-
-    markersize = 10
-    # get ylimit for the plot
-    ymax = max(ic1.max(), ic2.max()) * 1.1
-    # plot threshold for ne members
-    n_neuron = len(ic1)
-    thresh = 1 / np.sqrt(n_neuron)
-    ax1.plot([0, len(ic1) + 1], [thresh, thresh], 'k--')
-    ax1.plot([0, len(ic1) + 1], [0, 0], 'k')
-    ax1.plot([0, len(ic1) + 1], [-thresh, -thresh], 'k--')
-
-    x = range(n_neuron)
-    ax2 = ax1.twinx()
-
-    # plot on the left axes
-    markerline, stemline, baseline = ax1.stem(
-        range(1, n_neuron + 1), ic1,
-        markerfmt='o', basefmt='k')
-    plt.setp(markerline, markersize=markersize, color=color1)
-    plt.setp(stemline, color=color1)
-    ax1.set_xlim([0, n_neuron + 1])
-    ax1.set_ylim([-ymax, ymax])
-    ax1.spines['left'].set_color(color1)
-    ax1.spines.top.set_visible(False)
-    ax1.spines.right.set_visible(False)
-    ax1.tick_params(axis='y', colors=color1)
-
-    # plot on the right axes
-    markerline, stemline, baseline = ax2.stem(
-        range(1, n_neuron + 1), ic2,
-        markerfmt='o', basefmt='k')
-    plt.setp(markerline, markersize=markersize, color=color2)
-    plt.setp(stemline, color=color2)
-    ax2.set_xlim([0, n_neuron + 1])
-    ax2.set_ylim([-ymax, ymax])
-    ax2.invert_yaxis()
-    ax2.spines.top.set_visible(False)
-    ax2.spines.left.set_visible(False)
-    ax2.spines['right'].set_color(color2)
-    ax2.tick_params(axis='y', colors=color2)
-
-
-def plot_ne_split_ic_weight_corr(ne_split, figpath):
-    """
-    heatmap of correlation values among matching patterns
-    """
-    corr_mat = ne_split['corr_mat']
-    n_dmr = len(ne_split['order']['dmr'][0])
-    n_spon = len(ne_split['order']['spon'][0])
-    fig = plt.figure(figsize=(10, 8))
-    ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
-    im = ax.imshow(corr_mat, aspect='auto', cmap='Greys', vmin=0, vmax=1)
-    plt.colorbar(im)
-    # draw boundary for correlation matrix of dmr-evoked activities
-    p = mpl.patches.Rectangle((-0.48, -0.48), n_dmr - .04, n_dmr - .04,
-                              facecolor='none', edgecolor='green', linewidth=5)
-    ax.add_patch(p)
-    # draw boundary for correlation matrix of spontanoues activities
-    p = mpl.patches.Rectangle((n_dmr - 0.48, n_dmr - 0.48), n_spon - .04, n_spon - .04,
-                              facecolor='none', edgecolor='orange', linewidth=5)
-    ax.add_patch(p)
-    # draw boundary for correlation matrix of corss conditions
-    if ne_split['dmr_first']:
-        xy = (-0.48, n_dmr - 0.48)
-        x, y = n_dmr - .04, n_spon - .04
-    else:
-        xy = (n_dmr - 0.48, -0.48)
-        x, y = n_spon - .04, n_dmr - .04
-    p = mpl.patches.Rectangle(xy, x, y,
-                              facecolor='none', edgecolor='purple', linewidth=5)
-    ax.add_patch(p)
-    order = ne_split['order']['dmr'][0] + ne_split['order']['spon'][0]
-    ax.set_yticks(range(len(order)))
-    ax.set_yticklabels(order)
-    order = ne_split['order']['dmr'][1] + ne_split['order']['spon'][1]
-    ax.set_xticks(range(len(order)))
-    ax.set_xticklabels(order)
-    fig.savefig(figpath)
-    plt.close(fig)
-
 
 def plot_ne_construction(ne, savepath):
     """
@@ -778,6 +637,8 @@ def plot_xcorr(fig, ax, xcorr, savepath=None):
     if savepath:
         fig.savefig(os.path.join(savepath, 'xcorr_member_nonmember.jpg'))
         plt.close(fig)
+
+
 def plot_xcorr_imshow(ax, data):
     """Stack cross correlation curves and plot as heatmap"""
     ax.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
@@ -808,6 +669,177 @@ def plot_xcorr_avg(ax, corr):
     ax.set_ylim([-1, 3])
     ax.set_xlim([-200, 200])
     ax.set_ylabel('z-scored corr')
+
+
+# ---------------------plots for split ne dmr/spon stability-----------------------------
+def plot_ne_split_ic_weight_match(ne_split, figpath):
+    """
+    plot matching patterns for each cNE under 3 conditions: cross condition, spon and dmr
+
+    Inputs:
+        ne_split: dictionary containing ne data on 4 blocks
+        figpath: file path to save figures
+    """
+    colors = sns.color_palette("Paired")
+    color_idx = [3, 2, 7, 6, 9, 8]
+    colors = [colors[x] for x in color_idx]
+
+    corr_mat = ne_split['corr_mat']
+    dmr_first = ne_split['dmr_first']
+    n_dmr = len(ne_split['order']['dmr'][0])
+    n_spon = len(ne_split['order']['spon'][0])
+    n_match = min([n_dmr, n_spon])
+
+    for i in range(n_match):
+
+        fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(6, 9))
+
+        if dmr_first:
+            order = ne_split['order']['dmr'][1][i]
+            ic_dmr = ne_split['dmr1'].patterns[order]
+            order = ne_split['order']['spon'][0][i]
+            ic_spon = ne_split['spon0'].patterns[order]
+        else:
+            order = ne_split['order']['dmr'][0][i]
+            ic_dmr = ne_split['dmr0'].patterns[order]
+            order = ne_split['order']['spon'][1][i]
+            ic_spon = ne_split['spon1'].patterns[order]
+
+        plot_matching_ic(axes[0], ic_dmr, ic_spon, colors[0], colors[2])
+        order0 = ne_split['order']['dmr'][0][i]
+        order1 = ne_split['order']['dmr'][1][i]
+        plot_matching_ic(axes[1],
+                         ne_split['dmr0'].patterns[order0],
+                         ne_split['dmr1'].patterns[order1],
+                         colors[0], colors[1])
+        order0 = ne_split['order']['spon'][0][i]
+        order1 = ne_split['order']['spon'][1][i]
+        plot_matching_ic(axes[2],
+                         ne_split['spon0'].patterns[order0],
+                         ne_split['spon1'].patterns[order1],
+                         colors[2], colors[3])
+
+        plt.tight_layout()
+        fig.savefig(re.sub('.jpg', '-{}.jpg'.format(i), figpath))
+        plt.close()
+
+
+def plot_matching_ic(ax1, ic1, ic2, color1, color2):
+    """
+    stem plot of matching patterns
+
+    Input:
+        ax1: axes to plot on
+        ic1, ic2: cNE patterns
+        color1, color2: color for the 2 patterns
+    """
+
+    markersize = 10
+    # get ylimit for the plot
+    ymax = max(ic1.max(), ic2.max()) * 1.1
+    # plot threshold for ne members
+    n_neuron = len(ic1)
+    thresh = 1 / np.sqrt(n_neuron)
+    ax1.plot([0, len(ic1) + 1], [thresh, thresh], 'k--')
+    ax1.plot([0, len(ic1) + 1], [0, 0], 'k')
+    ax1.plot([0, len(ic1) + 1], [-thresh, -thresh], 'k--')
+
+    x = range(n_neuron)
+    ax2 = ax1.twinx()
+
+    # plot on the left axes
+    markerline, stemline, baseline = ax1.stem(
+        range(1, n_neuron + 1), ic1,
+        markerfmt='o', basefmt='k')
+    plt.setp(markerline, markersize=markersize, color=color1)
+    plt.setp(stemline, color=color1)
+    ax1.set_xlim([0, n_neuron + 1])
+    ax1.set_ylim([-ymax, ymax])
+    ax1.spines['left'].set_color(color1)
+    ax1.spines.top.set_visible(False)
+    ax1.spines.right.set_visible(False)
+    ax1.tick_params(axis='y', colors=color1)
+
+    # plot on the right axes
+    markerline, stemline, baseline = ax2.stem(
+        range(1, n_neuron + 1), ic2,
+        markerfmt='o', basefmt='k')
+    plt.setp(markerline, markersize=markersize, color=color2)
+    plt.setp(stemline, color=color2)
+    ax2.set_xlim([0, n_neuron + 1])
+    ax2.set_ylim([-ymax, ymax])
+    ax2.invert_yaxis()
+    ax2.spines.top.set_visible(False)
+    ax2.spines.left.set_visible(False)
+    ax2.spines['right'].set_color(color2)
+    ax2.tick_params(axis='y', colors=color2)
+
+
+def plot_ne_split_ic_weight_corr(ne_split, figpath):
+    """
+    heatmap of correlation values among matching patterns
+    """
+    corr_mat = ne_split['corr_mat']
+    n_dmr = len(ne_split['order']['dmr'][0])
+    n_spon = len(ne_split['order']['spon'][0])
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
+    im = ax.imshow(corr_mat, aspect='auto', cmap='Greys', vmin=0, vmax=1)
+    plt.colorbar(im)
+    # draw boundary for correlation matrix of dmr-evoked activities
+    p = mpl.patches.Rectangle((-0.48, -0.48), n_dmr - .04, n_dmr - .04,
+                              facecolor='none', edgecolor='green', linewidth=5)
+    ax.add_patch(p)
+    # draw boundary for correlation matrix of spontanoues activities
+    p = mpl.patches.Rectangle((n_dmr - 0.48, n_dmr - 0.48), n_spon - .04, n_spon - .04,
+                              facecolor='none', edgecolor='orange', linewidth=5)
+    ax.add_patch(p)
+    # draw boundary for correlation matrix of corss conditions
+    if ne_split['dmr_first']:
+        xy = (-0.48, n_dmr - 0.48)
+        x, y = n_dmr - .04, n_spon - .04
+    else:
+        xy = (n_dmr - 0.48, -0.48)
+        x, y = n_spon - .04, n_dmr - .04
+    p = mpl.patches.Rectangle(xy, x, y,
+                              facecolor='none', edgecolor='purple', linewidth=5)
+    ax.add_patch(p)
+    order = ne_split['order']['dmr'][0] + ne_split['order']['spon'][0]
+    ax.set_yticks(range(len(order)))
+    ax.set_yticklabels(order)
+    order = ne_split['order']['dmr'][1] + ne_split['order']['spon'][1]
+    ax.set_xticks(range(len(order)))
+    ax.set_xticklabels(order)
+    fig.savefig(figpath)
+    plt.close(fig)
+
+
+def plot_ne_split_ic_weight_null_corr(ne_split, figpath):
+    """
+    histogram of the distribution of null correlation, significance threshold and real values
+    """
+    fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(5, 8))
+    c = 0
+    for key, corr in ne_split['corr_null'].items():
+        thresh = ne_split['corr_thresh'][key]
+        ax = axes[c]
+        ax.hist(corr, np.linspace(0, 1, 51), color='k',
+                weights=np.repeat([1/len(corr)], len(corr)))
+        y = ax.get_ylim()
+        ax.plot([thresh, thresh], y, 'r')
+        corr_real = ne_split['corr'][key]
+        for corr_val in corr_real:
+            ax.plot([corr_val, corr_val], y, 'b')
+        ax.plot([thresh, thresh], y, 'r')
+        ax.set_xlim([0, 1])
+        ax.set_ylim(y)
+        ax.set_xlabel('|correlation|')
+        ax.set_ylabel('ratio')
+        ax.set_title(key)
+        c += 1
+    plt.tight_layout()
+    fig.savefig(figpath)
+    plt.close(fig)
 
 
 # ---------------------cNE properties ---------------------------------------------------
@@ -967,7 +999,6 @@ def ne_member_distance(ax, datafolder, stim, probe, direction='vertical'):
     ax.set_ylabel('ratio')
 
 
-
 def ne_member_span(ax, datafolder, stim, probe):
     random.seed(0)
     files = glob.glob(os.path.join(datafolder, '*' + stim + '.pkl'))
@@ -1044,6 +1075,7 @@ def ne_member_shank_span(ax, datafolder, stim, probe):
     ax.set_ylabel('ratio')
     ax.set_xticks([0, 125])
     ax.set_xticklabels(['same shank', 'across shank'])
+
 
 # ----------------------plot formatting tools -------------------------------------------
 def boxplot_scatter(ax, x, y, data, order, hue, palette, hue_order,

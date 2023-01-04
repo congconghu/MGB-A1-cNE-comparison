@@ -171,6 +171,7 @@ def get_member_nonmember_xcorr(files, df=2, maxlag=200):
     return xcorr
 
 
+# ------------ get cNE on split activities and related analysis of dmr/spon stability ------------------------
 def get_split_ne_ic_weight_match(ne_split):
     stims = ('dmr', 'spon')
     patterns = {'dmr': [], 'spon': []}
@@ -193,6 +194,7 @@ def get_split_ne_ic_weight_match(ne_split):
     ne_split['corr_mat'] = corr_mat
     ne_split['order'] = order
     return ne_split
+
 
 def match_ic_weight(patterns1, patterns2):
     n1, n2 = patterns1.shape[0], patterns2.shape[0]
@@ -262,5 +264,43 @@ def get_split_ne_null_ic_weight(ne_split, nshift=1000):
         ne = ne_split[stim]
         ne.get_sham_patterns(nshift=nshift)
 
+
 def get_null_ic_weight_corr(ne_split):
-    pass
+    corr_null = {'dmr': [], 'spon': [], 'cross': []}
+    for stim in ('spon', 'dmr'):
+        n_ne = ne_split[stim+'0'].patterns_sham.shape[0]
+        corr = np.abs(np.corrcoef(
+            x=ne_split[stim+'0'].patterns_sham,
+            y=ne_split[stim+'1'].patterns_sham))[:n_ne, n_ne:]
+        corr_null[stim] = corr.flatten()
+    if ne_split['dmr_first']:
+        n_ne = ne_split['spon0'].patterns_sham.shape[0]
+        corr = np.abs(np.corrcoef(
+            x=ne_split['spon0'].patterns_sham,
+            y=ne_split['dmr1'].patterns_sham))[:n_ne, n_ne:]
+    else:
+        n_ne = ne_split['spon1'].patterns_sham.shape[0]
+        corr = np.abs(np.corrcoef(
+            x=ne_split['spon1'].patterns_sham,
+            y=ne_split['dmr0'].patterns_sham))[:n_ne, n_ne:]
+    corr_null['cross'] = corr.flatten()
+    ne_split['corr_null'] = corr_null
+
+
+def get_ic_weight_corr_thresh(ne_split, alpha=99):
+    corr_thresh = {'dmr': [], 'spon': [], 'cross': []}
+    for stim, corr in ne_split['corr_null'].items():
+        corr_thresh[stim] = np.percentile(corr, alpha)
+    ne_split['corr_thresh'] = corr_thresh
+
+
+def get_ic_weight_corr(ne_split):
+    corr = {'dmr': [], 'spon': [], 'cross': []}
+    n_ne = min(ne_split['dmr0'].patterns.shape[0], ne_split['dmr1'].patterns.shape[0])
+    corr['dmr'] = ne_split['corr_mat'][:n_ne, :n_ne].diagonal()
+    corr['spon'] = ne_split['corr_mat'][n_ne:, n_ne:].diagonal()
+    if ne_split['dmr_first']:
+        corr['cross'] = ne_split['corr_mat'][n_ne:, :n_ne].diagonal()
+    else:
+        corr['cross'] = ne_split['corr_mat'][:n_ne, n_ne:].diagonal()
+    ne_split['corr'] = corr

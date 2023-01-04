@@ -121,19 +121,19 @@ for idx, file in enumerate(files):
         ne_split = pickle.load(f)
     print('({}/{}) match ICweights of split cNEs for {}'.format(idx + 1, len(files), file))
     ne_split = netools.get_split_ne_ic_weight_match(ne_split)
+    netools.get_ic_weight_corr(ne_split)
     with open(file, 'wb') as output:
         pickle.dump(ne_split, output, pickle.HIGHEST_PROTOCOL)
 
-# ----------------------------------------------get sham ICweight -----------------------------------------------------
+# -------------------------------get null distribution of ICweight correlations ----------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 files = glob.glob(datafolder + r'\*split.pkl', recursive=False)
 for idx, file in enumerate(files):
     with open(file, 'rb') as f:
         ne_split = pickle.load(f)
     print('({}/{}) get null ICweights of split cNEs for {}'.format(idx + 1, len(files), file))
-    netools.get_split_ne_null_ic_weight(ne_split, nshift=10)
+    netools.get_split_ne_null_ic_weight(ne_split, nshift=1000)
+    netools.get_null_ic_weight_corr(ne_split)
+    netools.get_ic_weight_corr_thresh(ne_split)
     with open(file, 'wb') as output:
         pickle.dump(ne_split, output, pickle.HIGHEST_PROTOCOL)
-
-# -------------------------------get null distribution of ICweight correlations ---------------------------------------
-
