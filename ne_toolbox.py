@@ -1,5 +1,6 @@
 import re
 import glob
+import os
 import pickle
 import numpy as np
 from itertools import combinations
@@ -236,8 +237,8 @@ def corr_mat_reorder_cross(corr_mat, dmr_first, orders):
             corr_dmr_spon = np.copy(corr_mat[n_ne_dmr:, :n_ne_dmr])
         else:
             corr_dmr_spon = np.copy(corr_mat[:n_ne_dmr, n_ne_dmr:])
-        corr_dmr_spon[:i+1, :] = 0
-        corr_dmr_spon[:, :i+1] = 0
+        corr_dmr_spon[:i + 1, :] = 0
+        corr_dmr_spon[:, :i + 1] = 0
     return corr_mat, orders
 
 
@@ -268,10 +269,10 @@ def get_split_ne_null_ic_weight(ne_split, nshift=1000):
 def get_null_ic_weight_corr(ne_split):
     corr_null = {'dmr': [], 'spon': [], 'cross': []}
     for stim in ('spon', 'dmr'):
-        n_ne = ne_split[stim+'0'].patterns_sham.shape[0]
+        n_ne = ne_split[stim + '0'].patterns_sham.shape[0]
         corr = np.abs(np.corrcoef(
-            x=ne_split[stim+'0'].patterns_sham,
-            y=ne_split[stim+'1'].patterns_sham))[:n_ne, n_ne:]
+            x=ne_split[stim + '0'].patterns_sham,
+            y=ne_split[stim + '1'].patterns_sham))[:n_ne, n_ne:]
         corr_null[stim] = corr.flatten()
     if ne_split['dmr_first']:
         n_ne = ne_split['spon0'].patterns_sham.shape[0]
@@ -304,3 +305,64 @@ def get_ic_weight_corr(ne_split):
     else:
         corr['cross'] = ne_split['corr_mat'][:n_ne, n_ne:].diagonal()
     ne_split['corr'] = corr
+
+
+def get_split_cNE_df(files, savefolder):
+    ne = pd.DataFrame(columns=['exp', 'probe', 'region', 'stim', 'dmr_first', 'idx1', 'idx2',
+                               'pattern1', 'pattern2', 'corr', 'corr_thresh'])
+
+    for idx, file in enumerate(files):
+        print('({}/{}) get split cNE patterns for {}'.format(idx + 1, len(files), file))
+        exp = re.findall('\d{6}_\d{6}', file)[0]
+        probe = re.findall('H\d{2}x\d{2}', file)[0]
+        region = 'A1' if probe == 'H22x32' else 'MGB'
+        with open(file, 'rb') as f:
+            ne_split = pickle.load(f)
+
+        # get matching cNE patterns within stim conditions
+        n_ne_dmr = len(ne_split['order']['dmr'][0])
+        for stim in ('dmr', 'spon'):
+            n_ne = len(ne_split['order'][stim][0])
+            for i in range(n_ne):
+                idx1 = ne_split['order'][stim][0][i]
+                idx2 = ne_split['order'][stim][1][i]
+                if stim == 'dmr':
+                    corr = ne_split['corr_mat'][i, i]
+                elif stim == 'spon':
+                    corr = ne_split['corr_mat'][i + n_ne_dmr, i + n_ne_dmr]
+                new_row = pd.DataFrame({'exp': exp, 'probe': probe, 'region': region, 'stim': stim,
+                                        'dmr_first': ne_split['dmr_first'], 'idx1': idx1, 'idx2': idx2,
+                                        'pattern1': [ne_split[stim+'0'].patterns[idx1]],
+                                        'pattern2': [ne_split[stim+'1'].patterns[idx2]],
+                                        'corr': corr, 'corr_thresh': ne_split['corr_thresh'][stim]})
+                ne = pd.concat([ne, new_row], ignore_index=True)
+
+        # get matching cNE patterns cross stimulus conditions
+        n_ne = min([n_ne_dmr, len(ne_split['order']['spon'][0])])
+        for i in range(n_ne):
+            if ne_split['dmr_first']:
+                # dmr1
+                idx1 = ne_split['order']['dmr'][1][i]
+                pattern1 = [ne_split['dmr1'].patterns[idx1]]
+                # spon0
+                idx2 = ne_split['order']['spon'][0][i]
+                pattern2 = [ne_split['spon0'].patterns[idx2]]
+                corr = ne_split['corr_mat'][n_ne_dmr + i, i]
+            else:
+                # spon1
+                idx1 = ne_split['order']['spon'][1][i]
+                pattern1 = [ne_split['spon1'].patterns[idx1]]
+                # dmr0
+                idx2 = ne_split['order']['dmr'][0][i]
+                pattern2 = [ne_split['dmr0'].patterns[idx2]]
+                corr = ne_split['corr_mat'][i, n_ne_dmr + i]
+
+            new_row = pd.DataFrame({'exp': exp, 'probe': probe, 'region': region, 'stim': 'cross',
+                                    'dmr_first': ne_split['dmr_first'], 'idx1': idx1, 'idx2': idx2,
+                                    'pattern1': pattern1, 'pattern2': pattern2,
+                                    'corr': corr,
+                                    'corr_thresh': ne_split['corr_thresh']['cross']})
+            ne = pd.concat([ne, new_row], ignore_index=True)
+
+    ne.to_json(os.path.join(savefolder, 'split_cNE.json'))
+

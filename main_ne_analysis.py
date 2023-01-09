@@ -137,3 +137,5 @@ for idx, file in enumerate(files):
     netools.get_ic_weight_corr_thresh(ne_split)
     with open(file, 'wb') as output:
         pickle.dump(ne_split, output, pickle.HIGHEST_PROTOCOL)
+
+# save split cNE information in pandas DataFrame

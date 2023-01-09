@@ -2,7 +2,6 @@ import os
 import glob
 import pickle
 import re
-import mat73
 
 import session_toolbox as mtp
 import helper
@@ -43,5 +42,4 @@ stim.save_pkl_file(stimfile_pkl_path)
 with helper.Timer():
     with open(stimfile_pkl_path, 'rb') as f:
         stim = pickle.load(f)
-
 
