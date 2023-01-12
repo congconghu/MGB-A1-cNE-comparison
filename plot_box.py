@@ -33,6 +33,130 @@ MGB_color = (colors[5], colors[4])
 colors_split = [colors[i] for i in [3, 2, 7, 6, 9, 8]]
 
 
+# -------------------------------------- single unit properties -------------------------------------------------------
+def plot_strf_df(units, figfolder, order='strf_ri'):
+    if order == 'strf_ri':
+        order_idx = (units[order]
+                     .apply(np.mean)
+                     .sort_values(ascending=False))
+    elif order == 'strf_ri_p':
+        order_idx = units[order].sort_values(ascending=True)
+    elif order == 'strf_ri_z':
+        order_idx = units[order].sort_values(ascending=False)
+
+    # plot all units sorted by order
+    fig, axes = plt.subplots(ncols=4, nrows=5, figsize=figure_size)
+    axes = axes.flatten()
+    c = 0
+    nfig = 0
+    for i, val in zip(order_idx.index, order_idx.values):
+        strf = np.array(units.iloc[i].strf)
+        plot_strf(axes[c], 
+                  strf,
+                  taxis=np.array(units.iloc[i].strf_taxis),
+                  faxis=np.array(units.iloc[i].strf_faxis))
+        axes[c].set_title('{:.3f}'.format(val))
+        c += 1
+        if c == 20:
+            plt.tight_layout()
+            fig.savefig(os.path.join(figfolder, '{}-{}.jpg'.format(order, nfig)))
+            nfig += 1
+            c = 0
+    if c != 20:
+        for i in range(c, 20):
+            axes[i].remove()
+            fig.savefig(os.path.join(figfolder, '{}-{}.jpg'.format(order, nfig)))
+
+
+def plot_crh_df(units, figfolder, order='strf_ri'):
+    if order == 'crh_ri':
+        order_idx = (units[order]
+                     .apply(np.mean)
+                     .sort_values(ascending=False))
+    elif order == 'crh_ri_p':
+        order_idx = units[order].sort_values(ascending=True)
+    elif order == 'crh_ri_z':
+        order_idx = units[order].sort_values(ascending=False)
+
+    # plot all units sorted by order
+    fig, axes = plt.subplots(ncols=4, nrows=5, figsize=figure_size)
+    axes = axes.flatten()
+    c = 0
+    nfig = 0
+    for i, val in zip(order_idx.index, order_idx.values):
+        crh = np.array(units.iloc[i].crh)
+        plot_crh(axes[c],
+                  crh,
+                  tmfaxis=np.array(units.iloc[i].tmfaxis),
+                  smfaxis=np.array(units.iloc[i].smfaxis))
+        axes[c].set_title('{:.3f}'.format(val))
+        c += 1
+        if c == 20:
+            plt.tight_layout()
+            fig.savefig(os.path.join(figfolder, '{}-{}.jpg'.format(order, nfig)))
+            nfig += 1
+            c = 0
+    if c != 20:
+        for i in range(c, 20):
+            axes[i].remove()
+            fig.savefig(os.path.join(figfolder, '{}-{}.jpg'.format(order, nfig)))
+
+
+def plot_strf(ax, strf, taxis, faxis):
+    """
+    plot strf and format axis labels for strf
+
+    Input
+        ax: axes to plot on
+        strf: matrix
+        taxis: time axis for strf
+        faxis: frequency axis for strf
+    """
+    max_val = abs(strf).max() * 1.01
+    ax.imshow(strf, aspect='auto', origin='lower', cmap='RdBu_r',
+              vmin=-max_val, vmax=max_val)
+
+    tlabels = np.array([75, 50, 25, 0])
+    xticks = np.searchsorted(-taxis, -tlabels)
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(tlabels)
+    ax.set_xlabel('time before spike (ms)')
+
+    faxis = faxis / 1000
+    flabels = ['0.5', '2', '8', '32']
+    flabels_arr = np.array([0.5, 2, 8, 32])
+    yticks = np.searchsorted(faxis, flabels_arr)
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(flabels)
+    ax.set_ylabel('frequency (kHz)', labelpad=-2)
+
+
+def plot_crh(ax, crh, tmfaxis, smfaxis):
+    """
+    plot crh and format axis labels for crh
+
+    Input
+        ax: axes to plot on
+        crh: matrix
+        tmfaxis: temporal modulation frequency axis for crh
+        smfaxis: spectral modulation frequency axis for crh
+    """
+    max_val = abs(crh).max() * 1.01
+    ax.imshow(crh, aspect='auto', origin='lower', cmap='Spectral_r',
+              vmin=0, vmax=max_val)
+
+    tlabels = np.array([-40, -20, 0, 20, 40])
+    ax.set_xticks(range(0, len(tmfaxis), 4))
+    ax.set_xticklabels(tlabels)
+    ax.set_xlabel('TMF (Hz)')
+
+    flabels = np.array(range(5))
+    ax.set_yticks(range(0, len(smfaxis), 4))
+    ax.set_yticklabels(flabels)
+    ax.set_ylabel('SMF (oct/cyc)', labelpad=0)
+
+
+# -------------------------------cNE method illustration ---------------------------------------
 def plot_ne_construction(ne, savepath):
     """
     cNE construction procedure
@@ -1337,31 +1461,5 @@ def plot_significance_star(ax, p, x_bar, y_bar, y_star):
                     horizontalalignment='center', verticalalignment='center')
 
 
-def plot_strf(ax, strf, taxis, faxis):
-    """
-    plot strf and format axis labels for strf
 
-    Input
-        ax: axes to plot on
-        strf: matrix
-        taxis: time axis for strf
-        faxis: frequency axis for strf
-    """
-    max_val = abs(strf).max() * 1.01
-    ax.imshow(strf, aspect='auto', origin='lower', cmap='RdBu_r',
-              vmin=-max_val, vmax=max_val)
-
-    tlabels = np.array([75, 50, 25, 0])
-    xticks = np.searchsorted(-taxis, -tlabels)
-    ax.set_xticks(xticks)
-    ax.set_xticklabels(tlabels)
-    ax.set_xlabel('time before spike (ms)')
-
-    faxis = faxis / 1000
-    flabels = ['0.5', '2', '8', '32']
-    flabels_arr = np.array([0.5, 2, 8, 32])
-    yticks = np.searchsorted(faxis, flabels_arr)
-    ax.set_yticks(yticks)
-    ax.set_yticklabels(flabels)
-    ax.set_ylabel('frequency (kHz)', labelpad=-2)
 

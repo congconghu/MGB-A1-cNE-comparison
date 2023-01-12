@@ -9,6 +9,8 @@ from scipy.io import loadmat
 import ne_toolbox as netools
 from itertools import combinations
 
+from helper import strf2rtf
+
 
 class Stimulus:
 
@@ -66,6 +68,36 @@ class Stimulus:
         self.df = df
         self.taxis = self.taxis[::10]
 
+    def mtf(self, nleads=200, tmodbins=8, smodbins=16):
+        """
+        get modulation transfer function (mtf) of the stimulus
+        :param nleads: number of time points to consider when getting modulation rate
+        :param tmodbins: number of bins for temporal modulation rate
+        :param smodbins: number of bins for spectral modulation rate
+        :return: dictionary containing mtf information
+            tmf: temporal modulation frequency
+            smf: spectral modulation frequency
+            tmf_axis: tmf axis
+            smf_axis: smf axis
+        """
+        print('Get mtf for stimulus')
+        nt = self.stim_mat.shape[1]
+        tmf = np.empty(nt)
+        smf = np.empty(nt)
+        for i in range(nleads, nt+1):
+            if i % 1000 == 0:
+                print('{}/{}'.format(i, nt))
+            frame = self.stim_mat[:, i - nleads: i]
+            tmf_axis, smf_axis, rtf = strf2rtf(frame, taxis=self.taxis, faxis=self.faxis,
+                                               maxtm=self.MaxFM, maxsm=self.MaxRD,
+                                               tmodbins=tmodbins, smodbins=smodbins)
+            idx_fmax, idx_tmax = np.unravel_index(rtf.argmax(), rtf.shape)
+            smf[i] = smf_axis[idx_fmax]
+            tmf[i] = tmf_axis[idx_tmax]
+
+        stim = {'tmf': tmf, 'smf': smf, 'tmf_axis': tmf_axis, 'smf_axis': smf_axis}
+        return stim
+
 
 class SingleUnit:
 
@@ -98,6 +130,43 @@ class SingleUnit:
         self.strf = strf
         self.strf_taxis = taxis
         self.strf_faxis = faxis
+
+    def get_crh(self, stim, edges):
+        spiketimes = self.spiketimes
+        spktrain, _ = np.histogram(spiketimes, edges)
+        self.crh, self.tmfaxis, self.smfaxis = netools.calc_crh(spktrain, stim)
+
+    def get_strf_ri(self, stim, edges, nlead=20, nlag=0, method='block', n_block=10, n_sample=1000):
+        spiketimes = self.spiketimes
+        spktrain, _ = np.histogram(spiketimes, edges)
+        stim_mat = stim.stim_mat
+        taxis = (stim.taxis[1] - stim.taxis[0]) * np.array(range(nlead - 1, -nlag - 1, -1)) * 1000
+        faxis = stim.faxis
+
+        ri = netools.calc_strf_ri(spktrain, stim_mat, nlead=nlead, nlag=nlag, method=method,
+                                      n_block=n_block, n_sample=n_sample, bigmat_file=stim.bigmat_file)
+        self.strf_ri = ri
+
+        spktrain_null = spktrain[::-1]
+        ri_null = netools.calc_strf_ri(spktrain_null, stim_mat, nlead=nlead, nlag=nlag, method=method,
+                                           n_block=n_block, n_sample=n_sample, bigmat_file=stim.bigmat_file)
+        self.strf_ri_null = ri_null
+        self.strf_ri_z = (ri.mean() - ri_null.mean()) / np.sqrt((ri.std() ** 2 + ri_null.std() ** 2) / 2)
+        self.strf_ri_p = sum(ri_null > ri.mean()) / n_sample
+
+    def get_crh_ri(self, stim, edges, method='block', n_block=10, n_sample=1000):
+        spiketimes = self.spiketimes
+        spktrain, _ = np.histogram(spiketimes, edges)
+
+        ri = netools.calc_crh_ri(spktrain, stim, method=method, n_block=n_block, n_sample=n_sample)
+        self.crh_ri = ri
+
+        spktrain_null = spktrain[::-1]
+        ri_null = netools.calc_crh_ri(spktrain_null, stim, method=method, n_block=n_block, n_sample=n_sample)
+        self.crh_ri_null = ri_null
+        self.crh_ri_z = (ri.mean() - ri_null.mean()) / np.sqrt((ri.std() ** 2 + ri_null.std() ** 2) / 2)
+        self.crh_ri_p = sum(ri_null > ri.mean()) / n_sample
+
 
 
 class Session:
@@ -250,12 +319,44 @@ class Session:
             unit.position = [int(probdata['xcoords'][idx_chan]), int(depth - probdata['ycoords'][idx_chan])]
 
     def get_strf(self, stim, nlead=20, nlag=0):
+        """
+        calculate strf for units in the session
+
+        :param stim: array containing the spectrogram of the stimulus played during the experiment
+        :param nlead: number of time binned before spikes
+        :param nlag: number of time binned after spikes
+        :return: None
+
+        Note:
+            The time resolution of the stimulus is the same as spktrain in the session -- 0.5ms
+            To achieve a desired time resolution, down sample stimulus using .downsample method before calling the
+            the session.get_strf method
+            e.g. stim.downsample(df=10) to achieve a 5ms temporal resolution
+        """
         edges = self.edges_dmr
         if hasattr(stim, 'df'):
             df = stim.df
             edges = edges[::df]
         for unit in self.units:
             unit.get_strf(stim, edges, nlag=nlag, nlead=nlead)
+
+    def get_crh(self, stim):
+        edges = self.edges_dmr
+        for unit in self.units:
+            unit.get_crh(stim, edges)
+
+    def get_strf_ri(self, stim, nlead=20, nlag=0, method='block', n_block=10, n_sample=1000):
+        edges = self.edges_dmr
+        if hasattr(stim, 'df'):
+            df = stim.df
+            edges = edges[::df]
+        for unit in self.units:
+            unit.get_strf_ri(stim, edges, nlead=20, nlag=0, method=method,  n_block=n_block, n_sample=n_sample)
+
+    def get_crh_ri(self, stim, method='block', n_block=10, n_sample=1000):
+        edges = self.edges_dmr
+        for unit in self.units:
+            unit.get_crh_ri(stim, edges, method=method, n_block=n_block, n_sample=n_sample)
 
     def get_cluster_span(self, members, direction='vert'):
         position = []
@@ -265,6 +366,8 @@ class Session:
             elif direction == 'horz':
                 position.append(self.units[member].position[0])
         return np.max(position) - np.min(position)
+
+
 class NE(Session):
     def __init__(self, exp, depth, probe, df, stim=None, spktrain=None, patterns=None, edges=None):
         self.exp = exp
@@ -411,3 +514,7 @@ class NE(Session):
             member_pairs.update(set(combinations(members, 2)))
         nonmember_pairs = all_pairs.difference(member_pairs)
         return member_pairs, nonmember_pairs
+
+
+def save_su_df(datafolder):
+    pass

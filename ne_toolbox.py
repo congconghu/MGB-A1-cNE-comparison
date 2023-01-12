@@ -2,15 +2,20 @@ import re
 import glob
 import os
 import pickle
-import numpy as np
+import random as rand
 from itertools import combinations
 from scipy.stats import zscore
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
 
 from scipy.stats import zscore
 from sklearn.decomposition import PCA, FastICA
+from sklearn.exceptions import ConvergenceWarning
+from sklearn.utils._testing import ignore_warnings
+
+from helper import Timer
 
 
 def detect_cell_assemblies(spktrain):
@@ -25,6 +30,7 @@ def detect_cell_assemblies(spktrain):
     return normalize_pattern(patterns)
 
 
+@ignore_warnings(category=ConvergenceWarning)
 def fast_ica(spktrain_z, num_ne, niter=500):
     """get cNE patterns using ICA"""
     # step1: PCA
@@ -104,6 +110,96 @@ def calc_strf(stim_mat, spktrain, nlag, nlead):
         strf[:, i] = stim_mat @ np.roll(spktrain, i - nlead)
     return strf
 
+
+def calc_crh(spktrain, stim):
+    tmf = stim['sprtmf'].flatten()[spktrain > 0]
+    smf = stim['sprsmf'].flatten()[spktrain > 0]
+
+    # edges for temporal bins
+    tmfaxis = stim['tmfaxis'].flatten()
+    dt = tmfaxis[1] - tmfaxis[0]
+    edges_tmf = np.append(tmfaxis - dt / 2, tmfaxis[-1] + dt / 2)
+    # edges for spectral
+    smfaxis = stim['smfaxis'].flatten()
+    df = smfaxis[1] - smfaxis[0]
+    edges_smf = np.append(smfaxis - df / 2, smfaxis[-1] + df / 2)
+    crh, _, _ = np.histogram2d(smf, tmf, [edges_smf, edges_tmf])
+    crh[0][:len(tmfaxis)//2] = crh[0][::-1][:len(tmfaxis)//2]/2
+    crh[0][len(tmfaxis) // 2 + 1:] =  crh[0][len(tmfaxis) // 2 + 1:] / 2
+
+    return crh, tmfaxis, smfaxis
+
+
+def calc_strf_ri(spktrain, stim_mat, nlead=20, nlag=0, method='block', n_block=10, n_sample=1000, bigmat_file=None):
+    strf = []
+    ri = np.empty(n_sample)
+    if method == 'block':
+        nt = stim_mat.shape[1]
+        nt_block = nt // n_block
+        for i in range(n_block):
+            strf.append(calc_strf(stim_mat[:, i * nt_block:(i + 1) * nt_block],
+                                  spktrain[i * nt_block:(i + 1) * nt_block],
+                                  nlag, nlead))
+        strf = np.array(strf)
+        strf_sum = np.sum(strf, axis=0)
+        for i in range(n_sample):
+            idx = rand.sample(range(10), 5)
+            strf1 = np.sum(strf[np.array(idx), :, :], axis=0)
+            strf2 = strf_sum - strf1
+            ri[i] = np.corrcoef(strf1.flatten(), strf2.flatten())[0, 1]
+    elif method == 'spike':
+        # compared to calculate strf for each sampling (394s)
+        # store strf of each spike in big mat reduce time by 90% (36s)
+        # compared to calculating bigmat every time (2.4s), loading bigmat from file is faster by 40% (1.4s)
+        with open(bigmat_file, 'rb') as f:
+            bigmat = pickle.load(f)
+
+        strf_mat = bigmat[:, spktrain > 0]
+        strf = np.sum(strf_mat, axis=1)
+
+        # compared to get strf for each sampling (36s), matrix multiplication reduce time by 50% (17s)
+        nspk = strf_mat.shape[1]
+        spk1 = np.empty([strf_mat.shape[1], n_sample])
+        for i in range(n_sample):
+            idx = rand.sample(range(nspk), nspk // 2)
+            spk1[idx, i] = 1
+        strf1 = np.transpose(strf_mat @ spk1)
+        strf2 = np.tile(strf, (n_sample, 1)) - strf1
+        ri = np.corrcoef(strf1, strf2)[:n_sample, n_sample:].diagonal()
+    return ri
+
+
+def calc_crh_ri(spktrain, stim, method='block', n_block=10, n_sample=1000):
+    crh = []
+    ri = np.empty(n_sample)
+
+    if method == 'block':
+        nt = stim['sprtmf'].flatten().shape[0]
+        nt_block = nt // n_block
+        for i in range(n_block):
+            spktrain_tmp = np.empty(spktrain.shape)
+            spktrain_tmp[i * nt_block: (i + 1) * nt_block] =  spktrain[i * nt_block : (i + 1) * nt_block]
+            crh_tmp, _, _ = calc_crh(spktrain_tmp, stim)
+            crh.append(crh_tmp)
+        crh = np.array(crh)
+        crh_sum = np.sum(crh, axis=0)
+        for i in range(n_sample):
+            idx = rand.sample(range(10), 5)
+            crh1 = np.sum(crh[np.array(idx), :, :], axis=0)
+            crh2 = crh_sum - crh1
+            ri[i] = np.corrcoef(crh1.flatten(), crh2.flatten())[0, 1]
+    elif method == 'spike':
+        crh = calc_crh(spktrain, stim)
+        spk_idx = np.where(spktrain > 0)[0]
+        nspk = spk_idx.shape[0]
+        for i in range(n_sample):
+            idx = rand.sample(range(nspk), nspk // 2)
+            spktrain_tmp = np.empty(spktrain.shape)
+            spktrain_tmp[spk_idx[idx]] = 1
+            crh1 = calc_crh(spktrain_tmp, stim)
+            crh2 = crh - crh1
+            ri[i] = np.corrcoef(crh1.flatten(), crh2.flatten())[0, 1]
+    return ri
 
 def get_pc_thresh(spktrain):
     q = spktrain.shape[1] / spktrain.shape[0]
@@ -194,7 +290,6 @@ def get_split_ne_ic_weight_match(ne_split):
     corr_mat, order = corr_mat_reorder_cross(corr_mat, ne_split['dmr_first'], orders)
     ne_split['corr_mat'] = corr_mat
     ne_split['order'] = order
-    return ne_split
 
 
 def match_ic_weight(patterns1, patterns2):
@@ -307,7 +402,7 @@ def get_ic_weight_corr(ne_split):
     ne_split['corr'] = corr
 
 
-def get_split_cNE_df(files, savefolder):
+def get_split_ne_df(files, savefolder):
     ne = pd.DataFrame(columns=['exp', 'probe', 'region', 'stim', 'dmr_first', 'idx1', 'idx2',
                                'pattern1', 'pattern2', 'corr', 'corr_thresh'])
 
@@ -365,4 +460,45 @@ def get_split_cNE_df(files, savefolder):
             ne = pd.concat([ne, new_row], ignore_index=True)
 
     ne.to_json(os.path.join(savefolder, 'split_cNE.json'))
+
+
+def sub_sample_split_ne(files, savefolder, n_neuron=10, n_sample=10):
+    rand.seed(0)
+    for i, file in enumerate(files):
+        with open(file, 'rb') as f:
+            session = pickle.load(f)
+
+        if len(session.units) <= n_neuron:
+            continue
+        elif not hasattr(session, 'spktrain_spon'):
+            continue
+
+        print('({}/{}) get split cNEs {}'.format(i+1, len(files), file))
+        spktrain_dmr = deepcopy(session.spktrain_dmr)
+        spktrain_spon = deepcopy(session.spktrain_spon)
+
+        ne_split_subsample = []
+        for sample in range(n_sample):
+            print('{}/{}'.format(sample+1, n_sample))
+            new_idx = rand.sample(range(len(session.units)), n_neuron)
+            session.spktrain_dmr = spktrain_dmr[new_idx]
+            session.spktrain_spon = spktrain_spon[new_idx]
+            ne_split = session.get_ne_split(df=20)
+            get_split_ne_ic_weight_match(ne_split)
+            get_ic_weight_corr(ne_split)
+            get_split_ne_null_ic_weight(ne_split, nshift=1000)
+            get_null_ic_weight_corr(ne_split)
+            get_ic_weight_corr_thresh(ne_split)
+            ne_split['neuron_idx'] = new_idx
+            for stim in ['dmr0', 'dmr1', 'spon0', 'spon1']:
+                del ne_split[stim].patterns_sham
+            ne_split_subsample.append(ne_split)
+
+        savename = re.sub('0.pkl', '0-split-sub{}.pkl'.format(n_neuron), file)
+        with open(savename, 'wb') as output:
+            pickle.dump(ne_split_subsample, output, pickle.HIGHEST_PROTOCOL)
+
+
+
+
 
