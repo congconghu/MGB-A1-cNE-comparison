@@ -85,25 +85,3 @@ with open(os.path.join(stimfolder, savefile), 'wb') as outfile:
     pickle.dump(mtf, outfile, pickle.HIGHEST_PROTOCOL)
 
 
-# ----------------------------------------- save single unit data into DataFrame ---------------------------------------
-datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
-savefolder = r'E:\Congcong\Documents\data\comparison\data-summary'
-files = glob.glob(datafolder + r'\*fs20000.pkl', recursive=False)
-units_all = []
-for idx, file in enumerate(files):
-    print('({}/{}) save dataframe for {}'.format(idx + 1, len(files), file))
-    with open(file, 'rb') as f:
-        session = pickle.load(f)
-
-    units = pd.DataFrame([vars(x) for x in session.units])
-    units.drop(['spiketimes', 'isi_bin', 'waveforms', 'waveforms_mean', 'waveforms_std', 'amps',
-                'adjacent_chan', 'template', 'peak_snr'], axis=1, inplace=True)
-    units['exp'] = session.exp
-    units['depth'] = session.depth
-    units['probe'] = session.probe
-    units_all.append(units)
-
-units = pd.concat(units_all)
-units = units.astype({'unit': 'int16', 'chan': 'int8', 'depth': 'int16'})
-units.reset_index(drop=True, inplace=True)
-units.to_json(os.path.join(savefolder, 'single_units.json'))

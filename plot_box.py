@@ -9,6 +9,7 @@ import pickle
 import os
 import glob
 import random
+import math
 
 import pandas as pd
 import numpy as np
@@ -17,7 +18,8 @@ import matplotlib.pyplot as plt
 from matplotlib.offsetbox import AnchoredOffsetbox, TextArea, VPacker, HPacker
 import seaborn as sns
 import scipy.stats as stats
-from scipy.stats import zscore
+from scipy.stats import  zscore
+from scipy.ndimage.filters import convolve
 import ne_toolbox as netools
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from helper import get_A1_MGB_files, get_distance, chi_square
@@ -34,7 +36,7 @@ colors_split = [colors[i] for i in [3, 2, 7, 6, 9, 8]]
 
 
 # -------------------------------------- single unit properties -------------------------------------------------------
-def plot_strf_df(units, figfolder, order='strf_ri'):
+def plot_strf_df(units, figfolder, order='strf_ri', properties=False, smooth=False):
     if order == 'strf_ri':
         order_idx = (units[order]
                      .apply(np.mean)
@@ -51,10 +53,19 @@ def plot_strf_df(units, figfolder, order='strf_ri'):
     nfig = 0
     for i, val in zip(order_idx.index, order_idx.values):
         strf = np.array(units.iloc[i].strf)
-        plot_strf(axes[c], 
-                  strf,
-                  taxis=np.array(units.iloc[i].strf_taxis),
-                  faxis=np.array(units.iloc[i].strf_faxis))
+        axes[c].clear()
+        if properties:
+            plot_strf(axes[c], 
+                      strf,
+                      taxis=np.array(units.iloc[i].strf_taxis),
+                      faxis=np.array(units.iloc[i].strf_faxis), 
+                      latency=np.array(units.iloc[i].latency),
+                      bf=np.array(units.iloc[i].bf), smooth=smooth)
+        else:
+            plot_strf(axes[c], 
+                      strf,
+                      taxis=np.array(units.iloc[i].strf_taxis),
+                      faxis=np.array(units.iloc[i].strf_faxis), smooth=smooth)
         axes[c].set_title('{:.3f}'.format(val))
         c += 1
         if c == 20:
@@ -102,7 +113,7 @@ def plot_crh_df(units, figfolder, order='strf_ri'):
             fig.savefig(os.path.join(figfolder, '{}-{}.jpg'.format(order, nfig)))
 
 
-def plot_strf(ax, strf, taxis, faxis):
+def plot_strf(ax, strf, taxis, faxis, latency=None, bf=None, smooth=False):
     """
     plot strf and format axis labels for strf
 
@@ -113,6 +124,13 @@ def plot_strf(ax, strf, taxis, faxis):
         faxis: frequency axis for strf
     """
     max_val = abs(strf).max() * 1.01
+    if smooth:
+        weights = np.array([[1],
+                        [2],
+                        [1]],
+                       dtype=np.float)
+        weights = weights / np.sum(weights[:])
+        strf = convolve(strf, weights, mode='constant')
     ax.imshow(strf, aspect='auto', origin='lower', cmap='RdBu_r',
               vmin=-max_val, vmax=max_val)
 
@@ -129,7 +147,13 @@ def plot_strf(ax, strf, taxis, faxis):
     ax.set_yticks(yticks)
     ax.set_yticklabels(flabels)
     ax.set_ylabel('frequency (kHz)', labelpad=-2)
-
+    
+    if bf and latency is not None:
+        idx_t = np.where(taxis <= latency)[0][0]
+        idx_f = idx = np.where(faxis >= bf/1000)[0][0]
+        ax.plot([0, idx_t], [idx_f, idx_f], 'k--')
+        ax.plot([idx_t, idx_t], [0, idx_f], 'k--')
+    
 
 def plot_crh(ax, crh, tmfaxis, smfaxis):
     """
@@ -796,7 +820,7 @@ def plot_xcorr_avg(ax, corr):
     ax.set_ylabel('z-scored corr')
 
 
-# ---------------------cNE properties ---------------------------------------------------
+# --------------------------------------------------cNE properties ---------------------------------------------------
 def num_ne_vs_num_neuron(ax, datafolder, stim):
     # get files for recordings in A1 and MGB
     files = get_A1_MGB_files(datafolder, stim)
@@ -1031,6 +1055,118 @@ def ne_member_shank_span(ax, datafolder, stim, probe):
     ax.set_xticklabels(['same shank', 'across shank'])
 
 
+def ne_freq_span_vs_all_freq_span(ax, datafolder, stim):
+    files = get_A1_MGB_files(datafolder, stim)
+    span_ne = {'A1': [], 'MGB': []}
+    span_all = {'A1': [], 'MGB': []}
+    for region, filepaths in files.items():
+        for file in filepaths:
+            with open(file, 'rb') as f:
+                ne = pickle.load(f)
+            session_file = re.sub('-ne-20dft-' + stim, '', file)
+            with open(session_file, 'rb') as f:
+                session = pickle.load(f)
+            n_neuron = ne.patterns.shape[1]
+            for members in ne.ne_members.values():
+                 # get cNE frequency span
+                 span_ne[region].append(session.get_cluster_freq_span(members))
+                 # get frequenct span of all neurons
+                 span_all[region].append(session.get_cluster_freq_span(range(n_neuron)))
+    sc = []
+    for region in files.keys():
+        span_ne[region] = np.array(span_ne[region])
+        span_all[region] = np.array(span_all[region])
+        idx = ~ np.isnan(span_ne[region])
+        span_ne[region] = span_ne[region][idx]
+        span_all[region] = span_all[region][idx]
+        sc.append(ax.scatter(span_all[region], span_ne[region], color=eval(region + '_color[0]')))
+        a, b = np.polyfit(span_all[region], span_ne[region], deg=1)
+        x = np.linspace(0, 6, num=10)
+        ax.plot(x, a * x + b, color=eval(region + '_color[0]'))
+        ax.legend(sc, ['A1', 'MGB'])
+        ax.set_xlabel('all neurons')
+        ax.set_ylabel('member neurons')
+    
+    
+def ne_member_freq_span(ax, datafolder, stim, probe):
+    random.seed(0)
+    files = glob.glob(os.path.join(datafolder, '*' + stim + '.pkl'))
+    files = [x for x in files if probe in x]
+    span_member = []
+    span_random = []
+    for file in files:
+        with open(file, 'rb') as f:
+            ne = pickle.load(f)
+        session_file = re.sub('-ne-20dft-' + stim, '', file)
+        n_neuron = ne.patterns.shape[1]
+        with open(session_file, 'rb') as f:
+            session = pickle.load(f)
+
+        for members in ne.ne_members.values():
+            # get cNE span
+            span_member.append(session.get_cluster_freq_span(members))
+            # get span of random neurons
+            n_member = len(members)
+            for _ in range(10):
+                members_sham = random.sample(range(n_neuron), n_member)
+                span_random.append(session.get_cluster_freq_span(members_sham))
+
+    if probe == 'H31x64':
+        color = MGB_color[0]
+    else:
+        color = A1_color[0]
+    
+    span_member = np.array(span_member)
+    span_random =  np.array(span_random)
+    span_member = span_member[~np.isnan(span_member)]
+    span_random = span_random[~np.isnan(span_random)]
+    ax.hist(span_member, np.linspace(0, 6, 13), color=color,
+            weights=np.repeat([1 / len(span_member)], len(span_member)))
+    ax.hist(span_random, np.linspace(0, 6, 13), color='k',
+            weights=np.repeat([1 / len(span_random)], len(span_random)),
+            fill=False, histtype='step')
+    ax.set_ylabel('ratio')
+    ax.set_xlabel('frequency span (oct)')
+    ax.set_xlim([0, 6])
+
+
+def ne_member_freq_distance(ax, datafolder, stim, probe):
+    files = glob.glob(os.path.join(datafolder, '*' + stim + '.pkl'))
+    files = [x for x in files if probe in x]
+    dist_member = []
+    dist_nonmember = []
+    for file in files:
+        with open(file, 'rb') as f:
+            ne = pickle.load(f)
+        member_pairs, nonmember_pairs = ne.get_member_pairs()
+        session_file = re.sub('-ne-20dft-'+stim, '', file)
+        with open(session_file, 'rb') as f:
+            session = pickle.load(f)
+        for pair in member_pairs:
+            if session.units[pair[0]].strf_sig and session.units[pair[1]].strf_sig:
+                f1 = session.units[pair[0]].bf
+                f2 = session.units[pair[1]].bf
+                dist_member.append(abs(math.log2(f1 / f2)))
+        for pair in nonmember_pairs:
+            if session.units[pair[0]].strf_sig and session.units[pair[1]].strf_sig:
+                f1 = session.units[pair[0]].bf
+                f2 = session.units[pair[1]].bf
+                dist_nonmember.append(abs(math.log2(f1 / f2)))
+    if probe == 'H31x64':
+        color = MGB_color[0]
+    else:
+        color = A1_color[0]
+
+    ax.hist(dist_member, np.linspace(0, 6, 25), color=color,
+            weights=np.repeat([1/len(dist_member)], len(dist_member)))
+    ax.hist(dist_nonmember, np.linspace(0, 6, 25), color='k',
+            weights=np.repeat([1/len(dist_nonmember)], len(dist_nonmember)),
+            fill=False, histtype='step')
+    ax.set_xlabel('pairwise frequency difference (oct)')
+    ax.set_xlim([0, 6])
+    ax.set_ylabel('ratio')
+    
+    
 # ---------------------plots for split ne dmr/spon stability-----------------------------
 def plot_ne_split_ic_weight_match(ne_split, axes=None, figpath=None):
     """

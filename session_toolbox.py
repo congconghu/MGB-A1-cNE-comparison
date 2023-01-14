@@ -1,10 +1,15 @@
+import glob
+import os
 import pickle
 import re
-from scipy.stats import zscore
 import random
+import math
 
 import mat73
 import numpy as np
+import pandas as pd
+
+from scipy.stats import zscore
 from scipy.io import loadmat
 import ne_toolbox as netools
 from itertools import combinations
@@ -167,6 +172,14 @@ class SingleUnit:
         self.crh_ri_z = (ri.mean() - ri_null.mean()) / np.sqrt((ri.std() ** 2 + ri_null.std() ** 2) / 2)
         self.crh_ri_p = sum(ri_null > ri.mean()) / n_sample
 
+    def get_strf_properties(self):
+        bf, latency = netools.calc_strf_properties(self.strf, self.strf_taxis, self.strf_faxis)
+        self.bf = bf
+        self.latency = latency
+
+    def get_strf_significance(self, criterion='z', thresh=3):
+        if criterion == 'z':
+            self.strf_sig = self.strf_ri_z > thresh
 
 
 class Session:
@@ -358,6 +371,14 @@ class Session:
         for unit in self.units:
             unit.get_crh_ri(stim, edges, method=method, n_block=n_block, n_sample=n_sample)
 
+    def get_strf_properties(self):
+        for unit in self.units:
+            unit.get_strf_properties()
+
+    def get_strf_significance(self, criterion='z', thresh=3):
+        for unit in self.units:
+            unit.get_strf_significance(criterion='z', thresh=3)
+
     def get_cluster_span(self, members, direction='vert'):
         position = []
         for member in members:
@@ -366,6 +387,16 @@ class Session:
             elif direction == 'horz':
                 position.append(self.units[member].position[0])
         return np.max(position) - np.min(position)
+
+    def get_cluster_freq_span(self, members):
+        freq = []
+        for member in members:
+            if self.units[member].strf_sig:
+                freq.append(self.units[member].bf)
+        if len(freq) >= 2:
+            return math.log2(np.max(freq) / np.min(freq))
+        else:
+            return np.nan
 
 
 class NE(Session):
@@ -516,5 +547,30 @@ class NE(Session):
         return member_pairs, nonmember_pairs
 
 
-def save_su_df(datafolder):
-    pass
+def save_su_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
+               savefolder=r'E:\Congcong\Documents\data\comparison\data-summary'):
+    """
+    save single unit data into DataFrame
+    :param datafolder:
+    :param savefolder:
+    :return:
+    """
+    files = glob.glob(datafolder + r'\*fs20000.pkl', recursive=False)
+    units_all = []
+    for idx, file in enumerate(files):
+        print('({}/{}) save dataframe for {}'.format(idx + 1, len(files), file))
+        with open(file, 'rb') as f:
+            session = pickle.load(f)
+
+        units = pd.DataFrame([vars(x) for x in session.units])
+        units.drop(['spiketimes', 'isi_bin', 'waveforms', 'waveforms_mean', 'waveforms_std', 'amps',
+                    'adjacent_chan', 'template', 'peak_snr'], axis=1, inplace=True)
+        units['exp'] = session.exp
+        units['depth'] = session.depth
+        units['probe'] = session.probe
+        units_all.append(units)
+
+    units = pd.concat(units_all)
+    units = units.astype({'unit': 'int16', 'chan': 'int8', 'depth': 'int16'})
+    units.reset_index(drop=True, inplace=True)
+    units.to_json(os.path.join(savefolder, 'single_units.json'))

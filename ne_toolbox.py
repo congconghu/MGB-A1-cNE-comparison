@@ -10,6 +10,7 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 
+from scipy.ndimage.filters import convolve
 from scipy.stats import zscore
 from sklearn.decomposition import PCA, FastICA
 from sklearn.exceptions import ConvergenceWarning
@@ -103,103 +104,6 @@ def get_binned_spiketimes(spiketimes, edges):
                 spiketimes_binned[ibin - 1] = spiketimes[idx_spiketimes[i]:]
     return spiketimes_binned
 
-
-def calc_strf(stim_mat, spktrain, nlag, nlead):
-    strf = np.zeros((stim_mat.shape[0], nlag + nlead))
-    for i in range(nlead):
-        strf[:, i] = stim_mat @ np.roll(spktrain, i - nlead)
-    return strf
-
-
-def calc_crh(spktrain, stim):
-    tmf = stim['sprtmf'].flatten()[spktrain > 0]
-    smf = stim['sprsmf'].flatten()[spktrain > 0]
-
-    # edges for temporal bins
-    tmfaxis = stim['tmfaxis'].flatten()
-    dt = tmfaxis[1] - tmfaxis[0]
-    edges_tmf = np.append(tmfaxis - dt / 2, tmfaxis[-1] + dt / 2)
-    # edges for spectral
-    smfaxis = stim['smfaxis'].flatten()
-    df = smfaxis[1] - smfaxis[0]
-    edges_smf = np.append(smfaxis - df / 2, smfaxis[-1] + df / 2)
-    crh, _, _ = np.histogram2d(smf, tmf, [edges_smf, edges_tmf])
-    crh[0][:len(tmfaxis)//2] = crh[0][::-1][:len(tmfaxis)//2]/2
-    crh[0][len(tmfaxis) // 2 + 1:] =  crh[0][len(tmfaxis) // 2 + 1:] / 2
-
-    return crh, tmfaxis, smfaxis
-
-
-def calc_strf_ri(spktrain, stim_mat, nlead=20, nlag=0, method='block', n_block=10, n_sample=1000, bigmat_file=None):
-    strf = []
-    ri = np.empty(n_sample)
-    if method == 'block':
-        nt = stim_mat.shape[1]
-        nt_block = nt // n_block
-        for i in range(n_block):
-            strf.append(calc_strf(stim_mat[:, i * nt_block:(i + 1) * nt_block],
-                                  spktrain[i * nt_block:(i + 1) * nt_block],
-                                  nlag, nlead))
-        strf = np.array(strf)
-        strf_sum = np.sum(strf, axis=0)
-        for i in range(n_sample):
-            idx = rand.sample(range(10), 5)
-            strf1 = np.sum(strf[np.array(idx), :, :], axis=0)
-            strf2 = strf_sum - strf1
-            ri[i] = np.corrcoef(strf1.flatten(), strf2.flatten())[0, 1]
-    elif method == 'spike':
-        # compared to calculate strf for each sampling (394s)
-        # store strf of each spike in big mat reduce time by 90% (36s)
-        # compared to calculating bigmat every time (2.4s), loading bigmat from file is faster by 40% (1.4s)
-        with open(bigmat_file, 'rb') as f:
-            bigmat = pickle.load(f)
-
-        strf_mat = bigmat[:, spktrain > 0]
-        strf = np.sum(strf_mat, axis=1)
-
-        # compared to get strf for each sampling (36s), matrix multiplication reduce time by 50% (17s)
-        nspk = strf_mat.shape[1]
-        spk1 = np.empty([strf_mat.shape[1], n_sample])
-        for i in range(n_sample):
-            idx = rand.sample(range(nspk), nspk // 2)
-            spk1[idx, i] = 1
-        strf1 = np.transpose(strf_mat @ spk1)
-        strf2 = np.tile(strf, (n_sample, 1)) - strf1
-        ri = np.corrcoef(strf1, strf2)[:n_sample, n_sample:].diagonal()
-    return ri
-
-
-def calc_crh_ri(spktrain, stim, method='block', n_block=10, n_sample=1000):
-    crh = []
-    ri = np.empty(n_sample)
-
-    if method == 'block':
-        nt = stim['sprtmf'].flatten().shape[0]
-        nt_block = nt // n_block
-        for i in range(n_block):
-            spktrain_tmp = np.empty(spktrain.shape)
-            spktrain_tmp[i * nt_block: (i + 1) * nt_block] =  spktrain[i * nt_block : (i + 1) * nt_block]
-            crh_tmp, _, _ = calc_crh(spktrain_tmp, stim)
-            crh.append(crh_tmp)
-        crh = np.array(crh)
-        crh_sum = np.sum(crh, axis=0)
-        for i in range(n_sample):
-            idx = rand.sample(range(10), 5)
-            crh1 = np.sum(crh[np.array(idx), :, :], axis=0)
-            crh2 = crh_sum - crh1
-            ri[i] = np.corrcoef(crh1.flatten(), crh2.flatten())[0, 1]
-    elif method == 'spike':
-        crh = calc_crh(spktrain, stim)
-        spk_idx = np.where(spktrain > 0)[0]
-        nspk = spk_idx.shape[0]
-        for i in range(n_sample):
-            idx = rand.sample(range(nspk), nspk // 2)
-            spktrain_tmp = np.empty(spktrain.shape)
-            spktrain_tmp[spk_idx[idx]] = 1
-            crh1 = calc_crh(spktrain_tmp, stim)
-            crh2 = crh - crh1
-            ri[i] = np.corrcoef(crh1.flatten(), crh2.flatten())[0, 1]
-    return ri
 
 def get_pc_thresh(spktrain):
     q = spktrain.shape[1] / spktrain.shape[0]
@@ -499,6 +403,118 @@ def sub_sample_split_ne(files, savefolder, n_neuron=10, n_sample=10):
             pickle.dump(ne_split_subsample, output, pickle.HIGHEST_PROTOCOL)
 
 
+# ---------------------------------------- single unit properties -----------------------------------------------------
 
 
+def calc_strf(stim_mat, spktrain, nlag, nlead):
+    strf = np.zeros((stim_mat.shape[0], nlag + nlead))
+    for i in range(nlead):
+        strf[:, i] = stim_mat @ np.roll(spktrain, i - nlead)
+    return strf
 
+
+def calc_crh(spktrain, stim):
+    tmf = stim['sprtmf'].flatten()[spktrain > 0]
+    smf = stim['sprsmf'].flatten()[spktrain > 0]
+
+    # edges for temporal bins
+    tmfaxis = stim['tmfaxis'].flatten()
+    dt = tmfaxis[1] - tmfaxis[0]
+    edges_tmf = np.append(tmfaxis - dt / 2, tmfaxis[-1] + dt / 2)
+    # edges for spectral
+    smfaxis = stim['smfaxis'].flatten()
+    df = smfaxis[1] - smfaxis[0]
+    edges_smf = np.append(smfaxis - df / 2, smfaxis[-1] + df / 2)
+    crh, _, _ = np.histogram2d(smf, tmf, [edges_smf, edges_tmf])
+    crh[0][:len(tmfaxis)//2] = crh[0][::-1][:len(tmfaxis)//2]/2
+    crh[0][len(tmfaxis) // 2 + 1:] =  crh[0][len(tmfaxis) // 2 + 1:] / 2
+
+    return crh, tmfaxis, smfaxis
+
+
+def calc_strf_ri(spktrain, stim_mat, nlead=20, nlag=0, method='block', n_block=10, n_sample=1000, bigmat_file=None):
+    strf = []
+    ri = np.empty(n_sample)
+    if method == 'block':
+        nt = stim_mat.shape[1]
+        nt_block = nt // n_block
+        for i in range(n_block):
+            strf.append(calc_strf(stim_mat[:, i * nt_block:(i + 1) * nt_block],
+                                  spktrain[i * nt_block:(i + 1) * nt_block],
+                                  nlag, nlead))
+        strf = np.array(strf)
+        strf_sum = np.sum(strf, axis=0)
+        for i in range(n_sample):
+            idx = rand.sample(range(10), 5)
+            strf1 = np.sum(strf[np.array(idx), :, :], axis=0)
+            strf2 = strf_sum - strf1
+            ri[i] = np.corrcoef(strf1.flatten(), strf2.flatten())[0, 1]
+    elif method == 'spike':
+        # compared to calculate strf for each sampling (394s)
+        # store strf of each spike in big mat reduce time by 90% (36s)
+        # compared to calculating bigmat every time (2.4s), loading bigmat from file is faster by 40% (1.4s)
+        with open(bigmat_file, 'rb') as f:
+            bigmat = pickle.load(f)
+
+        strf_mat = bigmat[:, spktrain > 0]
+        strf = np.sum(strf_mat, axis=1)
+
+        # compared to get strf for each sampling (36s), matrix multiplication reduce time by 50% (17s)
+        nspk = strf_mat.shape[1]
+        spk1 = np.empty([strf_mat.shape[1], n_sample])
+        for i in range(n_sample):
+            idx = rand.sample(range(nspk), nspk // 2)
+            spk1[idx, i] = 1
+        strf1 = np.transpose(strf_mat @ spk1)
+        strf2 = np.tile(strf, (n_sample, 1)) - strf1
+        ri = np.corrcoef(strf1, strf2)[:n_sample, n_sample:].diagonal()
+    return ri
+
+
+def calc_crh_ri(spktrain, stim, method='block', n_block=10, n_sample=1000):
+    crh = []
+    ri = np.empty(n_sample)
+
+    if method == 'block':
+        nt = stim['sprtmf'].flatten().shape[0]
+        nt_block = nt // n_block
+        for i in range(n_block):
+            spktrain_tmp = np.empty(spktrain.shape)
+            spktrain_tmp[i * nt_block: (i + 1) * nt_block] =  spktrain[i * nt_block : (i + 1) * nt_block]
+            crh_tmp, _, _ = calc_crh(spktrain_tmp, stim)
+            crh.append(crh_tmp)
+        crh = np.array(crh)
+        crh_sum = np.sum(crh, axis=0)
+        for i in range(n_sample):
+            idx = rand.sample(range(10), 5)
+            crh1 = np.sum(crh[np.array(idx), :, :], axis=0)
+            crh2 = crh_sum - crh1
+            ri[i] = np.corrcoef(crh1.flatten(), crh2.flatten())[0, 1]
+    elif method == 'spike':
+        crh, _, _ = calc_crh(spktrain, stim)
+        spk_idx = np.where(spktrain > 0)[0]
+        nspk = spk_idx.shape[0]
+        for i in range(n_sample):
+            idx = rand.sample(range(nspk), nspk // 2)
+            spktrain_tmp = np.empty(spktrain.shape)
+            spktrain_tmp[spk_idx[idx]] = 1
+            crh1, _, _ = calc_crh(spktrain_tmp, stim)
+            crh2 = crh - crh1
+            ri[i] = np.corrcoef(crh1.flatten(), crh2.flatten())[0, 1]
+    return np.array(ri)
+
+
+def calc_strf_properties(strf, taxis, faxis, sigma_y=2, sigma_x=1):
+    idx_t = np.where(taxis < 50)[0]
+    strf = strf[:, idx_t]
+    taxis = taxis[idx_t]
+    weights = np.array([[1],
+                        [2],
+                        [1]],
+                       dtype=np.float)
+    weights = weights / np.sum(weights[:])
+    strf_filtered = convolve(strf, weights, mode='constant')
+    row, col = np.unravel_index(abs(strf_filtered).argmax(), strf.shape)
+    bf = faxis[row]
+    latency = taxis[col]
+    return bf, latency

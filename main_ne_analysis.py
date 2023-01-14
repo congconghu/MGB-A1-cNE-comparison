@@ -34,6 +34,10 @@ for idx, file in enumerate(files):
     session.get_strf_ri(stim_strf)
     print('get crh RI')
     session.get_crh_ri(stim_crh)
+    print('get strf properties')
+    session.get_strf_properties()
+    print('get strf sig')
+    session.get_strf_significance(criterion='z', thresh=3)
     session.save_pkl_file(session.file_path)
 
 

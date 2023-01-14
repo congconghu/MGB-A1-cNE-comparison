@@ -14,8 +14,18 @@ import matplotlib.pyplot as plt
 
 import plot_box as plots
 
-# ++++++++++++++++++++++++ cNE properties +++++++++++++++++++++++++++++++++
-# -------------------plot 5ms binned strf of cNEs and member neurons----------
+# ++++++++++++++++++++++++++++++++++++++++ single units properties +++++++++++++++++++++++++++++++++++++++++++++++++++++
+# ----------------------------------------- plot strf of all units------------------------------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-summary'
+units = pd.read_json(os.path.join(datafolder, 'single_units.json'))
+figfolder = r'E:\Congcong\Documents\data\comparison\figure\su-strf'
+plots.plot_strf_df(units, figfolder, order='strf_ri_z', properties=True, smooth=True)
+figfolder = r'E:\Congcong\Documents\data\comparison\figure\su-crh'
+plots.plot_crh_df(units, figfolder, order='crh_ri_z')
+
+
+# +++++++++++++++++++++++++++++++++++++++++++ cNE properties ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# ------------------------------plot 5ms binned strf of cNEs and member neurons-----------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 figpath = r'E:\Congcong\Documents\data\comparison\figure\cNE-5ms-strf'
 files = glob.glob(datafolder + r'\*20dft-dmr.pkl', recursive=False)
@@ -26,7 +36,7 @@ for idx, file in enumerate(files):
         ne = pickle.load(f)
     plots.plot_5ms_strf_ne_and_members(ne, figpath)
 
-# -------------------plot cNE construction procedure --------------------------
+# --------------------------------plot cNE construction procedure -----------------------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 figpath = r'E:\Congcong\Documents\data\comparison\figure\cNE-construction'
 files = glob.glob(datafolder + r'\*20dft-dmr.pkl', recursive=False)
@@ -37,7 +47,7 @@ for idx, file in enumerate(files):
         ne = pickle.load(f)
     plots.plot_ne_construction(ne, figpath)
 
-# -----------------------plot cNE properties comparison--------------------------------------------------------
+# --------------------------------plot cNE properties comparison--------------------------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 figure_folder = r'/Users/hucongcong/Documents/UCSF/data/figure/cNE-properties'
 fig = plt.figure()
@@ -77,6 +87,14 @@ for stim in ('dmr', 'spon'):
         plots.ne_member_span(ax, datafolder, stim=stim, probe=probe)
         fig.savefig(os.path.join(figure_folder, 'member_span_{}_{}.jpg'.format(probe, stim)))
         ax.clear()
+        # pairwise frequency difference
+        plots.ne_member_freq_distance(ax, datafolder, stim=stim, probe=probe)
+        fig.savefig(os.path.join(figure_folder, 'member_freq_distance_{}_{}.jpg'.format(probe, stim)))
+        ax.clear()
+        # cNE freq span
+        plots.ne_member_freq_span(ax, datafolder, stim=stim, probe=probe)
+        fig.savefig(os.path.join(figure_folder, 'member_freq_span_{}_{}.jpg'.format(probe, stim)))
+        ax.clear()
     # horizontal distribution
     # pairwise distance
     plots.ne_member_distance(ax, datafolder, stim=stim, probe='H22x32', direction='horizontal')
@@ -87,14 +105,15 @@ for stim in ('dmr', 'spon'):
     fig.savefig(os.path.join(figure_folder, 'member_span_shank_{}.jpg'.format(stim)))
     ax.clear()
 
-# -----------------------plot stack of xcorr ----------------------------------
+# ---------------------------------------------plot stack of xcorr ----------------------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-summary'
 xcorr = pd.read_json(os.path.join(datafolder, 'member_nonmember_pair_xcorr.json'))
 xcorr['xcorr'] = xcorr['xcorr'].apply(lambda x: np.array(x))
 plots.plot_xcorr(xcorr)
 
-# ++++++++++++++++++++++++ split cNE: spon/dmr stability +++++++++++++++++++++++++++++++++
-# ----------------------plot ICweight correlation and matching ICs for split cNEs-----------------------------
+
+# +++++++++++++++++++++++++++++++++++++++ split cNE: spon/dmr stability +++++++++++++++++++++++++++++++++++++++++++++++
+# -------------------------------plot ICweight correlation and matching ICs for split cNEs-----------------------------
 datafolder = r'/Users/hucongcong/Documents/UCSF/data/data-pkl'
 figure_folder = r'/Users/hucongcong/Documents/UCSF/data/figure/cNE-split-corr'
 files = glob.glob(datafolder + r'/*split.pkl', recursive=False)
@@ -107,7 +126,7 @@ for idx, file in enumerate(files):
     plots.plot_ne_split_ic_weight_corr(ne_split, figure_path)
     plots.plot_ne_split_ic_weight_match(ne_split, figure_path)
 
-# ----------------------plot ICweight correlation null distribution-----------------------------
+# --------------------------------------plot ICweight correlation null distribution-------------------------------------
 datafolder = r'/Users/hucongcong/Documents/UCSF/data/data-pkl'
 figure_folder = r'/Users/hucongcong/Documents/UCSF/data/figure/cNE-split-corr-null'
 files = glob.glob(datafolder + r'/*split.pkl', recursive=False)
