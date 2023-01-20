@@ -3,7 +3,8 @@ import os
 import pickle
 import re
 import ne_toolbox as netools
-
+import session_toolbox as st
+from session_toolbox import save_su_df, save_session_df
 
 # ++++++++++++++++++++++++++++++++++++++++++++ single unit properties ++++++++++++++++++++++++++++++++++++++++++++++++
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
@@ -38,10 +39,17 @@ for idx, file in enumerate(files):
     session.get_strf_properties()
     print('get strf sig')
     session.get_strf_significance(criterion='z', thresh=3)
+    print('get crh properties')
+    session.get_crh_properties()
+    print('get crh sig')
+    session.get_crh_significance(criterion='z', thresh=3)
     session.save_pkl_file(session.file_path)
 
+save_su_df()
+save_session_df()
 
-# ++++++++++++++++++++++++++++++++++++++++++++++ cNE properties  ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+# ++++++++++++++++++++++++++++++++++++++++++++++ cNE analysis  ++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ------------------------------------------------ get cNEs-------------------------------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 
@@ -77,22 +85,40 @@ stimfile = r'rn1-500flo-40000fhi-0-4SM-0-40TM-40db-96khz-48DF-15min-seed190506_D
 with open(os.path.join(stimfolder, stimfile), 'rb') as f:
     stim = pickle.load(f)
 stim.down_sample(df=10)
+
+# get stimulus for crh calculation (mtf)
+stimfile = r'rn1-500flo-40000fhi-0-4SM-0-40TM-40db-96khz-48DF-15min-seed190506_mtf.pkl'
+with open(os.path.join(stimfolder, stimfile), 'rb') as f:
+    stim_crh = pickle.load(f)
+    
 for idx, file in enumerate(files):
     with open(file, 'rb') as f:
         ne = pickle.load(f)
+    print('({}/{}) get cNE response properties for {}'.format(idx + 1, len(files), file))
     if not hasattr(ne, 'ne_activity'):
-        print('({}/{}) get members and activity for {}'.format(idx + 1, len(files), file))
+        print('get members and activity')
         ne.get_members()
         ne.get_activity(member_only=True)
         ne.get_activity_thresh()
         ne.save_pkl_file(ne.file_path)
     if not hasattr(ne, 'ne_units'):
-        print('({}/{}) get ne spikes for {}'.format(idx + 1, len(files), file))
+        print('get ne spikes')
         ne.get_ne_spikes(alpha=alpha)
         ne.save_pkl_file(ne.file_path)
-
-    print('({}/{}) get 5ms binned strf for {}'.format(idx + 1, len(files), file))
+    
+    # get ne strf and strf properties
+    print('get 5ms binned strf')
     ne.get_strf(stim)
+    ne.get_strf_ri(stim)
+    ne.get_strf_properties()
+    ne.get_strf_significance(criterion='z', thresh=3)
+    # get ne crh and crh properties
+    print('get crh')
+    ne.get_crh(stim_crh)
+    ne.get_crh_ri(stim_crh)
+    ne.get_crh_properties()
+    ne.get_crh_significance(criterion='z', thresh=3)
+    
     ne.save_pkl_file(ne.file_path)
 
 # ---------------------------------------- get xcorr of member and nonmember pairs -------------------------------------
@@ -121,33 +147,57 @@ for idx, file in enumerate(files):
         with open(savefile_path, 'wb') as output:
             pickle.dump(ne_split, output, pickle.HIGHEST_PROTOCOL)
 
-# -----------------------------------------match split cNEs------------------------------------------------------------
+# ------------------------------------match split cNEs and get null distribution of corr------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 files = glob.glob(datafolder + r'\*split.pkl', recursive=False)
 for idx, file in enumerate(files):
     with open(file, 'rb') as f:
         ne_split = pickle.load(f)
-    print('({}/{}) match ICweights of split cNEs for {}'.format(idx + 1, len(files), file))
+    print('({}/{})  processing ne on split blocks for {}'.format(idx + 1, len(files), file))
+    
+    # match split cNEs
+    print('match ICweights of split cNEs')
     netools.get_split_ne_ic_weight_match(ne_split)
     netools.get_ic_weight_corr(ne_split)
-    with open(file, 'wb') as output:
-        pickle.dump(ne_split, output, pickle.HIGHEST_PROTOCOL)
-
-# -------------------------------get null distribution of ICweight correlations ----------------------------------------
-datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
-files = glob.glob(datafolder + r'\*split.pkl', recursive=False)
-for idx, file in enumerate(files):
-    with open(file, 'rb') as f:
-        ne_split = pickle.load(f)
-    print('({}/{}) get null ICweights of split cNEs for {}'.format(idx + 1, len(files), file))
+    
+    # get null distribution of ICweight correlations
+    print('get null ICweights')
     netools.get_split_ne_null_ic_weight(ne_split, nshift=1000)
     netools.get_null_ic_weight_corr(ne_split)
     netools.get_ic_weight_corr_thresh(ne_split)
+    
     with open(file, 'wb') as output:
         pickle.dump(ne_split, output, pickle.HIGHEST_PROTOCOL)
 
+# --------------------------subsample to get same numbe of neurons in each recording----------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+files = glob.glob(datafolder + r'\*fs20000.pkl', recursive=False)
+netools.sub_sample_split_ne(files, datafolder)
+
 # -------------------------------save split cNE parameters to Pandas DataFrame ----------------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 savefolder = r'E:\Congcong\Documents\data\comparison\data-summary'
+files = glob.glob(datafolder + r'\*split.pkl', recursive=False)
 netools.get_split_ne_df(files, savefolder)
+files = glob.glob(datafolder + r'\*sub10.pkl', recursive=False)
+netools.get_split_ne_null_df(files, savefolder)
 
 
+# ++++++++++++++++++++++++++++++++++++++++++++++ cNE stim response ++++++++++++++++++++++++++++++++++++++++++++++++++++
+# ------------------------------------------------ reliability-------------------------------------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+savefolder = r'E:\Congcong\Documents\data\comparison\data-summary'
+stimfolder = r'E:\Congcong\Documents\stimulus\thalamus'
+# get stimulus for strf calculation (spectrogram)
+stimfile = r'rn1-500flo-40000fhi-0-4SM-0-40TM-40db-96khz-48DF-15min-seed190506_DFt1_DFf5.pkl'
+with open(os.path.join(stimfolder, stimfile), 'rb') as f:
+    stim_strf = pickle.load(f)
+stim_strf.down_sample(df=10)
+# get stimulus for crh calculation (mtf)
+stimfile = r'rn1-500flo-40000fhi-0-4SM-0-40TM-40db-96khz-48DF-15min-seed190506_mtf.pkl'
+with open(os.path.join(stimfolder, stimfile), 'rb') as f:
+    stim_crh = pickle.load(f)
+
+st.ri_ne_neuron_subsample(stim_strf, stim_crh, datafolder, savefolder)
+
+# ------------------------------------------------strf ptd-------------------------------------------------------------

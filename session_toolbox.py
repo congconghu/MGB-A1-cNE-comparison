@@ -13,6 +13,7 @@ from scipy.stats import zscore
 from scipy.io import loadmat
 import ne_toolbox as netools
 from itertools import combinations
+from copy import deepcopy
 
 from helper import strf2rtf
 
@@ -141,36 +142,37 @@ class SingleUnit:
         spktrain, _ = np.histogram(spiketimes, edges)
         self.crh, self.tmfaxis, self.smfaxis = netools.calc_crh(spktrain, stim)
 
-    def get_strf_ri(self, stim, edges, nlead=20, nlag=0, method='block', n_block=10, n_sample=1000):
+    def get_strf_ri(self, stim, edges, nlead=20, nlag=0, method='block', n_block=10, n_sample=1000, return_null=True):
         spiketimes = self.spiketimes
         spktrain, _ = np.histogram(spiketimes, edges)
         stim_mat = stim.stim_mat
-        taxis = (stim.taxis[1] - stim.taxis[0]) * np.array(range(nlead - 1, -nlag - 1, -1)) * 1000
-        faxis = stim.faxis
 
         ri = netools.calc_strf_ri(spktrain, stim_mat, nlead=nlead, nlag=nlag, method=method,
                                       n_block=n_block, n_sample=n_sample, bigmat_file=stim.bigmat_file)
         self.strf_ri = ri
-
-        spktrain_null = spktrain[::-1]
-        ri_null = netools.calc_strf_ri(spktrain_null, stim_mat, nlead=nlead, nlag=nlag, method=method,
+        
+        if return_null:
+            spktrain_null = spktrain[::-1]
+            ri_null = netools.calc_strf_ri(spktrain_null, stim_mat, nlead=nlead, nlag=nlag, method=method,
                                            n_block=n_block, n_sample=n_sample, bigmat_file=stim.bigmat_file)
-        self.strf_ri_null = ri_null
-        self.strf_ri_z = (ri.mean() - ri_null.mean()) / np.sqrt((ri.std() ** 2 + ri_null.std() ** 2) / 2)
-        self.strf_ri_p = sum(ri_null > ri.mean()) / n_sample
+            self.strf_ri_null = ri_null
+            self.strf_ri_z = (ri.mean() - ri_null.mean()) / np.sqrt((ri.std() ** 2 + ri_null.std() ** 2) / 2)
+            self.strf_ri_p = sum(ri_null > ri.mean()) / n_sample
 
-    def get_crh_ri(self, stim, edges, method='block', n_block=10, n_sample=1000):
+    def get_crh_ri(self, stim, edges, method='block', n_block=10, n_sample=1000, return_null=True):
         spiketimes = self.spiketimes
         spktrain, _ = np.histogram(spiketimes, edges)
 
         ri = netools.calc_crh_ri(spktrain, stim, method=method, n_block=n_block, n_sample=n_sample)
         self.crh_ri = ri
-
-        spktrain_null = spktrain[::-1]
-        ri_null = netools.calc_crh_ri(spktrain_null, stim, method=method, n_block=n_block, n_sample=n_sample)
-        self.crh_ri_null = ri_null
-        self.crh_ri_z = (ri.mean() - ri_null.mean()) / np.sqrt((ri.std() ** 2 + ri_null.std() ** 2) / 2)
-        self.crh_ri_p = sum(ri_null > ri.mean()) / n_sample
+        
+        if return_null:
+            spktrain_null = spktrain[::-1]
+            ri_null = netools.calc_crh_ri(spktrain_null, stim, method=method, n_block=n_block, n_sample=n_sample)
+        
+            self.crh_ri_null = ri_null
+            self.crh_ri_z = (ri.mean() - ri_null.mean()) / np.sqrt((ri.std() ** 2 + ri_null.std() ** 2) / 2)
+            self.crh_ri_p = sum(ri_null > ri.mean()) / n_sample
 
     def get_strf_properties(self):
         bf, latency = netools.calc_strf_properties(self.strf, self.strf_taxis, self.strf_faxis)
@@ -180,6 +182,18 @@ class SingleUnit:
     def get_strf_significance(self, criterion='z', thresh=3):
         if criterion == 'z':
             self.strf_sig = self.strf_ri_z > thresh
+            
+    def get_crh_properties(self):
+        btmf, bsmf = netools.calc_crh_properties(self.crh, self.tmfaxis, self.smfaxis)
+        self.btmf = btmf
+        self.bsmf = bsmf
+
+    def get_crh_significance(self, criterion='z', thresh=3):
+        if criterion == 'z':
+            self.crh_sig = self.crh_ri_z > thresh
+    
+    def subsample(self, nspk):
+        self.spiketimes = np.array(random.sample(set(self.spiketimes), int(nspk)))
 
 
 class Session:
@@ -377,7 +391,15 @@ class Session:
 
     def get_strf_significance(self, criterion='z', thresh=3):
         for unit in self.units:
-            unit.get_strf_significance(criterion='z', thresh=3)
+            unit.get_strf_significance(criterion=criterion, thresh=thresh)
+    
+    def get_crh_properties(self):
+        for unit in self.units:
+            unit.get_crh_properties()
+
+    def get_crh_significance(self, criterion='z', thresh=3):
+        for unit in self.units:
+            unit.get_crh_significance(criterion=criterion, thresh=thresh)
 
     def get_cluster_span(self, members, direction='vert'):
         position = []
@@ -480,10 +502,7 @@ class NE(Session):
     def get_ne_spikes(self, alpha=99.5):
 
         # get session file from which the cNE is calculated
-        file_path = self.file_path
-        session_file_path = re.sub('-ne-.*.pkl', r'.pkl', file_path)
-        with open(session_file_path, 'rb') as f:
-            session = pickle.load(f)
+        session = self.get_session_data()
 
         spiketimes = []
         for unit in session.units:
@@ -508,10 +527,7 @@ class NE(Session):
 
     def get_strf(self, stim, nlead=20, nlag=0):
 
-        session_file_path = re.sub('-ne-.*.pkl', r'.pkl', self.file_path)
-        with open(session_file_path, 'rb') as f:
-            session = pickle.load(f)
-
+        session = self.get_session_data()
         edges = session.edges_dmr
         if hasattr(stim, 'df'):
             df = stim.df
@@ -522,7 +538,153 @@ class NE(Session):
         for _, members in self.member_ne_spikes.items():
             for unit in members:
                 unit.get_strf(stim, edges, nlag=nlag, nlead=nlead)
+    
+    def get_strf_ri(self, stim, nlead=20, nlag=0, method='block', n_block=10, n_sample=1000):
+        
+        session = self.get_session_data()
+        edges = session.edges_dmr
+        if hasattr(stim, 'df'):
+            df = stim.df
+            edges = edges[::df]
+        
+        # get strf ri for cNE events
+        for unit in self.ne_units:
+            unit.get_strf_ri(stim, edges, nlead=20, nlag=0, method=method,  n_block=n_block, n_sample=n_sample)
 
+        # get member strf ri
+        for _, members in self.member_ne_spikes.items():
+            for unit in members:
+                unit.get_strf_ri(stim, edges, nlead=20, nlag=0, method=method,  n_block=n_block, n_sample=n_sample)
+                
+    def get_strf_properties(self):
+        
+        # get strf ri for cNE events
+        for unit in self.ne_units:
+            unit.get_strf_properties()
+
+        # get member strf ri
+        for _, members in self.member_ne_spikes.items():
+            for unit in members:
+                unit.get_strf_properties()
+                
+    def get_strf_significance(self, criterion='z', thresh=3):
+        # get strf ri for cNE events
+        for unit in self.ne_units:
+            unit.get_strf_significance(criterion=criterion, thresh=thresh)
+
+        # get member strf ri
+        for _, members in self.member_ne_spikes.items():
+            for unit in members:
+                unit.get_strf_significance(criterion=criterion, thresh=thresh)
+                
+    def get_crh(self, stim):
+        
+        session = self.get_session_data()
+        edges = session.edges_dmr
+        
+        for unit in self.ne_units:
+            unit.get_crh(stim, edges)
+
+        for _, members in self.member_ne_spikes.items():
+            for unit in members:
+                unit.get_crh(stim, edges)
+                
+    def get_crh_ri(self, stim, method='block', n_block=10, n_sample=1000):
+       
+         session = self.get_session_data()
+         edges = session.edges_dmr
+         
+         # get strf ri for cNE events
+         for unit in self.ne_units:
+             unit.get_crh_ri(stim, edges, method=method, n_block=n_block, n_sample=n_sample)
+
+         # get member strf ri
+         for _, members in self.member_ne_spikes.items():
+             for unit in members:
+                 unit.get_crh_ri(stim, edges, method=method, n_block=n_block, n_sample=n_sample)
+                 
+    def get_crh_properties(self):
+         
+         # get strf ri for cNE events
+         for unit in self.ne_units:
+             unit.get_crh_properties()
+
+         # get member strf ri
+         for _, members in self.member_ne_spikes.items():
+             for unit in members:
+                 unit.get_crh_properties()
+                 
+    def get_crh_significance(self, criterion='z', thresh=3):
+         # get crh significance for cNE events
+         for unit in self.ne_units:
+             unit.get_crh_significance(criterion=criterion, thresh=thresh)
+
+         # get member crh sig
+         for _, members in self.member_ne_spikes.items():
+             for unit in members:
+                 unit.get_crh_significance(criterion=criterion, thresh=thresh)
+    
+    def get_subsampled_ri(self, stim_strf=None, stim_crh=None):
+        random.seed(0)
+        session = self.get_session_data()
+        edges = session.edges_dmr
+        if hasattr(stim_strf, 'df'):
+            df = stim_strf.df
+            edges_strf = edges[::df]
+        edges_crh = edges
+            
+        ri_all = []
+        for i, members in self.ne_members.items():
+            print('ne #{}/{}'.format(i, len(self.ne_members)))
+            ne_unit = self.ne_units[i]
+            if ne_unit.spiketimes.shape[0] < 100:
+                continue
+            
+            for m, member in enumerate(members):
+                ne_spike_unit = self.member_ne_spikes[i][m]
+                if ne_spike_unit.spiketimes.shape[0] < 100:
+                    continue
+                unit = session.units[member]
+                min_events = min(ne_unit.spiketimes.shape[0], ne_spike_unit.spiketimes.shape[0])
+                n_events = np.floor(min_events * 0.9)
+                # repeat 10 times for subsampling
+                rf_strf_crh = {'strf':[], 'crh':[]}
+                ri_strf_crh =  {'strf':[], 'crh':[]}
+                
+                for rf in ('strf', 'crh'):
+                    rf_strf_crh[rf] = np.empty((3, *eval('unit.{}.shape'.format(rf)), 10))
+                    ri_strf_crh[rf]  = np.empty((3, 1000, 10))
+                    
+                for n in range(10):
+                    unit_tmp = deepcopy(unit)
+                    ne_unit_tmp = deepcopy(ne_unit)
+                    ne_spike_unit_tmp = deepcopy(ne_spike_unit)
+                
+                    for u, unit in enumerate((unit_tmp, ne_unit_tmp, ne_spike_unit_tmp)):
+                        unit.subsample(n_events)
+                        
+                        for rf in ('strf', 'crh'):
+                            eval('unit.get_{}(stim_{}, edges_{})'.format(rf, rf, rf))
+                            eval('unit.get_{}_ri(stim_{}, edges_{}, return_null=False)'.format(rf, rf, rf))
+                            rf_strf_crh[rf][u, :, :, n] = eval('unit.{}'.format(rf))
+                            ri_strf_crh[rf][u, :, n] = eval(' unit.{}_ri'.format(rf))
+                
+                ri = {'exp': session.exp, 'depth': session.depth, 'probe': session.probe, 
+                                'cNE': i, 'member': member, 'n_events': n_events}
+                for rf in ('strf', 'crh'):
+                    if eval('stim_{}'.format(rf)) is not None:
+                    
+                        ri.update({rf + '_neuron': rf_strf_crh[rf][0], 
+                               rf + '_cNE': rf_strf_crh[rf][1], 
+                               rf + '_ne_spike': rf_strf_crh[rf][2],
+                               rf + '_ri_neuron': ri_strf_crh[rf][0],
+                               rf + '_ri_cNE': ri_strf_crh[rf][1],
+                               rf + '_ri_ne_spike': ri_strf_crh[rf][2]})
+                    
+                ri_all.append(ri)
+        ri_all = pd.DataFrame(ri_all)
+        return ri_all
+                
     def get_sham_patterns(self, nshift=1000):
         sham_patterns = []
         n_neuron, nt = self.spktrain.shape
@@ -545,6 +707,12 @@ class NE(Session):
             member_pairs.update(set(combinations(members, 2)))
         nonmember_pairs = all_pairs.difference(member_pairs)
         return member_pairs, nonmember_pairs
+    
+    def get_session_data(self):
+        session_file_path = re.sub('-ne-.*.pkl', r'.pkl', self.file_path)
+        with open(session_file_path, 'rb') as f:
+            session = pickle.load(f)
+        return session
 
 
 def save_su_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
@@ -572,5 +740,72 @@ def save_su_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
 
     units = pd.concat(units_all)
     units = units.astype({'unit': 'int16', 'chan': 'int8', 'depth': 'int16'})
-    units.reset_index(drop=True, inplace=True)
+    units.reset_index(inplace=True)
     units.to_json(os.path.join(savefolder, 'single_units.json'))
+
+
+def save_session_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
+               savefolder=r'E:\Congcong\Documents\data\comparison\data-summary'):
+    """
+    save single unit data into DataFrame
+    :param datafolder:
+    :param savefolder:
+    :return:
+    """
+    files = glob.glob(datafolder + r'\*fs20000.pkl', recursive=False)
+    sessions = []
+    for idx, file in enumerate(files):
+        print('({}/{}) save dataframe for {}'.format(idx + 1, len(files), file))
+        with open(file, 'rb') as f:
+            session = pickle.load(f)
+        rem_list = ['filt_params', 'fs', 'probdata', 'units', 'trigger', 'spktrain_dmr', 'spktrain_spon',
+                    'edges_dmr', 'edges_spon']
+        session_vars = vars(session)
+        session_vars = {key: session_vars[key] for key in session_vars.keys() if key not in rem_list}
+        session_vars['n_neuron'] = len(session.units)
+        session = pd.DataFrame(session_vars, index=[0])
+        sessions.append(session)
+
+    sessions = pd.concat(sessions)
+    sessions = sessions.astype({'depth': 'int16', 'site': 'int8', 'n_neuron': 'int8'})
+    sessions.reset_index(drop=True, inplace=True)
+    sessions.to_json(os.path.join(savefolder, 'sessions.json'))
+
+
+def save_ne_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
+               savefolder=r'E:\Congcong\Documents\data\comparison\data-summary'):
+    files = glob.glob(datafolder + r'\*ne-20dft-dmr.pkl', recursive=False)
+    ne_all = []
+    for idx, file in enumerate(files):
+        
+        print('({}/{}) save dataframe for {}'.format(idx + 1, len(files), file))
+        with open(file, 'rb') as f:
+            ne = pickle.load(f)
+        exp = ne.exp
+        probe = ne.probe
+        depth = ne.depth
+        for i, members in ne.ne_members.items():
+            pattern = ne.patterns[i]
+            strf_sig = ne.ne_units[i].strf_ri_z > 3
+            ne_all.append({'exp': exp, 'probe': probe, 'depth':depth,
+                           'cNE': i, 'members': members, 'pattern': pattern, 'strf_sig': strf_sig})
+    ne_all = pd.DataFrame(ne_all)
+    ne_all.to_json(os.path.join(savefolder, 'cNE.json'))
+
+def ri_ne_neuron_subsample(stim_strf=None, stim_crh=None, 
+                           datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
+                           savefolder=r'E:\Congcong\Documents\data\comparison\data-summary'):
+    
+    ri = []
+    files = glob.glob(os.path.join(datafolder, '*20dft-dmr.pkl'))
+    for idx, file in enumerate(files):
+        print('({}/{}) getting subsampled ri for {}'.format(idx + 1, len(files), file))
+        with open(file, 'rb') as f:
+            ne = pickle.load(f)
+        
+        ri.append(ne.get_subsampled_ri(stim_strf=stim_strf, stim_crh=stim_crh))
+    ri = pd.concat(ri)
+    ri.reset_index(drop=True, inplace=True)
+    ri.to_json(os.path.join(savefolder, 'subsample_ri.json'))
+    
+    

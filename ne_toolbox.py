@@ -4,9 +4,9 @@ import os
 import pickle
 import random as rand
 from itertools import combinations
-from scipy.stats import zscore
 from copy import deepcopy
 
+import scipy
 import numpy as np
 import pandas as pd
 
@@ -15,8 +15,6 @@ from scipy.stats import zscore
 from sklearn.decomposition import PCA, FastICA
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.utils._testing import ignore_warnings
-
-from helper import Timer
 
 
 def detect_cell_assemblies(spktrain):
@@ -317,55 +315,61 @@ def get_split_ne_df(files, savefolder):
         region = 'A1' if probe == 'H22x32' else 'MGB'
         with open(file, 'rb') as f:
             ne_split = pickle.load(f)
-
-        # get matching cNE patterns within stim conditions
-        n_ne_dmr = len(ne_split['order']['dmr'][0])
-        for stim in ('dmr', 'spon'):
-            n_ne = len(ne_split['order'][stim][0])
-            for i in range(n_ne):
-                idx1 = ne_split['order'][stim][0][i]
-                idx2 = ne_split['order'][stim][1][i]
-                if stim == 'dmr':
-                    corr = ne_split['corr_mat'][i, i]
-                elif stim == 'spon':
-                    corr = ne_split['corr_mat'][i + n_ne_dmr, i + n_ne_dmr]
-                new_row = pd.DataFrame({'exp': exp, 'probe': probe, 'region': region, 'stim': stim,
-                                        'dmr_first': ne_split['dmr_first'], 'idx1': idx1, 'idx2': idx2,
-                                        'pattern1': [ne_split[stim+'0'].patterns[idx1]],
-                                        'pattern2': [ne_split[stim+'1'].patterns[idx2]],
-                                        'corr': corr, 'corr_thresh': ne_split['corr_thresh'][stim]})
-                ne = pd.concat([ne, new_row], ignore_index=True)
-
-        # get matching cNE patterns cross stimulus conditions
-        n_ne = min([n_ne_dmr, len(ne_split['order']['spon'][0])])
-        for i in range(n_ne):
-            if ne_split['dmr_first']:
-                # dmr1
-                idx1 = ne_split['order']['dmr'][1][i]
-                pattern1 = [ne_split['dmr1'].patterns[idx1]]
-                # spon0
-                idx2 = ne_split['order']['spon'][0][i]
-                pattern2 = [ne_split['spon0'].patterns[idx2]]
-                corr = ne_split['corr_mat'][n_ne_dmr + i, i]
-            else:
-                # spon1
-                idx1 = ne_split['order']['spon'][1][i]
-                pattern1 = [ne_split['spon1'].patterns[idx1]]
-                # dmr0
-                idx2 = ne_split['order']['dmr'][0][i]
-                pattern2 = [ne_split['dmr0'].patterns[idx2]]
-                corr = ne_split['corr_mat'][i, n_ne_dmr + i]
-
-            new_row = pd.DataFrame({'exp': exp, 'probe': probe, 'region': region, 'stim': 'cross',
-                                    'dmr_first': ne_split['dmr_first'], 'idx1': idx1, 'idx2': idx2,
-                                    'pattern1': pattern1, 'pattern2': pattern2,
-                                    'corr': corr,
-                                    'corr_thresh': ne_split['corr_thresh']['cross']})
-            ne = pd.concat([ne, new_row], ignore_index=True)
-
+        
+        new_rows = get_matching_patterns_for_df(ne_split, exp, probe, region)
+        ne = pd.concat([ne, new_rows], ignore_index=True)
+        
     ne.to_json(os.path.join(savefolder, 'split_cNE.json'))
 
+def get_matching_patterns_for_df(ne_split, exp, probe, region):
+    ne = pd.DataFrame(columns=['exp', 'probe', 'region', 'stim', 'dmr_first', 'idx1', 'idx2',
+                               'pattern1', 'pattern2', 'corr', 'corr_thresh'])
+    # get matching cNE patterns within stim conditions
+    n_ne_dmr = len(ne_split['order']['dmr'][0])
+    for stim in ('dmr', 'spon'):
+        n_ne = len(ne_split['order'][stim][0])
+        for i in range(n_ne):
+            idx1 = ne_split['order'][stim][0][i]
+            idx2 = ne_split['order'][stim][1][i]
+            if stim == 'dmr':
+                corr = ne_split['corr_mat'][i, i]
+            elif stim == 'spon':
+                corr = ne_split['corr_mat'][i + n_ne_dmr, i + n_ne_dmr]
+            new_row = pd.DataFrame({'exp': exp, 'probe': probe, 'region': region, 'stim': stim,
+                                    'dmr_first': ne_split['dmr_first'], 'idx1': idx1, 'idx2': idx2,
+                                    'pattern1': [ne_split[stim+'0'].patterns[idx1]],
+                                    'pattern2': [ne_split[stim+'1'].patterns[idx2]],
+                                    'corr': corr, 'corr_thresh': ne_split['corr_thresh'][stim]})
+            ne = pd.concat([ne, new_row], ignore_index=True)
+    
+    # get matching cNE patterns cross stimulus conditions
+    n_ne = min([n_ne_dmr, len(ne_split['order']['spon'][0])])
+    for i in range(n_ne):
+        if ne_split['dmr_first']:
+             # dmr1
+             idx1 = ne_split['order']['dmr'][1][i]
+             pattern1 = [ne_split['dmr1'].patterns[idx1]]
+             # spon0
+             idx2 = ne_split['order']['spon'][0][i]
+             pattern2 = [ne_split['spon0'].patterns[idx2]]
+             corr = ne_split['corr_mat'][n_ne_dmr + i, i]
+        else:
+             # spon1
+             idx1 = ne_split['order']['spon'][1][i]
+             pattern1 = [ne_split['spon1'].patterns[idx1]]
+             # dmr0
+             idx2 = ne_split['order']['dmr'][0][i]
+             pattern2 = [ne_split['dmr0'].patterns[idx2]]
+             corr = ne_split['corr_mat'][i, n_ne_dmr + i]
 
+        new_row = pd.DataFrame({'exp': exp, 'probe': probe, 'region': region, 'stim': 'cross',
+                                 'dmr_first': ne_split['dmr_first'], 'idx1': idx1, 'idx2': idx2,
+                                 'pattern1': pattern1, 'pattern2': pattern2,
+                                 'corr': corr,
+                                 'corr_thresh': ne_split['corr_thresh']['cross']})
+        ne = pd.concat([ne, new_row], ignore_index=True)
+    return ne
+    
 def sub_sample_split_ne(files, savefolder, n_neuron=10, n_sample=10):
     rand.seed(0)
     for i, file in enumerate(files):
@@ -402,7 +406,23 @@ def sub_sample_split_ne(files, savefolder, n_neuron=10, n_sample=10):
         with open(savename, 'wb') as output:
             pickle.dump(ne_split_subsample, output, pickle.HIGHEST_PROTOCOL)
 
-
+def get_split_ne_null_df(files, savefolder):
+    ne_null = pd.DataFrame(columns=['exp', 'probe', 'region', 'stim', 'dmr_first', 'idx1', 'idx2',
+                               'pattern1', 'pattern2', 'corr', 'corr_thresh'])
+    for idx, file in enumerate(files):
+        print('({}/{}) get null split cNE patterns for {}'.format(idx + 1, len(files), file))
+        exp = re.findall('\d{6}_\d{6}', file)[0]
+        probe = re.findall('H\d{2}x\d{2}', file)[0]
+        region = 'A1' if probe == 'H22x32' else 'MGB'
+        with open(file, 'rb') as f:
+            ne_split_null = pickle.load(f)
+        
+        for ne_split in ne_split_null:
+            new_rows = get_matching_patterns_for_df(ne_split, exp, probe, region)
+            ne_null = pd.concat([ne_null, new_rows], ignore_index=True)
+        
+    ne_null.to_json(os.path.join(savefolder, 'split_cNE_null.json'))
+            
 # ---------------------------------------- single unit properties -----------------------------------------------------
 
 
@@ -518,3 +538,64 @@ def calc_strf_properties(strf, taxis, faxis, sigma_y=2, sigma_x=1):
     bf = faxis[row]
     latency = taxis[col]
     return bf, latency
+
+def calc_crh_properties(crh, tmfaxis, smfaxis):
+    tmf = np.sum(crh, axis=0)
+    smf = np.sum(crh, axis=1)
+    
+    # upsample tmf and smf
+    tmf_u = scipy.interpolate.interp1d(tmfaxis, tmf, kind='cubic')
+    smf_u = scipy.interpolate.interp1d(smfaxis, smf, kind='cubic')
+    x = np.linspace(tmfaxis[0], tmfaxis[-1], 1000)
+    tmf_u = tmf_u(x)
+    btmf = x[tmf_u.argmax()]
+    x = np.linspace(smfaxis[0], smfaxis[-1], 1000)
+    smf_u = smf_u(x)
+    bsmf = x[smf_u.argmax()]
+    
+    return btmf, bsmf
+
+def calc_strf_tpr(strf):
+    return (strf.max() - strf.min) / strf.std()
+
+def calc_crh_moranI(crh):
+    pass
+
+def create_spatial_autocorr_weight_mat(nrows, ncols, diagopt=True):
+    eq = [lambda i,j: np.array([i-1, j]), 
+          lambda i,j: np.array([i+1, j]),
+          lambda i,j: np.array([i, j-1]), 
+          lambda i,j: np.array([i, j+1])]
+    if diagopt:
+        eq.extend([lambda i,j: np.array([i-1, j-1]), 
+                   lambda i,j: np.array([i+1, j-1]),
+                   lambda i,j: np.array([i-1, j+1]), 
+                   lambda i,j: np.array([i+1, j+1])])
+    
+    nele = nrows * ncols;
+    weightmat = np.empty((nele, nele))
+    refmat = np.reshape(range(nele), [nrows, ncols])
+    
+    c = 1
+    for j in range(ncols):
+        for i in range(nrows):
+            
+            # apply all equations to find 2d-indices of contiguous pixels
+            rcidx = [func(i, j) for func in eq]
+            # keep only indices within range
+            rcidx = [[x, y] for [x, y] in rcidx if x >= 0 and x < nrows and y >= 0 and y < ncols]
+            # get 1d-indices from 2d
+            
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    

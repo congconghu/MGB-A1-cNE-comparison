@@ -60,12 +60,14 @@ def plot_strf_df(units, figfolder, order='strf_ri', properties=False, smooth=Fal
                       taxis=np.array(units.iloc[i].strf_taxis),
                       faxis=np.array(units.iloc[i].strf_faxis), 
                       latency=np.array(units.iloc[i].latency),
-                      bf=np.array(units.iloc[i].bf), smooth=smooth)
+                      bf=np.array(units.iloc[i].bf), 
+                      smooth=smooth)
         else:
             plot_strf(axes[c], 
                       strf,
                       taxis=np.array(units.iloc[i].strf_taxis),
-                      faxis=np.array(units.iloc[i].strf_faxis), smooth=smooth)
+                      faxis=np.array(units.iloc[i].strf_faxis),
+                      smooth=smooth)
         axes[c].set_title('{:.3f}'.format(val))
         c += 1
         if c == 20:
@@ -79,7 +81,7 @@ def plot_strf_df(units, figfolder, order='strf_ri', properties=False, smooth=Fal
             fig.savefig(os.path.join(figfolder, '{}-{}.jpg'.format(order, nfig)))
 
 
-def plot_crh_df(units, figfolder, order='strf_ri'):
+def plot_crh_df(units, figfolder, order='strf_ri', properties=False):
     if order == 'crh_ri':
         order_idx = (units[order]
                      .apply(np.mean)
@@ -96,10 +98,19 @@ def plot_crh_df(units, figfolder, order='strf_ri'):
     nfig = 0
     for i, val in zip(order_idx.index, order_idx.values):
         crh = np.array(units.iloc[i].crh)
-        plot_crh(axes[c],
-                  crh,
-                  tmfaxis=np.array(units.iloc[i].tmfaxis),
-                  smfaxis=np.array(units.iloc[i].smfaxis))
+        axes[c].clear()
+        if properties:
+            plot_crh(axes[c],
+                     crh,
+                     tmfaxis=np.array(units.iloc[i].tmfaxis),
+                     smfaxis=np.array(units.iloc[i].smfaxis),
+                     btmf=units.iloc[i].btmf,
+                     bsmf=units.iloc[i].bsmf)
+        else:
+            plot_crh(axes[c],
+                     crh,
+                     tmfaxis=np.array(units.iloc[i].tmfaxis),
+                     smfaxis=np.array(units.iloc[i].smfaxis))
         axes[c].set_title('{:.3f}'.format(val))
         c += 1
         if c == 20:
@@ -150,12 +161,12 @@ def plot_strf(ax, strf, taxis, faxis, latency=None, bf=None, smooth=False):
     
     if bf and latency is not None:
         idx_t = np.where(taxis <= latency)[0][0]
-        idx_f = idx = np.where(faxis >= bf/1000)[0][0]
+        idx_f = np.where(faxis >= bf/1000)[0][0]
         ax.plot([0, idx_t], [idx_f, idx_f], 'k--')
         ax.plot([idx_t, idx_t], [0, idx_f], 'k--')
     
 
-def plot_crh(ax, crh, tmfaxis, smfaxis):
+def plot_crh(ax, crh, tmfaxis, smfaxis, btmf=None, bsmf=None):
     """
     plot crh and format axis labels for crh
 
@@ -178,6 +189,10 @@ def plot_crh(ax, crh, tmfaxis, smfaxis):
     ax.set_yticks(range(0, len(smfaxis), 4))
     ax.set_yticklabels(flabels)
     ax.set_ylabel('SMF (oct/cyc)', labelpad=0)
+    if btmf is not None and bsmf is not None:
+        idx_t = np.where(tmfaxis <= btmf)[0][-1]
+        idx_f = np.where(smfaxis <= bsmf)[0][-1] + 0.5
+        ax.text(idx_t, idx_f, '*', color='k', fontsize=30, ha='center', va='center')
 
 
 # -------------------------------cNE method illustration ---------------------------------------
@@ -293,7 +308,66 @@ def plot_ne_construction(ne, savepath):
     plt.close(fig)
 
 
-def plot_5ms_strf_ne_and_members(ne, savepath):
+def plot_5ms_strf_ne_and_members(ne, savepath, ri=False, ri_z=False, freq=False):
+    """
+    cNE and member neuronn strf at 5ms resolution. use for sanity check
+    """
+    xspace = 0.1
+    yspace = 0.08
+    figx = 0.25
+    figy = 0.2
+
+    # load session file
+    session_file_path = re.sub('-ne-.*.pkl', r'.pkl', ne.file_path)
+    with open(session_file_path, 'rb') as f:
+        session = pickle.load(f)
+    n_neuron = ne.spktrain.shape[0]
+    member_thresh = 1 / np.sqrt(n_neuron)  # threshol for membership
+    
+    if freq:
+        ne_freq = pd.read_json('E:\Congcong\Documents\data\comparison\data-summary\cNE.json')
+    for i, cne in enumerate(ne.ne_units):
+
+        fig = plt.figure(figsize=figure_size)
+
+        # plot cNE strf
+        ax = fig.add_axes([xspace / 2, figy * 4 + yspace / 2, figx - xspace, figy - yspace])
+        plot_strf(ax, cne.strf, taxis=cne.strf_taxis, faxis=cne.strf_faxis)
+        if ri:
+            ax.set_title('RI: {:.2f}'.format(np.mean(cne.strf_ri)))
+        elif ri_z:
+            ax.set_title('RI: {:.1f}'.format(np.mean(cne.strf_ri_z)))
+        # plot ICweight
+        idx_ne = cne.unit
+        weights = ne.patterns[idx_ne]
+        ax = fig.add_axes([xspace / 2 + figx, figy * 4 + yspace / 2, 2 * figx - xspace, figy - yspace])
+        plot_ICweight(ax, weights, member_thresh)
+        if freq:
+            exp = session.exp.replace("_", "")
+            freq_span = ne_freq[(ne_freq.exp == np.int(exp)) & (ne_freq.probe == session.probe) 
+                                & (ne_freq.cNE == i)]['freq_span_oct'].values[0]
+            ax.set_title('{:.2f}'.format(freq_span))
+
+        # plot member strf
+        members = ne.ne_members[idx_ne]
+        for idx, member in enumerate(members):
+            unit = session.units[member]
+            nrow = 3 - idx // 4
+            ncol = idx % 4
+            ax = fig.add_axes([xspace / 2 + figx * ncol, figy * nrow + yspace / 2,
+                               figx - xspace, figy - yspace])
+            plot_strf(ax, unit.strf, taxis=unit.strf_taxis, faxis=unit.strf_faxis)
+            if ri:
+                ax.text(2, 50, '{:.2f}'.format(np.mean(unit.strf_ri)))
+            elif ri_z:
+                ax.set_title('{:.1f}'.format(np.mean(unit.strf_ri_z)))
+            ax.set_title('unit {}'.format(unit.unit))
+        name_base = re.findall('\d{6}_\d{6}.*', session_file_path)
+        name_base = re.sub('.pkl', '-cNE_{}.jpg'.format(idx_ne), name_base[0])
+        fig.savefig(os.path.join(savepath, name_base))
+        plt.close(fig)
+
+def plot_crh_ne_and_members(ne, savepath, ri=False):
     """
     cNE and member neuronn strf at 5ms resolution. use for sanity check
     """
@@ -315,8 +389,9 @@ def plot_5ms_strf_ne_and_members(ne, savepath):
 
         # plot cNE strf
         ax = fig.add_axes([xspace / 2, figy * 4 + yspace / 2, figx - xspace, figy - yspace])
-        plot_strf(ax, cne.strf, taxis=cne.strf_taxis, faxis=cne.strf_faxis)
-
+        plot_crh(ax, cne.crh, tmfaxis=cne.tmfaxis, smfaxis=cne.smfaxis)
+        if ri:
+            ax.set_title('RI: {:.2f}'.format(np.mean(cne.strf_ri)))
         # plot ICweight
         idx_ne = cne.unit
         weights = ne.patterns[idx_ne]
@@ -331,7 +406,10 @@ def plot_5ms_strf_ne_and_members(ne, savepath):
             ncol = idx % 4
             ax = fig.add_axes([xspace / 2 + figx * ncol, figy * nrow + yspace / 2,
                                figx - xspace, figy - yspace])
-            plot_strf(ax, unit.strf, taxis=unit.strf_taxis, faxis=unit.strf_faxis)
+            plot_crh(ax, unit.crh, tmfaxis=unit.tmfaxis, smfaxis=unit.smfaxis)
+
+            if ri:
+                ax.text(2, 50, '{:.2f}'.format(np.mean(unit.strf_ri)))
             ax.set_title('unit {}'.format(unit.unit))
         name_base = re.findall('\d{6}_\d{6}.*', session_file_path)
         name_base = re.sub('.pkl', '-cNE_{}.jpg'.format(idx_ne), name_base[0])
@@ -1440,7 +1518,7 @@ def figure2(datafolder, figfolder):
     bins = np.linspace(0.5, 1, 21)
     for i, stim in enumerate(['cross', 'spon', 'dmr']):
         ax = fig.add_axes([x_start, 0.79 + i * space_y, fig_x, fig_y])
-        sns.histplot(data=df[df.stim == stim], x='corr', bins=bins,
+        sns.histplot(data=df[(df.stim == stim) & df.corr_sig], x='corr', bins=bins,
                      hue="region", palette=[MGB_color[0], A1_color[0]], hue_order=['MGB', 'A1'],
                      ax=ax, legend=False, stat='proportion', common_norm=False)
         ax.set_title(stim)
@@ -1598,4 +1676,167 @@ def plot_significance_star(ax, p, x_bar, y_bar, y_star):
 
 
 
+# ------------------------------- ne properties 2 -----------------------------------------------------------------
+def plot_ne_stim_response_type(datafolder, savefolder, rf='strf'):
+    stim_sig = pd.DataFrame({'exp': [], 'ne': [], 'probe':[], 'ne_sig':[], 'member_sig':[]})
+    files = glob.glob(datafolder + r'\*20dft-dmr.pkl', recursive=False)
+    for file in files:
+        with open(file, 'rb') as f:
+            ne = pickle.load(f)
+        
+        session_file_path = re.sub('-ne-.*.pkl', r'.pkl', ne.file_path)
+        with open(session_file_path, 'rb') as f:
+            session = pickle.load(f)
+        
+        for idx, members in ne.ne_members.items():
+            
+            if rf == 'strf':
+                ne_sig = ne.ne_units[idx].strf_sig 
+                member_sig = []
+                for member in members:
+                    member_sig.append(session.units[member].strf_sig)
+            elif rf == 'crh':
+                ne_sig = ne.ne_units[idx].crh_sig 
+                member_sig = []
+                for member in members:
+                    member_sig.append(session.units[member].crh_sig)
+            elif rf == 'stim':
+                ne_sig = ne.ne_units[idx].strf_sig or ne.ne_units[idx].crh_sig
+                member_sig = []
+                for member in members:
+                    member_sig.append(session.units[member].strf_sig or session.units[member].crh_sig)
+            
+            member_sig = np.array(member_sig).mean()
+            stim_sig = pd.concat((stim_sig, 
+                                  pd.DataFrame({'exp': session.exp, 'ne': idx, 'probe': session.probe, 'ne_sig': ne_sig, 'member_sig': member_sig}, 
+                                               index=[0])), ignore_index=True)
+    fig, axes = plt.subplots(2, 2, figsize=(10, 10))
+    # plot back to back histogram
+    pie_colors = [colors[x] for x in [1, 7, 5, 3]]
+    for i, probe in enumerate(('H31x64', 'H22x32')):
+        ax = axes[i, 0]
+        rect = mpl.patches.Rectangle((-100, 0.5), 100, 0.5, edgecolor=None, facecolor=colors[0])
+        ax.add_patch(rect)
+        rect = mpl.patches.Rectangle((0, 0.5), 100, 0.5, edgecolor=None, facecolor=colors[6])
+        ax.add_patch(rect)
+        rect = mpl.patches.Rectangle((-100, 0), 100, 0.5, edgecolor=None, facecolor=colors[2])
+        ax.add_patch(rect)
+        rect = mpl.patches.Rectangle((0, 0), 100, 0.5, edgecolor=None, facecolor=colors[4])
+        ax.add_patch(rect)
 
+        data = stim_sig[stim_sig.probe == probe]
+        h1, _, _ = ax.hist(data[data.ne_sig > 0]['member_sig'], bins=np.linspace(0,1,11), 
+                orientation='horizontal', color=colors[7], edgecolor='k')
+        ax2 = ax.twiny()
+        h2, _, _ = ax2.hist(data[data.ne_sig == 0]['member_sig'], bins=np.linspace(0,1,11), 
+                 orientation='horizontal', color=colors[1], edgecolor='k')
+        ax2.invert_xaxis()
+        ax2.set_xticks([])
+        m1 = (np.ceil(max(h1) / 5) + 1) * 5
+        m2 = (np.ceil(max(h2) / 5) + 1) * 5
+        ax2.set_xlim([m2, -m1])
+        ax.set_xlim([-m2, m1])
+        ax.plot([-m2, m1], [0.5, 0.5], 'k')
+        ax.set_ylim([0, 1])
+        
+        y = [len(data[(data.ne_sig == 0) & (data.member_sig >= 0.5)]),
+             len(data[(data.ne_sig > 0) & (data.member_sig >= 0.5)]),
+             len(data[(data.ne_sig > 0) & (data.member_sig < 0.5)]),
+             len(data[(data.ne_sig == 0) & (data.member_sig < 0.5)])
+             ]
+        ax.set_ylabel('percent of {}+'.format(rf))
+        ax = axes[i, 1]
+        ax.pie(y, colors=pie_colors, normalize=True, 
+               wedgeprops={"edgecolor":"k",'linewidth': 2},
+               autopct='%1.1f%%',  pctdistance=1.3)
+        if i == 0:
+            ax.legend(['None-constructive', 'Facilitative', 'Constructive', 'Stimulus-independent'],
+                      bbox_to_anchor=(0.8, 1.4))
+    fig.savefig(os.path.join(savefolder, 'ne_types_{}.jpg'.format(rf)))
+
+
+def plot_ne_neuron_stim_response_hist(datafolder, savefolder):
+    files = get_A1_MGB_files(datafolder, 'dmr')
+    ne_sig = {'A1': [], 'MGB': []}
+    neuron_sig = {'A1': [], 'MGB': []}
+    for region, filepaths in files.items():
+        for file in filepaths:
+            with open(file, 'rb') as f:
+                ne = pickle.load(f)
+            session_file = re.sub('-ne-20dft-dmr', '', file)
+            
+            for cne in ne.ne_units:
+                ne_sig[region].append(np.array([cne.strf_sig, cne.crh_sig]))
+            
+            with open(session_file, 'rb') as f:
+                session = pickle.load(f)
+            
+            for unit in session.units:
+                neuron_sig[region].append(np.array([unit.strf_sig, unit.crh_sig]))
+    fig, axes = plt.subplots(2, 1, figsize=(6, 6))
+    c = 0
+    for region in files.keys():
+        ne_sig[region] = np.array(ne_sig[region])
+        neuron_sig[region] = np.array(neuron_sig[region])
+        stim_sig = []
+        for units in (ne_sig[region], neuron_sig[region]):
+            stim_sig.append(np.array([sum(~units[:,0] & ~units[:,1]),
+                        sum(units[:,0] & ~units[:,1]),
+                        sum(~units[:,0] & units[:,1]),
+                        sum(units[:,0] & units[:,1])
+                        ]))
+        x = np.array(range(4))
+        axes[c].bar(x - 0.2, stim_sig[0]/np.sum(stim_sig[0]), 0.4, label = 'cNEs')
+        axes[c].bar(x + 0.2,stim_sig[1]/np.sum(stim_sig[1]), 0.4, label = 'neurons')
+        if c == 0:
+            axes[c].legend()
+            axes[c].set_xticks([])
+        else:
+            axes[c].set_xticks(range(4))
+            axes[c].set_xticklabels(['-\n-', '+\n-', '-\n+', '+\n+'])
+        axes[c].set_ylabel('ratio')
+        axes[c].set_title(region)
+        c += 1
+    fig.savefig(os.path.join(savefolder, 'hist_ne_neuron_stim_encoding.png'))
+    
+    
+def plot_ne_neuron_strf_sig_hist(datafolder, savefolder):
+    files = get_A1_MGB_files(datafolder, 'dmr')
+    ne_sig = {'A1': [], 'MGB': []}
+    neuron_sig = {'A1': [], 'MGB': []}
+    for region, filepaths in files.items():
+        for file in filepaths:
+            with open(file, 'rb') as f:
+                ne = pickle.load(f)
+            session_file = re.sub('-ne-20dft-dmr', '', file)
+            
+            for cne in ne.ne_units:
+                ne_sig[region].append(cne.strf_sig)
+            
+            with open(session_file, 'rb') as f:
+                session = pickle.load(f)
+            
+            for unit in session.units:
+                neuron_sig[region].append(unit.strf_sig)
+    fig, axes = plt.subplots(2, 1, figsize=(6, 6))
+    c = 0
+    for region in ['MGB', 'A1']:
+        ne_sig[region] = np.array(ne_sig[region])
+        neuron_sig[region] = np.array(neuron_sig[region])
+        stim_sig = []
+        for units in (ne_sig[region], neuron_sig[region]):
+            stim_sig.append(np.array([sum(units), sum(~units)]))
+        x = np.array(range(2))
+        axes[c].bar(x - 0.2, stim_sig[0]/np.sum(stim_sig[0]), 0.4, label = 'cNEs')
+        axes[c].bar(x + 0.2,stim_sig[1]/np.sum(stim_sig[1]), 0.4, label = 'neurons')
+        axes[c].set_xticks(range(2))
+        if c == 0:
+            axes[c].legend()
+            axes[c].set_xticklabels(['', ''])
+        else:
+            axes[c].set_xticklabels(['strf +', 'strf -'])
+        axes[c].set_ylabel('ratio')
+        axes[c].set_title(region)
+        c += 1
+    plt.tight_layout()
+    fig.savefig(os.path.join(savefolder, 'hist_ne_neuron_strf_encoding.png'))
