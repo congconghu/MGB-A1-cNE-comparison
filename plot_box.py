@@ -18,16 +18,17 @@ import matplotlib.pyplot as plt
 from matplotlib.offsetbox import AnchoredOffsetbox, TextArea, VPacker, HPacker
 import seaborn as sns
 import scipy.stats as stats
-from scipy.stats import  zscore
+from scipy.stats import zscore
 from scipy.ndimage.filters import convolve
 import ne_toolbox as netools
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from helper import get_A1_MGB_files, get_distance, chi_square
 
-plt.rcParams['font.size'] = 18
-plt.rcParams['axes.linewidth'] = 2
+plt.rcParams['font.size'] = 8
+plt.rcParams['axes.linewidth'] = 1
 mpl.rcParams['font.family'] = 'Arial'
-figure_size = (18.3, 24.7)
+cm = 1/2.54  # centimeters in inches
+figure_size = [(17.6*cm, 17*cm), (11.6*cm, 17*cm), (8.5*cm, 17*cm)]
 activity_alpha = 99.5
 colors = sns.color_palette("Paired")
 A1_color = (colors[1], colors[0])
@@ -43,11 +44,13 @@ def plot_strf_df(units, figfolder, order='strf_ri', properties=False, smooth=Fal
                      .sort_values(ascending=False))
     elif order == 'strf_ri_p':
         order_idx = units[order].sort_values(ascending=True)
-    elif order == 'strf_ri_z':
+    elif order in ('strf_ri_z', 'strf_ptd'):
         order_idx = units[order].sort_values(ascending=False)
+    elif  order == 'strf_info':
+        order_idx = units[order].apply(np.mean).sort_values(ascending=False)
 
     # plot all units sorted by order
-    fig, axes = plt.subplots(ncols=4, nrows=5, figsize=figure_size)
+    fig, axes = plt.subplots(ncols=4, nrows=5, figsize=figure_size[0])
     axes = axes.flatten()
     c = 0
     nfig = 0
@@ -55,15 +58,15 @@ def plot_strf_df(units, figfolder, order='strf_ri', properties=False, smooth=Fal
         strf = np.array(units.iloc[i].strf)
         axes[c].clear()
         if properties:
-            plot_strf(axes[c], 
+            plot_strf(axes[c],
                       strf,
                       taxis=np.array(units.iloc[i].strf_taxis),
-                      faxis=np.array(units.iloc[i].strf_faxis), 
+                      faxis=np.array(units.iloc[i].strf_faxis),
                       latency=np.array(units.iloc[i].latency),
-                      bf=np.array(units.iloc[i].bf), 
+                      bf=np.array(units.iloc[i].bf),
                       smooth=smooth)
         else:
-            plot_strf(axes[c], 
+            plot_strf(axes[c],
                       strf,
                       taxis=np.array(units.iloc[i].strf_taxis),
                       faxis=np.array(units.iloc[i].strf_faxis),
@@ -72,13 +75,13 @@ def plot_strf_df(units, figfolder, order='strf_ri', properties=False, smooth=Fal
         c += 1
         if c == 20:
             plt.tight_layout()
-            fig.savefig(os.path.join(figfolder, '{}-{}.jpg'.format(order, nfig)))
+            fig.savefig(os.path.join(figfolder, '{}-{}.jpg'.format(order, nfig)), dpi=300)
             nfig += 1
             c = 0
     if c != 20:
         for i in range(c, 20):
             axes[i].remove()
-            fig.savefig(os.path.join(figfolder, '{}-{}.jpg'.format(order, nfig)))
+            fig.savefig(os.path.join(figfolder, '{}-{}.jpg'.format(order, nfig)), dpi=300)
 
 
 def plot_crh_df(units, figfolder, order='strf_ri', properties=False):
@@ -88,11 +91,11 @@ def plot_crh_df(units, figfolder, order='strf_ri', properties=False):
                      .sort_values(ascending=False))
     elif order == 'crh_ri_p':
         order_idx = units[order].sort_values(ascending=True)
-    elif order == 'crh_ri_z':
+    elif order in ('crh_ri_z', 'crh_morani'):
         order_idx = units[order].sort_values(ascending=False)
 
     # plot all units sorted by order
-    fig, axes = plt.subplots(ncols=4, nrows=5, figsize=figure_size)
+    fig, axes = plt.subplots(ncols=4, nrows=5, figsize=figure_size[0])
     axes = axes.flatten()
     c = 0
     nfig = 0
@@ -115,14 +118,49 @@ def plot_crh_df(units, figfolder, order='strf_ri', properties=False):
         c += 1
         if c == 20:
             plt.tight_layout()
-            fig.savefig(os.path.join(figfolder, '{}-{}.jpg'.format(order, nfig)))
+            fig.savefig(os.path.join(figfolder, '{}-{}.jpg'.format(order, nfig)), dpi=300)
             nfig += 1
             c = 0
     if c != 20:
         for i in range(c, 20):
             axes[i].remove()
-            fig.savefig(os.path.join(figfolder, '{}-{}.jpg'.format(order, nfig)))
+            fig.savefig(os.path.join(figfolder, '{}-{}.jpg'.format(order, nfig)), dpi=300)
 
+
+def plot_strf_nonlinearity_df(units, figfolder):
+    order_idx = units['nonlin_asi'].sort_values(ascending=False)
+
+    # plot all units sorted by order
+    fig, axes = plt.subplots(ncols=4, nrows=5, figsize=figure_size[0])
+    axes = axes.flatten()
+    c = 0
+    nfig = 0
+    for i, val in zip(order_idx.index, order_idx.values):
+        strf = np.array(units.iloc[i].strf)
+        centers = np.array(units.iloc[i].nonlin_centers)
+        fr = np.array(units.iloc[i].nonlin_fr)
+        fr_mean = np.array(units.iloc[i].nonlin_fr_mean)
+        # plot strf
+        axes[c].clear()
+        plot_strf(axes[c],
+                  strf,
+                  taxis=np.array(units.iloc[i].strf_taxis),
+                  faxis=np.array(units.iloc[i].strf_faxis))
+       
+        c += 1
+        axes[c].clear()
+        plot_nonlinearity(axes[c], centers, fr, fr_mean)
+        axes[c].set_title('{:.2f}'.format(val))
+        c += 1
+        if c == 20:
+            plt.tight_layout()
+            fig.savefig(os.path.join(figfolder, 'nonlineairty-{}.jpg'.format(nfig)), dpi=300)
+            nfig += 1
+            c = 0
+    if c != 20:
+        for i in range(c, 20):
+            axes[i].remove()
+            fig.savefig(os.path.join(figfolder, 'nonlinearity-{}.jpg'.format(nfig)), dpi=300)
 
 def plot_strf(ax, strf, taxis, faxis, latency=None, bf=None, smooth=False):
     """
@@ -137,9 +175,9 @@ def plot_strf(ax, strf, taxis, faxis, latency=None, bf=None, smooth=False):
     max_val = abs(strf).max() * 1.01
     if smooth:
         weights = np.array([[1],
-                        [2],
-                        [1]],
-                       dtype=np.float)
+                            [2],
+                            [1]],
+                           dtype=np.float)
         weights = weights / np.sum(weights[:])
         strf = convolve(strf, weights, mode='constant')
     ax.imshow(strf, aspect='auto', origin='lower', cmap='RdBu_r',
@@ -158,13 +196,13 @@ def plot_strf(ax, strf, taxis, faxis, latency=None, bf=None, smooth=False):
     ax.set_yticks(yticks)
     ax.set_yticklabels(flabels)
     ax.set_ylabel('frequency (kHz)', labelpad=-2)
-    
+
     if bf and latency is not None:
         idx_t = np.where(taxis <= latency)[0][0]
-        idx_f = np.where(faxis >= bf/1000)[0][0]
+        idx_f = np.where(faxis >= bf / 1000)[0][0]
         ax.plot([0, idx_t], [idx_f, idx_f], 'k--')
         ax.plot([idx_t, idx_t], [0, idx_f], 'k--')
-    
+
 
 def plot_crh(ax, crh, tmfaxis, smfaxis, btmf=None, bsmf=None):
     """
@@ -188,13 +226,20 @@ def plot_crh(ax, crh, tmfaxis, smfaxis, btmf=None, bsmf=None):
     flabels = np.array(range(5))
     ax.set_yticks(range(0, len(smfaxis), 4))
     ax.set_yticklabels(flabels)
-    ax.set_ylabel('SMF (oct/cyc)', labelpad=0)
+    ax.set_ylabel('SMF (cyc/oct)', labelpad=0)
     if btmf is not None and bsmf is not None:
         idx_t = np.where(tmfaxis <= btmf)[0][-1]
         idx_f = np.where(smfaxis <= bsmf)[0][-1] + 0.5
         ax.text(idx_t, idx_f, '*', color='k', fontsize=30, ha='center', va='center')
 
-
+def plot_nonlinearity(ax, centers, fr, fr_mean):
+    
+    ax.plot(centers, fr, 'ko-', ms=3)
+    ax.plot([centers[0]-1, centers[-1]+1], [fr_mean, fr_mean], 'k--')
+    ax.set_xlabel('similarity (s.d.)')
+    ax.set_ylabel('fr (spk/s)')
+    
+    
 # -------------------------------cNE method illustration ---------------------------------------
 def plot_ne_construction(ne, savepath):
     """
@@ -323,7 +368,7 @@ def plot_5ms_strf_ne_and_members(ne, savepath, ri=False, ri_z=False, freq=False)
         session = pickle.load(f)
     n_neuron = ne.spktrain.shape[0]
     member_thresh = 1 / np.sqrt(n_neuron)  # threshol for membership
-    
+
     if freq:
         ne_freq = pd.read_json('E:\Congcong\Documents\data\comparison\data-summary\cNE.json')
     for i, cne in enumerate(ne.ne_units):
@@ -344,7 +389,7 @@ def plot_5ms_strf_ne_and_members(ne, savepath, ri=False, ri_z=False, freq=False)
         plot_ICweight(ax, weights, member_thresh)
         if freq:
             exp = session.exp.replace("_", "")
-            freq_span = ne_freq[(ne_freq.exp == np.int(exp)) & (ne_freq.probe == session.probe) 
+            freq_span = ne_freq[(ne_freq.exp == np.int(exp)) & (ne_freq.probe == session.probe)
                                 & (ne_freq.cNE == i)]['freq_span_oct'].values[0]
             ax.set_title('{:.2f}'.format(freq_span))
 
@@ -366,6 +411,7 @@ def plot_5ms_strf_ne_and_members(ne, savepath, ri=False, ri_z=False, freq=False)
         name_base = re.sub('.pkl', '-cNE_{}.jpg'.format(idx_ne), name_base[0])
         fig.savefig(os.path.join(savepath, name_base))
         plt.close(fig)
+
 
 def plot_crh_ne_and_members(ne, savepath, ri=False):
     """
@@ -722,7 +768,8 @@ def figure1(datafolder, figfolder):
                                     y + (3 - i) * figy + (3 - i) * yspace + y_extra,
                                     figx, figy]))
     ax = np.reshape(np.array(ax), (4, 2))
-    xcorr = pd.read_json('E:\Congcong\Documents\data\comparison\data-summary\member_nonmember_pair_xcorr_filtered.json')
+    xcorr = pd.read_json(
+        r'E:\Congcong\Documents\data\comparison\data-summary\member_nonmember_pair_xcorr_filtered.json')
     xcorr = xcorr[xcorr['stim'] == 'dmr']
     plot_xcorr(fig, ax, xcorr.groupby(by=['region', 'member']))
 
@@ -957,8 +1004,8 @@ def ne_size_vs_num_neuron(ax, datafolder, stim, plot_type='mean', relative=False
         for region, size in ne_size.items():
             ne_size[region] = np.array(ne_size[region]) / np.array(n_neuron[region])
             ne_size_df = pd.concat([ne_size_df,
-                                   pd.DataFrame({'region': [region] * len(ne_size[region]),
-                                                 'size': ne_size[region]})],
+                                    pd.DataFrame({'region': [region] * len(ne_size[region]),
+                                                  'size': ne_size[region]})],
                                    axis=0)
         boxplot_scatter(ax, x='region', y='size', data=ne_size_df,
                         order=('MGB', 'A1'), hue='region',
@@ -1003,7 +1050,7 @@ def num_ne_participate(ax, datafolder, stim, n_neuron_filter=()):
                     n_participation[region].append(0)
     for region, participate in n_participation.items():
         ax.hist(n_participation[region], bins=range(6), alpha=0.5,
-                label=region, density=True, align='left', color=eval(region+'_color[0]'))
+                label=region, density=True, align='left', color=eval(region + '_color[0]'))
     ax.legend()
     ax.set_xlabel('number of cNEs each neuron belonged to')
     ax.set_ylabel('ratio')
@@ -1018,7 +1065,7 @@ def ne_member_distance(ax, datafolder, stim, probe, direction='vertical'):
         with open(file, 'rb') as f:
             ne = pickle.load(f)
         member_pairs, nonmember_pairs = ne.get_member_pairs()
-        session_file = re.sub('-ne-20dft-'+stim, '', file)
+        session_file = re.sub('-ne-20dft-' + stim, '', file)
         with open(session_file, 'rb') as f:
             session = pickle.load(f)
         for pair in member_pairs:
@@ -1038,9 +1085,9 @@ def ne_member_distance(ax, datafolder, stim, probe, direction='vertical'):
 
     if direction == 'vertical':
         ax.hist(dist_member, range(0, 601, step), color=color,
-                weights=np.repeat([1/len(dist_member)], len(dist_member)))
+                weights=np.repeat([1 / len(dist_member)], len(dist_member)))
         ax.hist(dist_nonmember, range(0, 601, step), color='k',
-                weights=np.repeat([1/len(dist_nonmember)], len(dist_nonmember)),
+                weights=np.repeat([1 / len(dist_nonmember)], len(dist_nonmember)),
                 fill=False, histtype='step')
         ax.set_xlabel('pairwise distance (um)')
         ax.set_xlim([0, 600])
@@ -1084,10 +1131,10 @@ def ne_member_span(ax, datafolder, stim, probe):
     else:
         color = A1_color[0]
         step = 25
-    ax.hist(span_member, range(0, 1001, step*2), color=color,
-            weights=np.repeat([1/len(span_member)], len(span_member)))
-    ax.hist(span_random, range(0, 1001, step*2), color='k',
-            weights=np.repeat([1/len(span_random)], len(span_random)),
+    ax.hist(span_member, range(0, 1001, step * 2), color=color,
+            weights=np.repeat([1 / len(span_member)], len(span_member)))
+    ax.hist(span_random, range(0, 1001, step * 2), color='k',
+            weights=np.repeat([1 / len(span_random)], len(span_random)),
             fill=False, histtype='step')
     ax.set_ylabel('ratio')
     ax.set_xlabel('cNE span (um)')
@@ -1124,9 +1171,9 @@ def ne_member_shank_span(ax, datafolder, stim, probe):
         color = A1_color[0]
         step = 25
     ax.hist(span_member, 2, color=color, align='left', rwidth=0.8,
-            weights=np.repeat([1/len(span_member)], len(span_member)))
+            weights=np.repeat([1 / len(span_member)], len(span_member)))
     ax.hist(span_random, 2, color='k', align='left', rwidth=0.8,
-            weights=np.repeat([1/len(span_random)], len(span_random)),
+            weights=np.repeat([1 / len(span_random)], len(span_random)),
             fill=False)
     ax.set_ylabel('ratio')
     ax.set_xticks([0, 125])
@@ -1146,10 +1193,10 @@ def ne_freq_span_vs_all_freq_span(ax, datafolder, stim):
                 session = pickle.load(f)
             n_neuron = ne.patterns.shape[1]
             for members in ne.ne_members.values():
-                 # get cNE frequency span
-                 span_ne[region].append(session.get_cluster_freq_span(members))
-                 # get frequenct span of all neurons
-                 span_all[region].append(session.get_cluster_freq_span(range(n_neuron)))
+                # get cNE frequency span
+                span_ne[region].append(session.get_cluster_freq_span(members))
+                # get frequency span of all neurons
+                span_all[region].append(session.get_cluster_freq_span(range(n_neuron)))
     sc = []
     for region in files.keys():
         span_ne[region] = np.array(span_ne[region])
@@ -1164,8 +1211,8 @@ def ne_freq_span_vs_all_freq_span(ax, datafolder, stim):
         ax.legend(sc, ['A1', 'MGB'])
         ax.set_xlabel('all neurons')
         ax.set_ylabel('member neurons')
-    
-    
+
+
 def ne_member_freq_span(ax, datafolder, stim, probe):
     random.seed(0)
     files = glob.glob(os.path.join(datafolder, '*' + stim + '.pkl'))
@@ -1193,9 +1240,9 @@ def ne_member_freq_span(ax, datafolder, stim, probe):
         color = MGB_color[0]
     else:
         color = A1_color[0]
-    
+
     span_member = np.array(span_member)
-    span_random =  np.array(span_random)
+    span_random = np.array(span_random)
     span_member = span_member[~np.isnan(span_member)]
     span_random = span_random[~np.isnan(span_random)]
     ax.hist(span_member, np.linspace(0, 6, 13), color=color,
@@ -1217,7 +1264,7 @@ def ne_member_freq_distance(ax, datafolder, stim, probe):
         with open(file, 'rb') as f:
             ne = pickle.load(f)
         member_pairs, nonmember_pairs = ne.get_member_pairs()
-        session_file = re.sub('-ne-20dft-'+stim, '', file)
+        session_file = re.sub('-ne-20dft-' + stim, '', file)
         with open(session_file, 'rb') as f:
             session = pickle.load(f)
         for pair in member_pairs:
@@ -1236,15 +1283,15 @@ def ne_member_freq_distance(ax, datafolder, stim, probe):
         color = A1_color[0]
 
     ax.hist(dist_member, np.linspace(0, 6, 25), color=color,
-            weights=np.repeat([1/len(dist_member)], len(dist_member)))
+            weights=np.repeat([1 / len(dist_member)], len(dist_member)))
     ax.hist(dist_nonmember, np.linspace(0, 6, 25), color='k',
-            weights=np.repeat([1/len(dist_nonmember)], len(dist_nonmember)),
+            weights=np.repeat([1 / len(dist_nonmember)], len(dist_nonmember)),
             fill=False, histtype='step')
     ax.set_xlabel('pairwise frequency difference (oct)')
     ax.set_xlim([0, 6])
     ax.set_ylabel('ratio')
-    
-    
+
+
 # ---------------------plots for split ne dmr/spon stability-----------------------------
 def plot_ne_split_ic_weight_match(ne_split, axes=None, figpath=None):
     """
@@ -1296,7 +1343,7 @@ def plot_matching_ic(ax1, ic1, ic2, color1, color2, stim1, stim2, marker_size=10
     plt.setp(markerline, markersize=marker_size, color=color1)
     plt.setp(stemline, color=color1)
     ax1.set_xlim([0, n_neuron + 1])
-    ax1.set_xticks(range(5, n_neuron+1, 5))
+    ax1.set_xticks(range(5, n_neuron + 1, 5))
     ax1.set_ylim([-ymax, ymax])
     ax1.set_yticks([-0.5, 0, 0.5])
     ax1.set_yticklabels([-0.5, 0, 0.5], fontsize=15)
@@ -1429,7 +1476,7 @@ def plot_ne_split_ic_weight_null_corr(ne_split, figpath):
         thresh = ne_split['corr_thresh'][key]
         ax = axes[c]
         ax.hist(corr, np.linspace(0, 1, 51), color='k',
-                weights=np.repeat([1/len(corr)], len(corr)))
+                weights=np.repeat([1 / len(corr)], len(corr)))
         y = ax.get_ylim()
         ax.plot([thresh, thresh], y, 'r')
         corr_real = ne_split['corr'][key]
@@ -1500,13 +1547,13 @@ def figure2(datafolder, figfolder):
     space_y = 0.07
     axes = []
     for i in range(3):
-        axes.append(fig.add_axes([x_start, 0.79 + (2-i) * space_y, fig_x, fig_y]))
+        axes.append(fig.add_axes([x_start, 0.79 + (2 - i) * space_y, fig_x, fig_y]))
     axes[2].set_ylabel('ICweight')
     axes[0].set_title('A', pad=20)
     plot_matching_ic_3_conditions(ne_split, axes, 1, marker_size=7, ymax=0.7)
     axes = []
     for i in range(3):
-        axes.append(fig.add_axes([x_start + space_x, 0.79 + (2-i) * space_y, fig_x, fig_y]))
+        axes.append(fig.add_axes([x_start + space_x, 0.79 + (2 - i) * space_y, fig_x, fig_y]))
     plot_matching_ic_3_conditions(ne_split, axes, 2, marker_size=7, ymax=0.7)
     axes[0].set_title('B', pad=20)
 
@@ -1636,6 +1683,7 @@ def figure2(datafolder, figfolder):
     fig.savefig(os.path.join(figfolder, 'fig2.png'))
     fig.savefig(os.path.join(figfolder, 'fig2.pdf'))
 
+
 # ----------------------plot formatting tools -------------------------------------------
 def boxplot_scatter(ax, x, y, data, order, hue, palette, hue_order,
                     jitter=0.4, legend=False, notch=True, size=5, alpha=1,
@@ -1675,28 +1723,27 @@ def plot_significance_star(ax, p, x_bar, y_bar, y_star):
                     horizontalalignment='center', verticalalignment='center')
 
 
-
 # ------------------------------- ne properties 2 -----------------------------------------------------------------
 def plot_ne_stim_response_type(datafolder, savefolder, rf='strf'):
-    stim_sig = pd.DataFrame({'exp': [], 'ne': [], 'probe':[], 'ne_sig':[], 'member_sig':[]})
+    stim_sig = pd.DataFrame({'exp': [], 'ne': [], 'probe': [], 'ne_sig': [], 'member_sig': []})
     files = glob.glob(datafolder + r'\*20dft-dmr.pkl', recursive=False)
     for file in files:
         with open(file, 'rb') as f:
             ne = pickle.load(f)
-        
+
         session_file_path = re.sub('-ne-.*.pkl', r'.pkl', ne.file_path)
         with open(session_file_path, 'rb') as f:
             session = pickle.load(f)
-        
+
         for idx, members in ne.ne_members.items():
-            
+
             if rf == 'strf':
-                ne_sig = ne.ne_units[idx].strf_sig 
+                ne_sig = ne.ne_units[idx].strf_sig
                 member_sig = []
                 for member in members:
                     member_sig.append(session.units[member].strf_sig)
             elif rf == 'crh':
-                ne_sig = ne.ne_units[idx].crh_sig 
+                ne_sig = ne.ne_units[idx].crh_sig
                 member_sig = []
                 for member in members:
                     member_sig.append(session.units[member].crh_sig)
@@ -1705,10 +1752,11 @@ def plot_ne_stim_response_type(datafolder, savefolder, rf='strf'):
                 member_sig = []
                 for member in members:
                     member_sig.append(session.units[member].strf_sig or session.units[member].crh_sig)
-            
+
             member_sig = np.array(member_sig).mean()
-            stim_sig = pd.concat((stim_sig, 
-                                  pd.DataFrame({'exp': session.exp, 'ne': idx, 'probe': session.probe, 'ne_sig': ne_sig, 'member_sig': member_sig}, 
+            stim_sig = pd.concat((stim_sig,
+                                  pd.DataFrame({'exp': session.exp, 'ne': idx, 'probe': session.probe, 'ne_sig': ne_sig,
+                                                'member_sig': member_sig},
                                                index=[0])), ignore_index=True)
     fig, axes = plt.subplots(2, 2, figsize=(10, 10))
     # plot back to back histogram
@@ -1725,11 +1773,11 @@ def plot_ne_stim_response_type(datafolder, savefolder, rf='strf'):
         ax.add_patch(rect)
 
         data = stim_sig[stim_sig.probe == probe]
-        h1, _, _ = ax.hist(data[data.ne_sig > 0]['member_sig'], bins=np.linspace(0,1,11), 
-                orientation='horizontal', color=colors[7], edgecolor='k')
+        h1, _, _ = ax.hist(data[data.ne_sig > 0]['member_sig'], bins=np.linspace(0, 1, 11),
+                           orientation='horizontal', color=colors[7], edgecolor='k')
         ax2 = ax.twiny()
-        h2, _, _ = ax2.hist(data[data.ne_sig == 0]['member_sig'], bins=np.linspace(0,1,11), 
-                 orientation='horizontal', color=colors[1], edgecolor='k')
+        h2, _, _ = ax2.hist(data[data.ne_sig == 0]['member_sig'], bins=np.linspace(0, 1, 11),
+                            orientation='horizontal', color=colors[1], edgecolor='k')
         ax2.invert_xaxis()
         ax2.set_xticks([])
         m1 = (np.ceil(max(h1) / 5) + 1) * 5
@@ -1738,7 +1786,7 @@ def plot_ne_stim_response_type(datafolder, savefolder, rf='strf'):
         ax.set_xlim([-m2, m1])
         ax.plot([-m2, m1], [0.5, 0.5], 'k')
         ax.set_ylim([0, 1])
-        
+
         y = [len(data[(data.ne_sig == 0) & (data.member_sig >= 0.5)]),
              len(data[(data.ne_sig > 0) & (data.member_sig >= 0.5)]),
              len(data[(data.ne_sig > 0) & (data.member_sig < 0.5)]),
@@ -1746,9 +1794,9 @@ def plot_ne_stim_response_type(datafolder, savefolder, rf='strf'):
              ]
         ax.set_ylabel('percent of {}+'.format(rf))
         ax = axes[i, 1]
-        ax.pie(y, colors=pie_colors, normalize=True, 
-               wedgeprops={"edgecolor":"k",'linewidth': 2},
-               autopct='%1.1f%%',  pctdistance=1.3)
+        ax.pie(y, colors=pie_colors, normalize=True,
+               wedgeprops={"edgecolor": "k", 'linewidth': 2},
+               autopct='%1.1f%%', pctdistance=1.3)
         if i == 0:
             ax.legend(['None-constructive', 'Facilitative', 'Constructive', 'Stimulus-independent'],
                       bbox_to_anchor=(0.8, 1.4))
@@ -1764,13 +1812,13 @@ def plot_ne_neuron_stim_response_hist(datafolder, savefolder):
             with open(file, 'rb') as f:
                 ne = pickle.load(f)
             session_file = re.sub('-ne-20dft-dmr', '', file)
-            
+
             for cne in ne.ne_units:
                 ne_sig[region].append(np.array([cne.strf_sig, cne.crh_sig]))
-            
+
             with open(session_file, 'rb') as f:
                 session = pickle.load(f)
-            
+
             for unit in session.units:
                 neuron_sig[region].append(np.array([unit.strf_sig, unit.crh_sig]))
     fig, axes = plt.subplots(2, 1, figsize=(6, 6))
@@ -1780,14 +1828,14 @@ def plot_ne_neuron_stim_response_hist(datafolder, savefolder):
         neuron_sig[region] = np.array(neuron_sig[region])
         stim_sig = []
         for units in (ne_sig[region], neuron_sig[region]):
-            stim_sig.append(np.array([sum(~units[:,0] & ~units[:,1]),
-                        sum(units[:,0] & ~units[:,1]),
-                        sum(~units[:,0] & units[:,1]),
-                        sum(units[:,0] & units[:,1])
-                        ]))
+            stim_sig.append(np.array([sum(~units[:, 0] & ~units[:, 1]),
+                                      sum(units[:, 0] & ~units[:, 1]),
+                                      sum(~units[:, 0] & units[:, 1]),
+                                      sum(units[:, 0] & units[:, 1])
+                                      ]))
         x = np.array(range(4))
-        axes[c].bar(x - 0.2, stim_sig[0]/np.sum(stim_sig[0]), 0.4, label = 'cNEs')
-        axes[c].bar(x + 0.2,stim_sig[1]/np.sum(stim_sig[1]), 0.4, label = 'neurons')
+        axes[c].bar(x - 0.2, stim_sig[0] / np.sum(stim_sig[0]), 0.4, label='cNEs')
+        axes[c].bar(x + 0.2, stim_sig[1] / np.sum(stim_sig[1]), 0.4, label='neurons')
         if c == 0:
             axes[c].legend()
             axes[c].set_xticks([])
@@ -1798,8 +1846,8 @@ def plot_ne_neuron_stim_response_hist(datafolder, savefolder):
         axes[c].set_title(region)
         c += 1
     fig.savefig(os.path.join(savefolder, 'hist_ne_neuron_stim_encoding.png'))
-    
-    
+
+
 def plot_ne_neuron_strf_sig_hist(datafolder, savefolder):
     files = get_A1_MGB_files(datafolder, 'dmr')
     ne_sig = {'A1': [], 'MGB': []}
@@ -1809,13 +1857,13 @@ def plot_ne_neuron_strf_sig_hist(datafolder, savefolder):
             with open(file, 'rb') as f:
                 ne = pickle.load(f)
             session_file = re.sub('-ne-20dft-dmr', '', file)
-            
+
             for cne in ne.ne_units:
                 ne_sig[region].append(cne.strf_sig)
-            
+
             with open(session_file, 'rb') as f:
                 session = pickle.load(f)
-            
+
             for unit in session.units:
                 neuron_sig[region].append(unit.strf_sig)
     fig, axes = plt.subplots(2, 1, figsize=(6, 6))
@@ -1827,8 +1875,8 @@ def plot_ne_neuron_strf_sig_hist(datafolder, savefolder):
         for units in (ne_sig[region], neuron_sig[region]):
             stim_sig.append(np.array([sum(units), sum(~units)]))
         x = np.array(range(2))
-        axes[c].bar(x - 0.2, stim_sig[0]/np.sum(stim_sig[0]), 0.4, label = 'cNEs')
-        axes[c].bar(x + 0.2,stim_sig[1]/np.sum(stim_sig[1]), 0.4, label = 'neurons')
+        axes[c].bar(x - 0.2, stim_sig[0] / np.sum(stim_sig[0]), 0.4, label='cNEs')
+        axes[c].bar(x + 0.2, stim_sig[1] / np.sum(stim_sig[1]), 0.4, label='neurons')
         axes[c].set_xticks(range(2))
         if c == 0:
             axes[c].legend()
@@ -1840,3 +1888,75 @@ def plot_ne_neuron_strf_sig_hist(datafolder, savefolder):
         c += 1
     plt.tight_layout()
     fig.savefig(os.path.join(savefolder, 'hist_ne_neuron_strf_encoding.png'))
+
+
+def plot_neuron_ne_subsample_strf_crh(subsample_ri, taxis, faxis, tmfaxis, smfaxis, 
+                                      savefolder=r'E:\Congcong\Documents\data\comparison\figure\cNE-subsample-strf_crh'):
+    """
+    plot sub sampled strf and crh for each member neuron
+    """
+    nrows = 8
+    fig, axes = plt.subplots(nrows=nrows, ncols=6, figsize = figure_size)
+    r = 0
+    nfig=1
+    for i in subsample_ri.index:
+        unit = subsample_ri.iloc[i]
+        # plot strf
+        unit_types = ['neuron', 'ne_spike', 'cNE']
+        m = 0
+        for c, unit_type in enumerate(unit_types):
+            axes[r][c].clear()
+            strf = np.array(unit['strf_{}'.format(unit_type)])[:,:,0]
+            m = max(np.abs(strf).max(), m)
+            plot_strf(ax=axes[r][c], 
+                      strf=strf, 
+                      taxis=taxis, faxis=faxis)
+            axes[r][c].set_title('{:.2f} / {:.1f}'\
+                                 .format(np.array(unit['strf_ri_{}'.format(unit_type)]).mean(), 
+                                         unit['strf_ptd_{}'.format(unit_type)]))
+            if r != nrows - 1:
+                axes[r][c].set_xlabel('')
+            if c > 0:
+                axes[r][c].set_ylabel('')
+                axes[r][c].set_yticklabels('')
+        for c in range(3):
+            axes[r][c].clim(-m, m)
+        
+        # plot crh
+        for j, unit_type in enumerate(unit_types):
+            c = j+3
+            axes[r][c].clear()
+            plot_crh(ax=axes[r][c], 
+                     crh=np.array(unit['crh_{}'.format(unit_type)])[:,:,0], 
+                     tmfaxis=tmfaxis, smfaxis=smfaxis)
+            axes[r][c].set_title('{:.2f}'\
+                                 .format(np.array(unit['crh_ri_{}'.format(unit_type)]).mean()))
+            if r != nrows - 1:
+                axes[r][c].set_xlabel('')
+            if c > 3:
+                axes[r][c].set_ylabel('')
+                axes[r][c].set_yticklabels('')
+        
+        if r == nrows - 1:
+            plt.tight_layout()
+            plt.savefig(os.path.join(savefolder, 'subsampled_strf_ri-{}.jpg'.format(nfig)))
+            plt.savefig(os.path.join(savefolder, 'subsampled_strf_ri-{}.pdf'.format(nfig)))
+            r = 0
+            nfig += 1
+        else:
+            r += 1
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+

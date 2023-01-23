@@ -21,11 +21,11 @@ units = pd.read_json(os.path.join(datafolder, 'single_units.json'))
 figfolder = r'E:\Congcong\Documents\data\comparison\figure\su-strf'
 plots.plot_strf_df(units, figfolder, order='strf_ri_z', properties=True, smooth=True)
 figfolder = r'E:\Congcong\Documents\data\comparison\figure\su-crh'
-plots.plot_crh_df(units, figfolder, order='crh_ri_z')
+plots.plot_crh_df(units, figfolder, order='crh_ri_z', properties=True)
 
 
 # +++++++++++++++++++++++++++++++++++++++++++ cNE properties ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# ------------------------------plot 5ms binned strf of cNEs and member neurons-----------------------------------------
+# ------------------------------ plot 5ms binned strf of cNEs and member neurons-----------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 figpath = r'E:\Congcong\Documents\data\comparison\figure\cNE-5ms-strf'
 files = glob.glob(datafolder + r'\*20dft-dmr.pkl', recursive=False)
@@ -35,6 +35,17 @@ for idx, file in enumerate(files):
     with open(file, 'rb') as f:
         ne = pickle.load(f)
     plots.plot_5ms_strf_ne_and_members(ne, figpath)
+
+# ------------------------------ plot crh of cNEs and member neurons-----------------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+figpath = r'E:\Congcong\Documents\data\comparison\figure\cNE-crh'
+files = glob.glob(datafolder + r'\*20dft-dmr.pkl', recursive=False)
+
+for idx, file in enumerate(files):
+    print('({}/{}) plot 5ms STRFs for {}'.format(idx, len(files), file))
+    with open(file, 'rb') as f:
+        ne = pickle.load(f)
+    plots.plot_crh_ne_and_members(ne, figpath)
 
 # --------------------------------plot cNE construction procedure -----------------------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
@@ -60,6 +71,10 @@ for stim in ('dmr', 'spon'):
     # scatter plot of cNE size vs number of neurons
     plots.ne_size_vs_num_neuron(ax, datafolder, stim=stim, plot_type='mean')
     fig.savefig(os.path.join(figure_folder, 'ne_size_vs_n_neuron_mean_{}.jpg'.format(stim)))
+    ax.clear()
+    # scatter plot of frequncy range ne vs all neurons
+    plots.ne_freq_span_vs_all_freq_span(ax, datafolder, stim)
+    fig.savefig(os.path.join(figure_folder, 'freq_span_ne_vs_all_{}.jpg'.format(stim)))
     ax.clear()
     # box plot of cNE size vs number of neurons
     plots.ne_size_vs_num_neuron(ax, datafolder, stim=stim, plot_type='raw', relative=True)
@@ -138,3 +153,19 @@ for idx, file in enumerate(files):
     figure_path = os.path.join(figure_folder, re.sub('pkl', 'jpg', filename))
     plots.plot_ne_split_ic_weight_null_corr(ne_split, figure_path)
 
+# +++++++++++++++++++++++++++++++++++++++ cNE stimulus encoding +++++++++++++++++++++++++++++++++++++++++++++++
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+savefolder = r'E:\Congcong\Documents\data\comparison\figure\cNE-properties'
+# plots.plot_ne_neuron_stim_response_hist(datafolder, savefolder)
+plots.plot_ne_neuron_strf_response_hist(datafolder, savefolder)
+
+# ------------------------------ plot strf, crh and onlinearity of cNEs and member neurons------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+figpath = r'E:\Congcong\Documents\data\comparison\figure\cNE-strf-crh-nonlinearity'
+files = glob.glob(datafolder + r'\*20dft-dmr.pkl', recursive=False)
+
+for idx, file in enumerate(files):
+    print('({}/{}) plot 5ms STRFs for {}'.format(idx, len(files), file))
+    with open(file, 'rb') as f:
+        ne = pickle.load(f)
+    plots.plot_ne_member_strf_crh_nonlinearity(ne, figpath)

@@ -27,22 +27,33 @@ for idx, file in enumerate(files):
     print('({}/{}) processing {}'.format(idx + 1, len(files), file))
     print('get unit positions')
     session.get_unit_position()
+    
     print('get 5ms binned strf')
     session.get_strf(stim_strf)
-    print('get crh')
-    session.get_crh(stim_crh)
-    print('get strf RI')
-    session.get_strf_ri(stim_strf)
-    print('get crh RI')
-    session.get_crh_ri(stim_crh)
     print('get strf properties')
     session.get_strf_properties()
+    print('get strf ptd')
+    session.get_strf_ptd()
+    print('get strf nonlinearity')
+    session.get_strf_nonlinearity(stim_strf)
+    print('get strf mutual information')
+    session.get_strf_mi(stim_strf)
+    print('get strf RI')
+    session.get_strf_ri(stim_strf)
     print('get strf sig')
     session.get_strf_significance(criterion='z', thresh=3)
+    
+    print('get crh')
+    session.get_crh(stim_crh)
     print('get crh properties')
     session.get_crh_properties()
+    print('get crh moranI')
+    session.get_crh_morani()
+    print('get crh RI')
+    session.get_crh_ri(stim_crh)
     print('get crh sig')
     session.get_crh_significance(criterion='z', thresh=3)
+    
     session.save_pkl_file(session.file_path)
 
 save_su_df()
@@ -80,21 +91,10 @@ datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 files = glob.glob(datafolder + r'\*20dft-dmr.pkl', recursive=False)
 
 alpha = 99.5
-stimfolder = r'E:\Congcong\Documents\stimulus\thalamus'
-stimfile = r'rn1-500flo-40000fhi-0-4SM-0-40TM-40db-96khz-48DF-15min-seed190506_DFt1_DFf5.pkl'
-with open(os.path.join(stimfolder, stimfile), 'rb') as f:
-    stim = pickle.load(f)
-stim.down_sample(df=10)
-
-# get stimulus for crh calculation (mtf)
-stimfile = r'rn1-500flo-40000fhi-0-4SM-0-40TM-40db-96khz-48DF-15min-seed190506_mtf.pkl'
-with open(os.path.join(stimfolder, stimfile), 'rb') as f:
-    stim_crh = pickle.load(f)
-    
 for idx, file in enumerate(files):
     with open(file, 'rb') as f:
         ne = pickle.load(f)
-    print('({}/{}) get cNE response properties for {}'.format(idx + 1, len(files), file))
+    print('({}/{}) get cNE activities and members for {}'.format(idx + 1, len(files), file))
     if not hasattr(ne, 'ne_activity'):
         print('get members and activity')
         ne.get_members()
@@ -106,21 +106,8 @@ for idx, file in enumerate(files):
         ne.get_ne_spikes(alpha=alpha)
         ne.save_pkl_file(ne.file_path)
     
-    # get ne strf and strf properties
-    print('get 5ms binned strf')
-    ne.get_strf(stim)
-    ne.get_strf_ri(stim)
-    ne.get_strf_properties()
-    ne.get_strf_significance(criterion='z', thresh=3)
-    # get ne crh and crh properties
-    print('get crh')
-    ne.get_crh(stim_crh)
-    ne.get_crh_ri(stim_crh)
-    ne.get_crh_properties()
-    ne.get_crh_significance(criterion='z', thresh=3)
-    
     ne.save_pkl_file(ne.file_path)
-
+    
 # ---------------------------------------- get xcorr of member and nonmember pairs -------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 files = glob.glob(datafolder + r'\*fs20000.pkl', recursive=False)
@@ -184,8 +171,45 @@ netools.get_split_ne_null_df(files, savefolder)
 
 
 # ++++++++++++++++++++++++++++++++++++++++++++++ cNE stim response ++++++++++++++++++++++++++++++++++++++++++++++++++++
-# ------------------------------------------------ reliability-------------------------------------------------------------
+# ----------------------------------------- get cNE stimulus responses ---------------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+files = glob.glob(datafolder + r'\*20dft-dmr.pkl', recursive=False)
+
+stimfolder = r'E:\Congcong\Documents\stimulus\thalamus'
+stimfile = r'rn1-500flo-40000fhi-0-4SM-0-40TM-40db-96khz-48DF-15min-seed190506_DFt1_DFf5.pkl'
+with open(os.path.join(stimfolder, stimfile), 'rb') as f:
+    stim = pickle.load(f)
+stim.down_sample(df=10)
+
+# get stimulus for crh calculation (mtf)
+stimfile = r'rn1-500flo-40000fhi-0-4SM-0-40TM-40db-96khz-48DF-15min-seed190506_mtf.pkl'
+with open(os.path.join(stimfolder, stimfile), 'rb') as f:
+    stim_crh = pickle.load(f)
+    
+for idx, file in enumerate(files):
+    with open(file, 'rb') as f:
+        ne = pickle.load(f)
+    print('({}/{}) get cNE response properties for {}'.format(idx + 1, len(files), file))
+    
+    # get ne strf and strf properties
+    print('get 5ms binned strf')
+    ne.get_strf(stim)
+    ne.get_strf_ri(stim)
+    ne.get_strf_properties()
+    ne.get_strf_significance(criterion='z', thresh=3)
+    ne.get_strf_nonlinearity(stim)
+    ne.get_strf_info(stim)
+    
+    # get ne crh and crh properties
+    print('get crh')
+    ne.get_crh(stim_crh)
+    ne.get_crh_ri(stim_crh)
+    ne.get_crh_properties()
+    ne.get_crh_significance(criterion='z', thresh=3)
+    
+    ne.save_pkl_file(ne.file_path)
+    
+# ------------------------------------------reliability of stimulus response-------------------------------------------
 savefolder = r'E:\Congcong\Documents\data\comparison\data-summary'
 stimfolder = r'E:\Congcong\Documents\stimulus\thalamus'
 # get stimulus for strf calculation (spectrogram)

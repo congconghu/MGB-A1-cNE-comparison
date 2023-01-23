@@ -90,16 +90,7 @@ def get_ne_spikes(activity, thresh, spiketimes, edges):
 
 
 def get_binned_spiketimes(spiketimes, edges):
-    nbins = len(edges) - 1
-    dig = np.digitize(spiketimes, edges)
-    idx_bin, idx_spiketimes = np.unique(dig, return_index=True)
-    spiketimes_binned = [[] for i in range(nbins)]
-    for i, ibin in enumerate(idx_bin):
-        if 0 < ibin <= nbins:
-            try:
-                spiketimes_binned[ibin - 1] = spiketimes[idx_spiketimes[i]: idx_spiketimes[i + 1]]
-            except IndexError:  # when there is no spike after the last bin
-                spiketimes_binned[ibin - 1] = spiketimes[idx_spiketimes[i]:]
+    spiketimes_binned, _ = np.histogram(spiketimes, edges)
     return spiketimes_binned
 
 
@@ -426,7 +417,7 @@ def get_split_ne_null_df(files, savefolder):
 # ---------------------------------------- single unit properties -----------------------------------------------------
 
 
-def calc_strf(stim_mat, spktrain, nlag, nlead):
+def calc_strf(stim_mat, spktrain, nlag=0, nlead=20):
     strf = np.zeros((stim_mat.shape[0], nlag + nlead))
     for i in range(nlead):
         strf[:, i] = stim_mat @ np.roll(spktrain, i - nlead)
@@ -539,6 +530,7 @@ def calc_strf_properties(strf, taxis, faxis, sigma_y=2, sigma_x=1):
     latency = taxis[col]
     return bf, latency
 
+
 def calc_crh_properties(crh, tmfaxis, smfaxis):
     tmf = np.sum(crh, axis=0)
     smf = np.sum(crh, axis=1)
@@ -555,11 +547,31 @@ def calc_crh_properties(crh, tmfaxis, smfaxis):
     
     return btmf, bsmf
 
-def calc_strf_tpr(strf):
-    return (strf.max() - strf.min) / strf.std()
 
-def calc_crh_moranI(crh):
-    pass
+def calc_strf_ptd(strf, nspk):
+    return (strf.max() - strf.min()) / nspk
+
+
+def moran_i(mat, diagopt=True):
+    
+    weightmat = create_spatial_autocorr_weight_mat(*mat.shape, diagopt=diagopt)
+    N = mat.size
+    W = weightmat.sum()
+    
+    # Calculate denominator
+    xbar = mat.mean()
+    dvec = mat - xbar
+    dvec = dvec.flatten()
+    deno = np.multiply(dvec, dvec).sum()
+    
+    # Calculate numerator
+    numer = 0
+    i, j = np.where(weightmat)
+    
+    for m, n in zip(i, j):
+        numer += dvec[m] * dvec[n]
+    return (N / W) * (numer / deno)
+
 
 def create_spatial_autocorr_weight_mat(nrows, ncols, diagopt=True):
     eq = [lambda i,j: np.array([i-1, j]), 
@@ -573,10 +585,9 @@ def create_spatial_autocorr_weight_mat(nrows, ncols, diagopt=True):
                    lambda i,j: np.array([i+1, j+1])])
     
     nele = nrows * ncols;
-    weightmat = np.empty((nele, nele))
-    refmat = np.reshape(range(nele), [nrows, ncols])
+    weightmat = np.zeros((nele, nele))
+    # single index
     
-    c = 1
     for j in range(ncols):
         for i in range(nrows):
             
@@ -585,13 +596,147 @@ def create_spatial_autocorr_weight_mat(nrows, ncols, diagopt=True):
             # keep only indices within range
             rcidx = [[x, y] for [x, y] in rcidx if x >= 0 and x < nrows and y >= 0 and y < ncols]
             # get 1d-indices from 2d
+            idx = [np.ravel_multi_index(x, [nrows, ncols]) for x in rcidx]
             
+            weightmat[i * nrows + j, idx] = 1
+    return weightmat
+            
+
+def calc_strf_nonlinearity(strf, spktrain, stim):
+    
+    ntbins = strf.shape[1]
+    similarity_null = get_strf_proj_xprior(strf, stim)
+    
+    sd = similarity_null.std()
+    m = similarity_null.mean()
+    similarity_null = (similarity_null - m) / sd
+    
+    edge_min = np.round(similarity_null.min()) - .5
+    edge_max = np.round(similarity_null.max()) + .5
+    edges = np.arange(edge_min, edge_max+0.5)
+    centers = (edges[:-1] + edges[1:])/2
+    t, _ = np.histogram(similarity_null, edges) 
+    t = t * 5e-3 # time of each sd bin in s
+    
+    similarity_spk = similarity_null[spktrain[ntbins-1:] > 0]
+    nspk, _ = np.histogram(similarity_spk, edges)
+    
+    fr = np.divide(nspk, t)
+    fr_mean = nspk.sum() / t.sum()
+    fr_normalized = fr - fr_mean
+    
+    idx0 = np.where(centers == 0)[0][0]
+    fr_l = fr_normalized[:idx0].sum() 
+    fr_r = fr_normalized[idx0+1:].sum() 
+    asi = (fr_r - fr_l) / (fr_r + fr_l)
+    nonlinearity = {'si_null': similarity_null, 'si_spk': similarity_spk, 
+                    'centers': centers, 't_bins': t, 'nspk_bins': nspk, 
+                    'fr':fr, 'fr_mean': fr_mean, 'asi': asi}
+    
+    return nonlinearity
+
+
+def calc_strf_mi(spiketimes, edges, stim, frac=[90, 92.5, 95, 97.5, 100], nreps=10, nblocks=2):
+    rand.seed(0)
+    spktrain = get_binned_spiketimes(spiketimes, edges)
+    spiketimes = spiketimes[(spiketimes >= edges[0]) & (spiketimes <= edges[-1])]
+    np.random.shuffle(spiketimes)
+    nspk_block = int(spktrain.sum()/nblocks)
+    info = np.zeros(nblocks)
+    ifrac = np.zeros([nblocks, nreps, len(frac)])
+    xbins_centers = np.zeros([nblocks, 14])
+    
+    for i in range(nblocks):
+        spiketimes_tmp = spiketimes[i*nspk_block: (i+1)*nspk_block]
+        spktrain_train = get_binned_spiketimes(spiketimes_tmp, edges)
+        spktrain_test = spktrain - spktrain_train
+        info[i], ifrac[i], xbins_centers[i] = cal_mi(spktrain_train, spktrain_test, stim)
+    
+    return info, ifrac, xbins_centers
+
+def cal_mi(spktrain_train, spktrain_test, stim, frac=[90, 92.5, 95, 97.5, 100], nreps=10, nlag=0, nlead=20):
+    
+    strf = calc_strf(stim, spktrain_train, nlag=nlag, nlead=nlead)
+    xprior = get_strf_proj_xprior(strf, stim)
+    xpost = xprior[spktrain_test[(nlead-1):] > 0]
+    
+    ifrac, xbins_centers = info_from_fraction(xprior, xpost, frac=frac, nreps=nreps)
+    
+    info_mn = np.mean(ifrac, axis=0)
+    x = 100 / np.array(frac)
+    
+    _, info = scipy.polyfit(x, info_mn, 1)
+    
+    return info, ifrac, xbins_centers
+
+def info_from_fraction(xprior, xpost, frac=[90, 92.5, 95, 97.5, 100], nreps=10):
+    rand.seed(0)
+    ifrac = np.empty([nreps, len(frac)])
+    n_event = len(xpost)
+    
+    # prior distribution of projection values
+    xmn = xprior.mean()
+    xstd = xprior.std()
+    xprior = (xprior - xmn) / xstd
+    xpost = (xpost - xmn) / xstd
+    xbins_edges = np.linspace(xprior.min(), xprior.max(), 15)
+    xbins_centers = (xbins_edges[:-1] +  xbins_edges[1:]) / 2
+    nx_prior, _ = np.histogram(xprior, xbins_edges)
+    px_prior = nx_prior / len(xprior)
+    
+    # posterior distribution of projection values of subset of spikes
+    for m, curr_frac in enumerate(frac):
+        n_event_subset = int(np.round(curr_frac / 100 * n_event))
+        
+        if curr_frac == 100:
+            nreps = 1
+        
+        for n in range(nreps):
+            xspk = rand.sample(list(xpost), n_event_subset)
+            nx_post, _ = np.histogram(xspk, xbins_edges)
+            px_post = nx_post / n_event_subset
+            ifrac[n, m] = info_prior_post(px_prior, px_post)
+        
+        if curr_frac == 100:
+            ifrac[:, m] = ifrac[n, m]
+
+    return ifrac, xbins_centers
+    
+
+def get_strf_proj_xprior(strf, stim):
+    """
+    get the projection value of strt and the entire stimulus (xprior for info/nonlinearity calculation)
+
+    Parameters
+    ----------
+    strf : np.array, m * n
+        spectrotemporal receptive field  (STRF) of the unit
+    stim : np.array, nf * nt
+        spectrogram of the stimulus
+
+    Returns
+    -------
+    similarity_null : np.array, 1 * (nt - n + 1)
+        xprior. projection value of strf with the entire stimulus
+
+    """
+    ntbins = strf.shape[1]
+    similarity_tbins = np.transpose(strf) @ stim
+    similarity_null = np.zeros(stim.shape[1] - ntbins + 1)
+    for i in range(ntbins):
+        if i == ntbins-1:
+            similarity_null = similarity_null + similarity_tbins[i, i:]
+        else:
+            similarity_null = similarity_null + similarity_tbins[i, i:-ntbins+i+1]
+    
+    return similarity_null
     
     
-    
-    
-    
-    
+def info_prior_post(px_prior, px_post):
+    idx = np.where((px_prior > 0) & (px_post > 0))[0]
+    px_prior = px_prior[idx]
+    px_post = px_post[idx]
+    return np.sum(px_post * np.log2(px_post / px_prior))
     
     
     

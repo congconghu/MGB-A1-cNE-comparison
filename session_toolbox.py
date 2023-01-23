@@ -182,11 +182,35 @@ class SingleUnit:
     def get_strf_significance(self, criterion='z', thresh=3):
         if criterion == 'z':
             self.strf_sig = self.strf_ri_z > thresh
+    
+    def get_strf_ptd(self):
+        self.strf_ptd = netools.calc_strf_ptd(self.strf, len(self.spiketimes))
+        
+    def get_strf_nonlinearity(self, edges, stim):
+        spiketimes = self.spiketimes
+        spktrain, _ = np.histogram(spiketimes, edges)
+        strf_nonlinearity = netools.calc_strf_nonlinearity(self.strf, spktrain, stim)
+        
+        self.si_null =  strf_nonlinearity['si_null']
+        self.si_spk =  strf_nonlinearity['si_spk']
+        self.nonlin_centers =  strf_nonlinearity['centers']
+        self.nonlin_t_bins =  strf_nonlinearity['t_bins']
+        self.nonlin_nspk_bins =  strf_nonlinearity['nspk_bins']
+        self.nonlin_fr =  strf_nonlinearity['fr']
+        self.nonlin_fr_mean =  strf_nonlinearity['fr_mean']
+        self.nonlin_asi =  strf_nonlinearity['asi']
+        
+    def get_strf_mi(self, edges, stim):
+            spiketimes = self.spiketimes
+            self.strf_info, self.strf_ifrac, self.strf_info_xcenters = netools.calc_strf_mi(spiketimes, edges, stim)
             
     def get_crh_properties(self):
         btmf, bsmf = netools.calc_crh_properties(self.crh, self.tmfaxis, self.smfaxis)
         self.btmf = btmf
         self.bsmf = bsmf
+    
+    def get_crh_morani(self):
+        self.crh_morani = netools.moran_i(self.crh)
 
     def get_crh_significance(self, criterion='z', thresh=3):
         if criterion == 'z':
@@ -366,11 +390,30 @@ class Session:
             edges = edges[::df]
         for unit in self.units:
             unit.get_strf(stim, edges, nlag=nlag, nlead=nlead)
-
-    def get_crh(self, stim):
-        edges = self.edges_dmr
+    
+    def get_strf_properties(self):
         for unit in self.units:
-            unit.get_crh(stim, edges)
+            unit.get_strf_properties()
+            
+    def get_strf_ptd(self):
+        for unit in self.units:
+            unit.get_strf_ptd()
+    
+    def get_strf_nonlinearity(self, stim):
+        edges = self.edges_dmr
+        if hasattr(stim, 'df'):
+            df = stim.df
+            edges = edges[::df]
+        for unit in self.units:
+            unit.get_strf_nonlinearity(edges, stim.stim_mat)
+    
+    def get_strf_mi(self, stim):
+        edges = self.edges_dmr
+        if hasattr(stim, 'df'):
+            df = stim.df
+            edges = edges[::df]
+        for unit in self.units:
+            unit.get_strf_mi(edges, stim.stim_mat)
 
     def get_strf_ri(self, stim, nlead=20, nlag=0, method='block', n_block=10, n_sample=1000):
         edges = self.edges_dmr
@@ -379,24 +422,29 @@ class Session:
             edges = edges[::df]
         for unit in self.units:
             unit.get_strf_ri(stim, edges, nlead=20, nlag=0, method=method,  n_block=n_block, n_sample=n_sample)
+    
+    def get_strf_significance(self, criterion='z', thresh=3):
+        for unit in self.units:
+            unit.get_strf_significance(criterion=criterion, thresh=thresh)    
+    
+    def get_crh(self, stim):
+        edges = self.edges_dmr
+        for unit in self.units:
+            unit.get_crh(stim, edges)
+
+    def get_crh_properties(self):
+        for unit in self.units:
+            unit.get_crh_properties()
+    
+    def get_crh_morani(self):
+        for unit in self.units:
+            unit.get_crh_morani()
 
     def get_crh_ri(self, stim, method='block', n_block=10, n_sample=1000):
         edges = self.edges_dmr
         for unit in self.units:
             unit.get_crh_ri(stim, edges, method=method, n_block=n_block, n_sample=n_sample)
-
-    def get_strf_properties(self):
-        for unit in self.units:
-            unit.get_strf_properties()
-
-    def get_strf_significance(self, criterion='z', thresh=3):
-        for unit in self.units:
-            unit.get_strf_significance(criterion=criterion, thresh=thresh)
-    
-    def get_crh_properties(self):
-        for unit in self.units:
-            unit.get_crh_properties()
-
+            
     def get_crh_significance(self, criterion='z', thresh=3):
         for unit in self.units:
             unit.get_crh_significance(criterion=criterion, thresh=thresh)
@@ -576,6 +624,49 @@ class NE(Session):
         for _, members in self.member_ne_spikes.items():
             for unit in members:
                 unit.get_strf_significance(criterion=criterion, thresh=thresh)
+    
+    def get_strf_ptd(self):
+        # get strf ptd for cNE events
+        for unit in self.ne_units:
+            unit.get_strf_ptd()
+
+        # get member ne spike strf ptd
+        for _, members in self.member_ne_spikes.items():
+            for unit in members:
+                unit.get_strf_ptd()
+                
+    def get_strf_nonlinearity(self, stim):
+        session = self.get_session_data()
+        edges = session.edges_dmr
+        if hasattr(stim, 'df'):
+            df = stim.df
+            edges = edges[::df]
+            
+        # get strf ptd for cNE events
+        for unit in self.ne_units:
+            unit.get_strf_nonlinearity(edges, stim.stim_mat)
+
+        # get member ne spike strf ptd
+        for _, members in self.member_ne_spikes.items():
+            for unit in members:
+                unit.get_strf_nonlinearity(edges, stim.stim_mat)
+                
+    def get_strf_info(self, stim):
+         session = self.get_session_data()
+         edges = session.edges_dmr
+         if hasattr(stim, 'df'):
+             df = stim.df
+             edges = edges[::df]
+             
+         # get strf ptd for cNE events
+         for unit in self.ne_units:
+             unit.get_strf_mi(edges, stim.stim_mat)
+
+         # get member ne spike strf ptd
+         for _, members in self.member_ne_spikes.items():
+             for unit in members:
+                 unit.get_strf_mi(edges, stim.stim_mat)
+        
                 
     def get_crh(self, stim):
         
@@ -660,14 +751,14 @@ class NE(Session):
                     ne_unit_tmp = deepcopy(ne_unit)
                     ne_spike_unit_tmp = deepcopy(ne_spike_unit)
                 
-                    for u, unit in enumerate((unit_tmp, ne_unit_tmp, ne_spike_unit_tmp)):
-                        unit.subsample(n_events)
+                    for u, curr_unit in enumerate((unit_tmp, ne_unit_tmp, ne_spike_unit_tmp)):
+                        curr_unit.subsample(n_events)
                         
                         for rf in ('strf', 'crh'):
-                            eval('unit.get_{}(stim_{}, edges_{})'.format(rf, rf, rf))
-                            eval('unit.get_{}_ri(stim_{}, edges_{}, return_null=False)'.format(rf, rf, rf))
-                            rf_strf_crh[rf][u, :, :, n] = eval('unit.{}'.format(rf))
-                            ri_strf_crh[rf][u, :, n] = eval(' unit.{}_ri'.format(rf))
+                            eval('curr_unit.get_{}(stim_{}, edges_{})'.format(rf, rf, rf))
+                            eval('curr_unit.get_{}_ri(stim_{}, edges_{}, return_null=False)'.format(rf, rf, rf))
+                            rf_strf_crh[rf][u, :, :, n] = eval('curr_unit.{}'.format(rf))
+                            ri_strf_crh[rf][u, :, n] = eval('curr_unit.{}_ri'.format(rf))
                 
                 ri = {'exp': session.exp, 'depth': session.depth, 'probe': session.probe, 
                                 'cNE': i, 'member': member, 'n_events': n_events}
@@ -731,8 +822,11 @@ def save_su_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
             session = pickle.load(f)
 
         units = pd.DataFrame([vars(x) for x in session.units])
+        for i in units.index:
+            units.iloc[0]['strf_nonlinearity']
         units.drop(['spiketimes', 'isi_bin', 'waveforms', 'waveforms_mean', 'waveforms_std', 'amps',
-                    'adjacent_chan', 'template', 'peak_snr'], axis=1, inplace=True)
+                    'adjacent_chan', 'template', 'peak_snr', 'strf_nonlinearity', 'si_null', 'si_spk', 
+                    'nonlin_t_bins', 'nonlin_nspk_bins', 'strf_ifrac', 'strf_info_xcenters'], axis=1, inplace=True)
         units['exp'] = session.exp
         units['depth'] = session.depth
         units['probe'] = session.probe
@@ -787,8 +881,10 @@ def save_ne_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
         for i, members in ne.ne_members.items():
             pattern = ne.patterns[i]
             strf_sig = ne.ne_units[i].strf_ri_z > 3
+            crh_sig = ne.ne_units[i].crh_ri_z > 3
             ne_all.append({'exp': exp, 'probe': probe, 'depth':depth,
-                           'cNE': i, 'members': members, 'pattern': pattern, 'strf_sig': strf_sig})
+                           'cNE': i, 'members': members, 'pattern': pattern, 
+                           'strf_sig': strf_sig, 'crh_sig': crh_sig})
     ne_all = pd.DataFrame(ne_all)
     ne_all.to_json(os.path.join(savefolder, 'cNE.json'))
 
@@ -802,10 +898,10 @@ def ri_ne_neuron_subsample(stim_strf=None, stim_crh=None,
         print('({}/{}) getting subsampled ri for {}'.format(idx + 1, len(files), file))
         with open(file, 'rb') as f:
             ne = pickle.load(f)
-        
-        ri.append(ne.get_subsampled_ri(stim_strf=stim_strf, stim_crh=stim_crh))
-    ri = pd.concat(ri)
-    ri.reset_index(drop=True, inplace=True)
-    ri.to_json(os.path.join(savefolder, 'subsample_ri.json'))
+        exp = ne.exp
+        probe = ne.probe
+        ri = ne.get_subsampled_ri(stim_strf=stim_strf, stim_crh=stim_crh)
+        ri.reset_index(drop=True, inplace=True)
+        ri.to_json(os.path.join(savefolder, '{}-{}-subsample_ri.json'.format(exp, probe)))
     
     
