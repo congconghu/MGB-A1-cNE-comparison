@@ -22,7 +22,8 @@ figfolder = r'E:\Congcong\Documents\data\comparison\figure\su-strf'
 plots.plot_strf_df(units, figfolder, order='strf_ri_z', properties=True, smooth=True)
 figfolder = r'E:\Congcong\Documents\data\comparison\figure\su-crh'
 plots.plot_crh_df(units, figfolder, order='crh_ri_z', properties=True)
-
+figfolder = r'E:\Congcong\Documents\data\comparison\figure\su-strf\nonlinearity'
+plots.plot_strf_nonlinearity_df(units, figfolder)
 
 # +++++++++++++++++++++++++++++++++++++++++++ cNE properties ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ------------------------------ plot 5ms binned strf of cNEs and member neurons-----------------------------------------
@@ -153,13 +154,15 @@ for idx, file in enumerate(files):
     figure_path = os.path.join(figure_folder, re.sub('pkl', 'jpg', filename))
     plots.plot_ne_split_ic_weight_null_corr(ne_split, figure_path)
 
+
 # +++++++++++++++++++++++++++++++++++++++ cNE stimulus encoding +++++++++++++++++++++++++++++++++++++++++++++++
+# ------------------------------percentage of stimulus encoding units------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 savefolder = r'E:\Congcong\Documents\data\comparison\figure\cNE-properties'
 # plots.plot_ne_neuron_stim_response_hist(datafolder, savefolder)
 plots.plot_ne_neuron_strf_response_hist(datafolder, savefolder)
 
-# ------------------------------ plot strf, crh and onlinearity of cNEs and member neurons------------------------------
+# ------------------------------ plot strf, crh and nonlinearity of cNEs and member neurons------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 figpath = r'E:\Congcong\Documents\data\comparison\figure\cNE-strf-crh-nonlinearity'
 files = glob.glob(datafolder + r'\*20dft-dmr.pkl', recursive=False)
@@ -169,3 +172,16 @@ for idx, file in enumerate(files):
     with open(file, 'rb') as f:
         ne = pickle.load(f)
     plots.plot_ne_member_strf_crh_nonlinearity(ne, figpath)
+    
+# ------------------------------ plot strf, crh and nonlinearity of subsampled spikes------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-summary\subsample'
+figpath = r'E:\Congcong\Documents\data\comparison\figure\cNE-strf-crh-nonlinearity-subsampled'
+files = glob.glob(datafolder + r'\*subsample_ri.json.pkl', recursive=False)
+
+for idx, file in enumerate(files):
+    print('({}/{}) plot 5ms STRFs for {}'.format(idx, len(files), file))
+    with open(file, 'rb') as f:
+        ne = pickle.load(f)
+    plots.plot_ne_member_strf_crh_nonlinearity_subsample(ne, figpath)
+    
+    

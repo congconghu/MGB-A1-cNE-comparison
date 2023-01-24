@@ -172,6 +172,9 @@ def plot_strf(ax, strf, taxis, faxis, latency=None, bf=None, smooth=False):
         taxis: time axis for strf
         faxis: frequency axis for strf
     """
+    strf = np.array(strf)
+    taxis = np.array(taxis)
+    faxis = np.array(faxis)
     max_val = abs(strf).max() * 1.01
     if smooth:
         weights = np.array([[1],
@@ -1948,7 +1951,190 @@ def plot_neuron_ne_subsample_strf_crh(subsample_ri, taxis, faxis, tmfaxis, smfax
         
 
 
+def plot_ne_member_strf_crh_nonlinearity(ne, figpath):
 
+    # load session file
+    session = ne.get_session_data()
+    n_neuron = ne.spktrain.shape[0]
+    member_thresh = 1 / np.sqrt(n_neuron)  # threshol for membership
+
+    for i, cne in enumerate(ne.ne_units):
+        
+        idx_ne = cne.unit
+        members = ne.ne_members[idx_ne]
+        nrows = max(len(members)+1, 5)
+        fig, axes = plt.subplots(nrows, 6, figsize=figure_size[0])
+    
+        for idx in range(3):
+            axes[0][idx].remove()
+    
+        taxis = cne.strf_taxis
+        faxis = cne.strf_faxis
+        tmfaxis = cne.tmfaxis
+        smfaxis = cne.smfaxis
+        # plot cNE strf
+        plot_strf(axes[0][3], cne.strf, taxis=taxis, faxis=faxis)
+        axes[0][3].set_title('{:.2f} / {:.2f}'.format(np.mean(cne.strf_ri), cne.strf_ptd))
+
+        # plot cNE crh
+        plot_crh(axes[0][4], cne.crh, tmfaxis=tmfaxis, smfaxis=smfaxis)
+        axes[0][4].set_title('{:.2f} / {:.2f}'.format(np.mean(cne.crh_ri), cne.crh_morani))
+
+        # plot cNE nonlinearity
+        plot_nonlinearity(axes[0][5], centers=cne.nonlin_centers, fr=cne.nonlin_fr, fr_mean=cne.nonlin_fr_mean)
+        axes[0][5].set_title('{:.2f} / {:.2f}'.format(cne.nonlin_asi, np.mean(cne.strf_info)))
+        for c in range(3, 6):
+           axes[0][c].set_xlabel('')
+           axes[0][c].set_ylabel('')
+           axes[0][c].set_yticklabels([])
+           axes[0][c].set_xticklabels([])
+
+        # plot member strf
+        
+        for idx, member_idx in enumerate(members):
+            unit = session.units[member_idx]
+            member = ne.member_ne_spikes[idx_ne][idx]
+            nrow = idx + 1
+            
+            # plot neuron strf
+            plot_strf(axes[nrow][0], unit.strf, taxis=taxis, faxis=faxis)
+            axes[nrow][0].set_title('{:.2f} / {:.2f}'.format(np.mean(unit.strf_ri), unit.strf_ptd))
+            # plot neuron crh
+            plot_crh(axes[nrow][1], unit.crh, tmfaxis=tmfaxis, smfaxis=smfaxis)
+            axes[nrow][1].set_title('{:.2f} / {:.2f}'.format(np.mean(unit.crh_ri), unit.crh_morani))
+            # plot neuron nonlinearity
+            plot_nonlinearity(axes[nrow][2], centers=unit.nonlin_centers, fr=unit.nonlin_fr, fr_mean=unit.nonlin_fr_mean)
+            axes[nrow][2].set_title('{:.2f} / {:.2f}'.format(unit.nonlin_asi, np.mean(unit.strf_info)))
+            
+            # plot neuron strf
+            plot_strf(axes[nrow][3], member.strf, taxis=taxis, faxis=faxis)
+            axes[nrow][3].set_title('{:.2f} / {:.2f}'.format(np.mean(member.strf_ri), member.strf_ptd))
+            # plot neuron crh
+            plot_crh(axes[nrow][4], member.crh, tmfaxis=tmfaxis, smfaxis=smfaxis)
+            axes[nrow][4].set_title('{:.2f} / {:.2f}'.format(np.mean(member.crh_ri), member.crh_morani))
+            # plot neuron nonlinearity
+            plot_nonlinearity(axes[nrow][5], centers=member.nonlin_centers, fr=member.nonlin_fr, fr_mean=member.nonlin_fr_mean)
+            axes[nrow][5].set_title('{:.2f} / {:.2f}'.format(member.nonlin_asi, np.mean(member.strf_info)))
+            
+            if nrow < len(members):
+                for c in range(6):
+                    axes[nrow][c].set_xlabel('')
+                    axes[nrow][c].set_ylabel('')
+                    axes[nrow][c].set_yticklabels([])
+                    axes[nrow][c].set_xticklabels([])
+
+                    
+            
+        plt.tight_layout()
+        for r in range(len(members)+1, 5):
+            for c in range(6):
+                axes[r][c].remove()
+        name_base = re.findall('\d{6}_\d{6}.*', ne.file_path)
+        name_base = re.sub('.pkl', '-cNE_{}.jpg'.format(idx_ne), name_base[0])
+        if session.probe == 'H31x64':
+            region = 'MGB'
+        else:
+            region = 'A1'
+        fig.savefig(os.path.join(figpath, region, name_base), dpi=300)
+        plt.close(fig)
+        
+
+def plot_ne_member_strf_crh_nonlinearity_subsample(ne, taxis, faxis, tmfaxis, smfaxis, figpath):
+    
+    cnes = ne.cNE.unique()
+    # load session file
+
+    for idx_ne, cne in enumerate(cnes):
+        
+        curr_ne = ne[ne.cNE == cne]
+        nrows = max(len(curr_ne), 9)
+        fig, axes = plt.subplots(nrows, 9, figsize=np.array(figure_size[0])*2)
+        
+        nrow = 0
+        for idx in curr_ne.index:
+            unit = curr_ne.loc[idx]
+            
+            # plot strf
+            for i, unit_type in enumerate(('neuron', 'ne_spike', 'cNE')):
+                strf = np.array(eval('unit.strf_{}'.format(unit_type)))[:,:,0]
+                plot_strf(axes[nrow][i], strf, taxis, faxis)
+                
+                # infromation about strf: RI/PTD
+                strf_ri = np.nanmean(np.array(eval('unit.strf_ri_{}'.format(unit_type)), dtype=np.float64))
+                strf_ptd = np.array(eval('unit.ptd_{}'.format(unit_type))).mean()
+                axes[nrow][i].text(1, 50, 'RI:{:.2f}'.format(strf_ri))
+                axes[nrow][i].text(1, 40, 'PTD:{:.2f}'.format(strf_ptd))
+                
+                # title
+                if nrow == 0:
+                    axes[nrow][i].set_title(unit_type.replace('_', ' '))
+                
+                # axis labels
+                axes[nrow][i].set_ylabel(None)
+                axes[nrow][i].set_yticklabels([])
+                axes[nrow][i].set_xlabel(None)
+                axes[nrow][i].set_xticklabels([])
+                    
+            # plot crh
+            for i, unit_type in enumerate(('neuron', 'ne_spike', 'cNE')):
+                i += 3
+                crh = np.array(eval('unit.crh_{}'.format(unit_type)))[:,:,0]
+                plot_crh(axes[nrow][i], crh, tmfaxis, smfaxis)
+                
+                # infromation about strf: RI/PTD
+                crh_ri = np.nanmean(np.array(eval('unit.crh_ri_{}'.format(unit_type)), dtype=np.float64))
+                crh_morani = np.array(eval('unit.morani_{}'.format(unit_type))).mean()
+                axes[nrow][i].text(1, 13, 'RI:{:.2f}'.format(crh_ri), color='w')
+                axes[nrow][i].text(1, 10, '{:.2f}'.format(crh_morani), color='w')
+                
+                # title
+                if nrow == 0:
+                    axes[nrow][i].set_title(unit_type.replace('_', ' '))
+                
+                # axis labels
+                axes[nrow][i].set_ylabel(None)
+                axes[nrow][i].set_yticklabels([])
+                axes[nrow][i].set_xlabel(None)
+                axes[nrow][i].set_xticklabels([])
+            
+            # plot nonlinearity
+            for i, unit_type in enumerate(('neuron', 'ne_spike', 'cNE')):
+                i += 6
+                axes[nrow][i].clear()
+                centers = eval('unit.nonlin_centers_{}'.format(unit_type))
+                fr = eval('unit.nonlin_fr_{}'.format(unit_type))[-1]
+                # fr_mean = eval('unit.nonlin_fr_mean_{}'.format(unit_type))[-1]
+                plot_nonlinearity(axes[nrow][i], centers, fr, 0)
+                
+                # infromation about strf: RI/PTD
+                asi = np.array(eval('unit.asi_{}'.format(unit_type))).mean()
+                mi = np.array(eval('unit.mi_{}'.format(unit_type))).mean()
+                _, ymax = axes[nrow][i].get_ylim()
+                xmin, _ = axes[nrow][i].get_xlim()
+                axes[nrow][i].text(xmin+1, ymax * 0.8, 'ASI:{:.2f}'.format(asi))
+                axes[nrow][i].text(xmin+1, ymax * 0.6, 'MI:{:.2f}'.format(mi))
+                
+                # title
+                if nrow == 0:
+                    axes[nrow][i].set_title(unit_type.replace('_', ' '))
+                
+                # axis labels
+
+
+                axes[nrow][i].set_ylabel(None)
+                axes[nrow][i].set_yticklabels([])
+                axes[nrow][i].set_xlabel(None)
+                axes[nrow][i].set_xticklabels([])
+            nrow += 1
+
+                    
+            
+        plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+        for r in range(len(curr_ne), 9):
+            for c in range(9):
+                axes[r][c].remove()
+        fig.savefig(os.path.join(figpath, '{}_{}-{}'.format(ne.exp[0], ne.probe[0], idx_ne)), dpi=300)
+        plt.close(fig)
 
 
 

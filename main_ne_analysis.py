@@ -199,6 +199,7 @@ for idx, file in enumerate(files):
     ne.get_strf_significance(criterion='z', thresh=3)
     ne.get_strf_nonlinearity(stim)
     ne.get_strf_info(stim)
+    ne.get_strf_ptd()
     
     # get ne crh and crh properties
     print('get crh')
@@ -206,6 +207,7 @@ for idx, file in enumerate(files):
     ne.get_crh_ri(stim_crh)
     ne.get_crh_properties()
     ne.get_crh_significance(criterion='z', thresh=3)
+    ne.get_crh_morani()
     
     ne.save_pkl_file(ne.file_path)
     
@@ -222,6 +224,6 @@ stimfile = r'rn1-500flo-40000fhi-0-4SM-0-40TM-40db-96khz-48DF-15min-seed190506_m
 with open(os.path.join(stimfolder, stimfile), 'rb') as f:
     stim_crh = pickle.load(f)
 
-st.ri_ne_neuron_subsample(stim_strf, stim_crh, datafolder, savefolder)
+st.ne_neuron_subsample(stim_strf, stim_crh, datafolder, savefolder)
 
 # ------------------------------------------------strf ptd-------------------------------------------------------------

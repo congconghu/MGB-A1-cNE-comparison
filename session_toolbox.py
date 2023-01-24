@@ -667,7 +667,6 @@ class NE(Session):
              for unit in members:
                  unit.get_strf_mi(edges, stim.stim_mat)
         
-                
     def get_crh(self, stim):
         
         session = self.get_session_data()
@@ -715,8 +714,17 @@ class NE(Session):
              for unit in members:
                  unit.get_crh_significance(criterion=criterion, thresh=thresh)
     
-    def get_subsampled_ri(self, stim_strf=None, stim_crh=None):
-        random.seed(0)
+    def get_crh_morani(self):
+        # get strf ptd for cNE events
+        for unit in self.ne_units:
+            unit.get_crh_morani()
+
+        # get member ne spike strf ptd
+        for _, members in self.member_ne_spikes.items():
+            for unit in members:
+                unit.get_crh_morani()
+    
+    def get_subsampled_properties(self, stim_strf=None, stim_crh=None, nspk_thresh=100, nsample=10):
         session = self.get_session_data()
         edges = session.edges_dmr
         if hasattr(stim_strf, 'df'):
@@ -728,12 +736,12 @@ class NE(Session):
         for i, members in self.ne_members.items():
             print('ne #{}/{}'.format(i, len(self.ne_members)))
             ne_unit = self.ne_units[i]
-            if ne_unit.spiketimes.shape[0] < 100:
+            if ne_unit.spiketimes.shape[0] < nspk_thresh:
                 continue
             
             for m, member in enumerate(members):
                 ne_spike_unit = self.member_ne_spikes[i][m]
-                if ne_spike_unit.spiketimes.shape[0] < 100:
+                if ne_spike_unit.spiketimes.shape[0] < nspk_thresh:
                     continue
                 unit = session.units[member]
                 min_events = min(ne_unit.spiketimes.shape[0], ne_spike_unit.spiketimes.shape[0])
@@ -741,17 +749,25 @@ class NE(Session):
                 # repeat 10 times for subsampling
                 rf_strf_crh = {'strf':[], 'crh':[]}
                 ri_strf_crh =  {'strf':[], 'crh':[]}
+                ptd = np.empty((3, nsample))
+                morani = np.empty((3, nsample))
+                asi = np.empty((3, nsample))
+                nonlin_centers  = [[], [], []]
+                nonlin_fr = [[], [], []]
+                mi = np.empty((3, nsample))
                 
                 for rf in ('strf', 'crh'):
-                    rf_strf_crh[rf] = np.empty((3, *eval('unit.{}.shape'.format(rf)), 10))
-                    ri_strf_crh[rf]  = np.empty((3, 1000, 10))
+                    rf_strf_crh[rf] = np.empty((3, *eval('unit.{}.shape'.format(rf)), nsample))
+                    ri_strf_crh[rf]  = np.empty((3, 1000, nsample))
                     
-                for n in range(10):
+                for n in range(nsample):
+                    
                     unit_tmp = deepcopy(unit)
                     ne_unit_tmp = deepcopy(ne_unit)
                     ne_spike_unit_tmp = deepcopy(ne_spike_unit)
                 
                     for u, curr_unit in enumerate((unit_tmp, ne_unit_tmp, ne_spike_unit_tmp)):
+                        random.seed(n)
                         curr_unit.subsample(n_events)
                         
                         for rf in ('strf', 'crh'):
@@ -759,6 +775,17 @@ class NE(Session):
                             eval('curr_unit.get_{}_ri(stim_{}, edges_{}, return_null=False)'.format(rf, rf, rf))
                             rf_strf_crh[rf][u, :, :, n] = eval('curr_unit.{}'.format(rf))
                             ri_strf_crh[rf][u, :, n] = eval('curr_unit.{}_ri'.format(rf))
+                        
+                        curr_unit.get_strf_ptd()
+                        curr_unit.get_crh_morani()
+                        curr_unit.get_strf_nonlinearity(edges_strf, stim_strf.stim_mat)
+                        curr_unit.get_strf_mi(edges_strf, stim_strf.stim_mat)
+                        ptd[u, n] =  curr_unit.strf_ptd
+                        morani[u, n] =  curr_unit.crh_morani
+                        asi[u, n] =  curr_unit.nonlin_asi
+                        nonlin_centers[u].append(curr_unit.nonlin_centers)
+                        nonlin_fr[u].append(curr_unit.nonlin_fr)
+                        mi[u, n] =  np.mean(curr_unit.strf_info)
                 
                 ri = {'exp': session.exp, 'depth': session.depth, 'probe': session.probe, 
                                 'cNE': i, 'member': member, 'n_events': n_events}
@@ -771,6 +798,11 @@ class NE(Session):
                                rf + '_ri_neuron': ri_strf_crh[rf][0],
                                rf + '_ri_cNE': ri_strf_crh[rf][1],
                                rf + '_ri_ne_spike': ri_strf_crh[rf][2]})
+                
+                for param in ('ptd', 'morani', 'asi', 'mi', 'nonlin_centers', 'nonlin_fr'):
+                    ri.update({param + '_neuron': eval(param + '[0]'), 
+                           param + '_cNE': eval(param + '[1]'), 
+                           param + '_ne_spike': eval(param + '[2]')})
                     
                 ri_all.append(ri)
         ri_all = pd.DataFrame(ri_all)
@@ -888,11 +920,12 @@ def save_ne_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
     ne_all = pd.DataFrame(ne_all)
     ne_all.to_json(os.path.join(savefolder, 'cNE.json'))
 
-def ri_ne_neuron_subsample(stim_strf=None, stim_crh=None, 
+def ne_neuron_subsample(stim_strf=None, stim_crh=None, 
                            datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
                            savefolder=r'E:\Congcong\Documents\data\comparison\data-summary'):
     
-    ri = []
+    subsample = []
+    
     files = glob.glob(os.path.join(datafolder, '*20dft-dmr.pkl'))
     for idx, file in enumerate(files):
         print('({}/{}) getting subsampled ri for {}'.format(idx + 1, len(files), file))
@@ -900,8 +933,28 @@ def ri_ne_neuron_subsample(stim_strf=None, stim_crh=None,
             ne = pickle.load(f)
         exp = ne.exp
         probe = ne.probe
-        ri = ne.get_subsampled_ri(stim_strf=stim_strf, stim_crh=stim_crh)
-        ri.reset_index(drop=True, inplace=True)
-        ri.to_json(os.path.join(savefolder, '{}-{}-subsample_ri.json'.format(exp, probe)))
+        subsample = ne.get_subsampled_properties(stim_strf=stim_strf, stim_crh=stim_crh)
+        subsample.reset_index(drop=True, inplace=True)
+        subsample.to_json(os.path.join(savefolder, '{}-{}-subsample_ri.json'.format(exp, probe)))
     
-    
+def ne_neuron_subsample_combine(datafolder='E:\Congcong\Documents\data\comparison\data-summary\subsample'):
+    ri_file = glob.glob(os.path.join(datafolder, '*subsample_ri.json'))
+    subsample_ri = []
+    for file in ri_file:
+        subsample_ri.append(pd.read_json(file))
+    subsample_ri = pd.concat(subsample_ri)
+    subsample_ri.reset_index(drop=True, inplace=True)
+    subsample_ri.to_json('E:\Congcong\Documents\data\comparison\data-summary\subsample_ri.json')
+    region = ['MGB' if x == 'H31x64' else 'A1' for x in subsample_ri.probe]
+    subsample_ri['region'] = region
+
+    for rf in ('strf', 'crh'):
+        for ri in ('_ri_neuron', '_ri_cNE', '_ri_ne_spike'):
+            # flatten the columns contaning ri
+            subsample_ri[rf+ri] = subsample_ri[rf+ri].apply(lambda x:np.array(x, dtype=np.float64)).apply(lambda x: x.flatten())
+            # get ri std
+            subsample_ri[rf+ri+'_std'] =  subsample_ri[rf+ri].apply(np.nanstd)
+            # get ri mean
+            subsample_ri[rf+ri+'_mean'] =  subsample_ri[rf+ri].apply(np.nanmean)
+        
+        

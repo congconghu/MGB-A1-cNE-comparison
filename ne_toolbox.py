@@ -623,11 +623,10 @@ def calc_strf_nonlinearity(strf, spktrain, stim):
     
     fr = np.divide(nspk, t)
     fr_mean = nspk.sum() / t.sum()
-    fr_normalized = fr - fr_mean
     
     idx0 = np.where(centers == 0)[0][0]
-    fr_l = fr_normalized[:idx0].sum() 
-    fr_r = fr_normalized[idx0+1:].sum() 
+    fr_l = fr[:idx0].sum() 
+    fr_r = fr[idx0+1:].sum() 
     asi = (fr_r - fr_l) / (fr_r + fr_l)
     nonlinearity = {'si_null': similarity_null, 'si_spk': similarity_spk, 
                     'centers': centers, 't_bins': t, 'nspk_bins': nspk, 
