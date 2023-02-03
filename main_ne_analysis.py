@@ -5,6 +5,7 @@ import re
 import ne_toolbox as netools
 import session_toolbox as st
 from session_toolbox import save_su_df, save_session_df
+import numpy as np
 
 # ++++++++++++++++++++++++++++++++++++++++++++ single unit properties ++++++++++++++++++++++++++++++++++++++++++++++++
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
@@ -170,6 +171,100 @@ files = glob.glob(datafolder + r'\*sub10.pkl', recursive=False)
 netools.get_split_ne_null_df(files, savefolder)
 
 
+# ++++++++++++++++++++++++++++++++++++ cNE significanc: data shuffling  +++++++++++++++++++++++++++++++++++++++++++++++
+# ------------------------------------ get cNEs and number of cNEs from shuffled data ---------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+files = glob.glob(datafolder + r'\*20000.pkl', recursive=False)
+for idx, file in enumerate(files):
+    with open(file, 'rb') as f:
+        session = pickle.load(f)
+    # cNE analysis
+    print('({}/{}) Get shuffled cNEs for {}'.format(idx+1, len(files), file))
+    for stim in ('dmr', 'spon'):
+        savefile_path = re.sub(r'fs20000.pkl', 'fs20000-ne-20dft-{}-shuffled.pkl'.format(stim), session.file_path)
+        ne = []
+        n_ne = np.zeros(10)
+        for idx in range(10):
+            ne.append(session.get_ne(df=20, stim=stim, shuffle=True))
+            if ne[-1] is not None:
+                ne[-1].get_members()
+                n_ne[idx] = len(ne[-1].ne_members)
+        with open(savefile_path, 'wb') as f:
+            pickle.dump({'ne': ne, 'n_ne': n_ne}, f)
+            
+# --------------------------------------- stability across dmr/spon on shuffled data --------------------------------
+# real data
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+files = glob.glob(datafolder + r'\*ne-20dft-dmr.pkl', recursive=False)
+nfile_MGB = 0
+nfile_A1 = 0
+for file in files:
+   
+    file_spon = re.sub('20dft-dmr', '20dft-spon', file)
+    if not os.path.exists(file_spon):
+        continue
+    
+    with open(file, 'rb') as f:
+        ne = pickle.load(f)
+    with open(file_spon, 'rb') as f:
+        ne_spon = pickle.load(f)
+    corrmat, order, _ = netools.match_ic_weight(ne.patterns, ne_spon.patterns)
+    ne.corrmat = corrmat
+    ne.pattern_order = order
+    ne.save_pkl_file()
+    
+# shuffled data
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+files = glob.glob(datafolder + r'\*ne-20dft-dmr.pkl', recursive=False)
+for idx, file in enumerate(files):
+    file_spon = re.sub('20dft-dmr', '20dft-spon', file)
+    if not os.path.exists(file_spon):
+        continue
+    
+    with open(file, 'rb') as f:
+        ne_dmr = pickle.load(f)
+    with open(file_spon, 'rb') as f:
+        ne_spon = pickle.load(f)
+
+    print('({}/{})  processing ne on split blocks for {}'.format(idx + 1, len(files), file))
+    
+    # get null distribution of ICweight correlations
+    print('get null ICweights')
+    for ne in [ne_dmr, ne_spon]:
+        ne.get_sham_patterns(nshift=1000)
+    
+    with open(file, 'wb') as output:
+        pickle.dump(ne_dmr, output)
+    with open(file_spon, 'wb') as output:
+        pickle.dump(ne_spon, output)
+
+# get correlation threshold
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+files = glob.glob(datafolder + r'\*ne-20dft-dmr.pkl', recursive=False)
+for idx, file in enumerate(files):
+    file_spon = re.sub('20dft-dmr', '20dft-spon', file)
+    if not os.path.exists(file_spon):
+        continue
+    
+    with open(file, 'rb') as f:
+        ne_dmr = pickle.load(f)
+    with open(file_spon, 'rb') as f:
+        ne_spon = pickle.load(f)
+
+    print('({}/{})  processing ne on split blocks for {}'.format(idx + 1, len(files), file))
+    
+    # get null distribution of ICweight correlations
+    n_ne = ne_dmr.patterns_sham.shape[0]
+    corr = np.abs(np.corrcoef(
+        x=ne_dmr.patterns_sham,
+        y=ne_spon.patterns_sham))[:n_ne, n_ne:]
+    ne_dmr.corr_null = corr.flatten()
+    ne_dmr.corr_thresh = np.percentile(abs(ne_dmr.corr_null), 99)
+    
+    with open(file, 'wb') as output:
+        pickle.dump(ne_dmr, output)
+
+
 # ++++++++++++++++++++++++++++++++++++++++++++++ cNE stim response ++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ----------------------------------------- get cNE stimulus responses ---------------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
@@ -211,8 +306,10 @@ for idx, file in enumerate(files):
     
     ne.save_pkl_file(ne.file_path)
     
-# ------------------------------------------reliability of stimulus response-------------------------------------------
-savefolder = r'E:\Congcong\Documents\data\comparison\data-summary'
+# --------------------------------------get stimulus response with subsampled spike trains--------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+savefolder = r'E:\Congcong\Documents\data\comparison\data-summary\subsample'
+
 stimfolder = r'E:\Congcong\Documents\stimulus\thalamus'
 # get stimulus for strf calculation (spectrogram)
 stimfile = r'rn1-500flo-40000fhi-0-4SM-0-40TM-40db-96khz-48DF-15min-seed190506_DFt1_DFf5.pkl'
@@ -226,4 +323,47 @@ with open(os.path.join(stimfolder, stimfile), 'rb') as f:
 
 st.ne_neuron_subsample(stim_strf, stim_crh, datafolder, savefolder)
 
-# ------------------------------------------------strf ptd-------------------------------------------------------------
+
+# ++++++++++++++++++++++++++++++++++++++++++++++ cNE stability across binsize ++++++++++++++++++++++++++++++++++++++++++
+# -------------------------------------------- get cNE under different binsizes ----------------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+files = glob.glob(datafolder + r'\*fs20000.pkl', recursive=False)
+dfs = np.array([2, 5, 20, 40, 80, 160])*2
+for idx, file in enumerate(files):
+    with open(file, 'rb') as f:
+        session = pickle.load(f)
+    # cNE analysis
+    print('({}/{}) Get cNEs for {}'.format(idx+1, len(files), file))
+    for df in dfs:
+        for stim in ('dmr', 'spon'):
+            savefile_path = re.sub(r'fs20000.pkl', 'fs20000-ne-{}dft-{}.pkl'.format(df, stim), session.file_path)
+            ne = session.get_ne(df=20, stim=stim)
+            if ne:
+                ne.save_pkl_file(savefile_path)
+
+# ------------------------------------------- match cNE patterns in each recording -------------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+files = glob.glob(datafolder + r'\*320dft-dmr.pkl', recursive=False)
+dfs = np.array([160, 80, 40, 20, 10, 5, 2])*2
+for idx, file in enumerate(files):
+    ic_matched = netools.ICweight_match_binsize(datafolder, file, dfs)
+    savefile = re.sub('dmr.pkl', 'dmr-ic_match_tbins.pkl', file)
+    with open(savefile, 'wb') as f:
+        pickle.dump(ic_matched, f)
+
+
+# ++++++++++++++++++++++++++++++++++++++++++++++ cNE and UP/DOWN states ++++++++++++++++++++++++++++++++++++++++++
+# ---------------------------------------------get up.down spikes ------------------------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+files = glob.glob(datafolder + r'\*-20dft-dmr.pkl', recursive=False)
+for idx, file in enumerate(files):
+    
+    with open(file, 'rb') as f:
+        ne = pickle.load(f)
+    
+    ne.get_up_down_spikes(datafolder)
+    ne.save_pkl_file()
+    
+    session = ne.get_session_data()
+    session.get_up_down_spikes(datafolder)
+    session.save_pkl_file()

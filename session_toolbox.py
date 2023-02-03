@@ -218,6 +218,22 @@ class SingleUnit:
     
     def subsample(self, nspk):
         self.spiketimes = np.array(random.sample(set(self.spiketimes), int(nspk)))
+    
+    def get_up_down_spike(self, up_interval):
+        spiketimes = self.spiketimes
+        spiketimes_up = np.zeros(spiketimes.shape)
+        
+        idx = 0
+        for start, end in zip(*up_interval):
+            
+            while idx < len(spiketimes) and spiketimes[idx] < end:
+                if spiketimes[idx] > start:
+                    spiketimes_up[idx] = 1
+                
+                idx += 1
+        
+        self.spiketimes_down = spiketimes[spiketimes_up == 0]
+        self.spiketimes_up = spiketimes[spiketimes_up == 1]
 
 
 class Session:
@@ -267,8 +283,11 @@ class Session:
                               adjacent_chan=unit['adjacent_chan'])
             self.units.append(su)
 
-    def save_pkl_file(self, savefile_path):
-        self.file_path = savefile_path
+    def save_pkl_file(self, savefile_path=None):
+        if savefile_path is None:
+            savefile_path = self.file_path
+        else:
+            self.file_path = savefile_path
         with open(savefile_path, 'wb') as output:
             pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
 
@@ -327,14 +346,19 @@ class Session:
         spktrain = np.resize(spktrain, (spktrain.shape[0], nt, df))
         return np.sum(spktrain, axis=2), edges
 
-    def get_ne(self, df, stim):
+    def get_ne(self, df, stim, shuffle=False):
         """get cNEs in each recording session, under dmr and spon"""
         # get cNE for dmr-evoked activity
         spktrain, edges = self.downsample_spktrain(df, stim)
+        if shuffle:
+            spktrain = netools.shuffle_spktrain(spktrain)
         if spktrain.any():
             patterns = netools.detect_cell_assemblies(spktrain)
-            ne = NE(self.exp, self.depth, self.probe, df, stim=stim, spktrain=spktrain, patterns=patterns, edges=edges)
-            return ne
+            if patterns is None:
+                return None
+            else:
+                ne = NE(self.exp, self.depth, self.probe, df, stim=stim, spktrain=spktrain, patterns=patterns, edges=edges)
+                return ne
         else:
             return None
 
@@ -467,6 +491,22 @@ class Session:
             return math.log2(np.max(freq) / np.min(freq))
         else:
             return np.nan
+    
+    def get_up_down_data(self, datafolder):
+        exp = self.exp
+        depth = self.depth
+        up_down_file = glob.glob(os.path.join(datafolder, '{}-*-{}um-*up_down.pkl'.format(exp, depth)))
+        assert(len(up_down_file) == 1)
+        with open(up_down_file[0], 'rb') as f:
+            up_down = pickle.load(f)
+        return up_down
+    
+    def get_up_down_spikes(self, datafolder):
+        up_down = self.get_up_down_data(datafolder)
+        up_interval = up_down['up_interval']
+        for unit in self.units:
+            unit.get_up_down_spike(up_interval)
+        
 
 
 class NE(Session):
@@ -527,9 +567,7 @@ class NE(Session):
             activities[i] = []
         for _ in range(niter):
             # shuffle spktrain
-            for i in range(spktrain.shape[0]):
-                shift = random.randint(1, spktrain.shape[1])
-                spktrain[i] = np.roll(spktrain[i], shift)
+            spktrain = netools.shuffle_spktrain(spktrain)
             # get activity for all cNEs
             for i in range(patterns.shape[0]):
                 activity = netools.get_activity(spktrain, patterns[i], member_only, members[i])
@@ -836,6 +874,27 @@ class NE(Session):
         with open(session_file_path, 'rb') as f:
             session = pickle.load(f)
         return session
+    
+    def get_up_down_data(self, datafolder):
+        exp = re.findall('\d{6}_\d{6}', self.file_path)[0]
+        depth =  re.findall('\d{3,4}um', self.file_path)[0]
+        up_down_file = glob.glob(os.path.join(datafolder, '{}-*-{}-*up_down.pkl'.format(exp, depth)))
+        assert(len(up_down_file) == 1)
+        with open(up_down_file[0], 'rb') as f:
+            up_down = pickle.load(f)
+        return up_down
+    
+    def get_up_down_spikes(self, datafolder):
+        up_down = self.get_up_down_data(datafolder)
+        up_interval = up_down['up_interval']
+        # cNE events
+        for unit in self.ne_units:
+            unit.get_up_down_spikes()
+
+        # get member ne spike 
+        for _, members in self.member_ne_spikes.items():
+            for unit in members:
+                unit.get_up_down_spikes()
 
 
 def save_su_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
@@ -914,11 +973,83 @@ def save_ne_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
             pattern = ne.patterns[i]
             strf_sig = ne.ne_units[i].strf_ri_z > 3
             crh_sig = ne.ne_units[i].crh_ri_z > 3
+            
             ne_all.append({'exp': exp, 'probe': probe, 'depth':depth,
                            'cNE': i, 'members': members, 'pattern': pattern, 
                            'strf_sig': strf_sig, 'crh_sig': crh_sig})
     ne_all = pd.DataFrame(ne_all)
     ne_all.to_json(os.path.join(savefolder, 'cNE.json'))
+        
+
+def save_matched_ne_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
+               savefolder=r'E:\Congcong\Documents\data\comparison\data-summary'):
+    
+    files = glob.glob(datafolder + r'\*ne-20dft-dmr.pkl', recursive=False)
+    ne_all = []
+    for idx, file in enumerate(files):
+        print('({}/{}) save dataframe for {}'.format(idx + 1, len(files), file))
+        file_spon = re.sub('20dft-dmr', '20dft-spon', file)
+        if not os.path.exists(file_spon):
+            print('no spontaneous activity')
+            continue
+        with open(file, 'rb') as f:
+            ne = pickle.load(f)
+        with open(file_spon, 'rb') as f:
+            ne_spon = pickle.load(f)
+            
+        exp = ne.exp
+        probe = ne.probe
+        depth = ne.depth
+        for i, members in ne.ne_members.items():
+            pattern_dmr = ne.patterns[i]
+            strf_sig = ne.ne_units[i].strf_ri_z > 3
+            crh_sig = ne.ne_units[i].crh_ri_z > 3
+            if i in ne.pattern_order[0]:
+                idx_match = np.where(np.array(ne.pattern_order[0]) == i)[0][0]
+                idx_spon = ne.pattern_order[1][idx_match]
+                pattern_spon = ne_spon.patterns[idx_spon]
+                pattern_corr = ne.corrmat[idx_match, idx_match]
+                
+            else:
+                pattern_spon = []
+                pattern_corr = np.nan
+            ne_all.append({'exp': exp, 'probe': probe, 'depth':depth,
+                           'cNE': i, 'members': members, 
+                           'pattern_dmr': pattern_dmr, 'pattern_spon': pattern_spon, 
+                           'pattern_corr': pattern_corr, 'corr_thresh': ne.corr_thresh,
+                           'strf_sig': strf_sig, 'crh_sig': crh_sig})
+    ne_all = pd.DataFrame(ne_all)
+    ne_all.to_json(os.path.join(savefolder, 'cNE_matched.json'))
+    
+def save_matched_shuffled_ne_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
+               savefolder=r'E:\Congcong\Documents\data\comparison\data-summary'):
+    
+    files = glob.glob(datafolder + r'\*ne-20dft-dmr-shuffled.pkl', recursive=False)
+    ne_all = []
+    for idx, file in enumerate(files):
+        print('({}/{}) save dataframe for {}'.format(idx + 1, len(files), file))
+        with open(file, 'rb') as f:
+            ne_list = pickle.load(f)
+        
+        if not 'corrmat' in ne_list: continue
+        c = 0
+        for ne in ne_list['ne']:
+            if ne is None:
+                continue
+            exp = ne.exp
+            probe = ne.probe
+            depth = ne.depth
+            break
+        
+        for corrmat in ne_list['corrmat']:
+            n_ne = corrmat.shape[0]
+            for i in range(n_ne):
+                ne_all.append({'exp': exp, 'probe': probe, 'depth':depth,'cNE': c,  
+                           'pattern_corr': corrmat[i, i]})
+                c += 1
+    ne_all = pd.DataFrame(ne_all)
+    ne_all.to_json(os.path.join(savefolder, 'cNE_matched_shuffled.json'))
+   
 
 def ne_neuron_subsample(stim_strf=None, stim_crh=None, 
                            datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
@@ -956,5 +1087,6 @@ def ne_neuron_subsample_combine(datafolder='E:\Congcong\Documents\data\compariso
             subsample_ri[rf+ri+'_std'] =  subsample_ri[rf+ri].apply(np.nanstd)
             # get ri mean
             subsample_ri[rf+ri+'_mean'] =  subsample_ri[rf+ri].apply(np.nanmean)
-        
+
+
         

@@ -12,6 +12,7 @@ import pandas as pd
 
 from scipy.ndimage.filters import convolve
 from scipy.stats import zscore
+from scipy.stats.stats import pearsonr
 from sklearn.decomposition import PCA, FastICA
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.utils._testing import ignore_warnings
@@ -25,8 +26,11 @@ def detect_cell_assemblies(spktrain):
     # get threshold for significant PCs (based on Marcenko-Patur distribution)
     thresh = get_pc_thresh(spktrain)
     num_ne = sum(pca.explained_variance_ > thresh)
-    patterns = fast_ica(spktrain_z, num_ne)
-    return normalize_pattern(patterns)
+    if num_ne > 0:
+        patterns = fast_ica(spktrain_z, num_ne)
+        return normalize_pattern(patterns)
+    else:
+        return None
 
 
 @ignore_warnings(category=ConvergenceWarning)
@@ -190,7 +194,10 @@ def match_ic_weight(patterns1, patterns2):
     n_ne = min([n1, n2])
     corr_mat = np.abs(np.corrcoef(patterns1, patterns2))[:n1, n1:]
     order1, order2 = corr_mat_reorder(corr_mat)
-    return corr_mat, [order1, order2], [patterns1[np.array(order1)], patterns2[np.array(order2)]]
+    patterns1 = patterns1[np.array(order1)]
+    patterns2 = patterns2[np.array(order2)]
+    corr_mat = np.abs(np.corrcoef(patterns1, patterns2))[:n_ne, n_ne:]
+    return corr_mat, [order1, order2], [patterns1, patterns2]
 
 
 def corr_mat_reorder(corr_mat):
@@ -736,10 +743,46 @@ def info_prior_post(px_prior, px_post):
     px_prior = px_prior[idx]
     px_post = px_post[idx]
     return np.sum(px_post * np.log2(px_post / px_prior))
+
+def ICweight_match_binsize(datafolder, file, dfs):
+    base = re.findall('.*db', file)[0]
+    suffix = re.findall('dft-.*', file)[0]
     
+    patterns = []
+    for i, df in enumerate(dfs):
+        file = glob.glob('{}-*{}{}'.format(base, df, suffix))[0]
+        with open(file, 'rb') as f:
+            ne = pickle.load(f)
+        patterns.append(ne.patterns)
     
+    n_ne = [len(x) for x in patterns]
+    p = np.ones([n_ne[0], len(dfs)-1])
+    corr = np.zeros([n_ne[0], len(dfs)-1])
+    for i in range(len(n_ne)-1):
+        pattern1 = np.array(patterns[i])
+        row_idx = np.where(abs(pattern1).sum(axis=1) > 0)[0] # get index of existing patterns
+        pattern2 = np.array(patterns[i+1])
+        patterns[i+1] = np.zeros([n_ne[0], pattern1.shape[1]])
+        if not any(row_idx):
+            continue
+        pattern1 = pattern1[row_idx,:]
+        
+        corrmat = np.corrcoef(pattern1, pattern2)[:len(row_idx), len(row_idx):]
+        for _ in range(corrmat.shape[0]):
+            row, col = np.unravel_index(abs(corrmat).argmax(), corrmat.shape)
+            corrmat[row,:] = 0
+            corrmat[:, col] = 0
+            corr[row_idx[row], i], p[row_idx[row], i] = pearsonr(pattern1[row], pattern2[col])
+            patterns[i+1][row_idx[row]] = pattern2[col]
+            
+    return {'df': dfs, 'n_ne': n_ne, 'patterns': patterns, 'pearsonr': corr, 'p': p}
+   
     
-    
+def shuffle_spktrain(spktrain):
+    for i in range(spktrain.shape[0]):
+        shift = rand.randint(1, spktrain.shape[1])
+        spktrain[i] = np.roll(spktrain[i], shift)
+    return spktrain
     
     
     
