@@ -1473,11 +1473,6 @@ def plot_ne_split_ic_weight_null_corr(ne_split, figpath):
     plt.close(fig)
 
 
-
-
-
-
-
 # ------------------------------- cNE significance-----------------------------------------------------------------
 def plot_num_cne_vs_shuffle(ax, datafolder='E:\Congcong\Documents\data\comparison\data-summary'):
     df = pd.read_json(os.path.join(datafolder, 'num_ne_data_vs_shuffle.json'))
@@ -1537,7 +1532,49 @@ def plot_num_cne_vs_shuffle(ax, datafolder='E:\Congcong\Documents\data\compariso
     ax.annotate('spon', xy=(1.5, -.5), xycoords=trans, ha="center", va="center", fontsize=fontsize_figure_tick_label)
     ax.annotate('dmr', xy=(5.5, -.5), xycoords=trans, ha="center", va="center", fontsize=fontsize_figure_tick_label)
         
-    
+
+def plot_ne_sig_corr_hist(ax, ne_real, ne_shuffled, region, bins):
+    data = ne_real[(~ne_real.pattern_corr.apply(np.isnan)) & (ne_real.region==region)]
+    sns.histplot(data=data, x="pattern_corr", 
+                      bins=bins, color=eval('{}_color[0]'.format(region)),
+                      element="step", fill=False, stat='probability', ax=ax)
+    n_unit = len(data)
+    sns.histplot(data=data[data.corr_sig], x="pattern_corr", 
+                    bins=bins, color=eval('{}_color[0]'.format(region)), 
+                    ec=eval('{}_color[0]'.format(region)), fill=True, weights=1/n_unit, ax=ax)
+    ratio = np.array(data['corr_sig']).mean()
+    print(region, ratio, len(np.array(data['corr_sig'])), np.array(data['corr_sig']).sum())
+    bootstrap_stats = stats.bootstrap([np.array(data['corr_sig']).astype(int)], np.mean, 
+                        confidence_level=0.95, random_state=1, method='percentile')
+    print(bootstrap_stats)
+    data = ne_shuffled[ne_shuffled.region==region]
+    sns.histplot(data=data, x="pattern_corr", 
+                    bins=bins, color=eval('{}_color[1]'.format(region)),
+                    element="step", fill=False, stat='probability', ax=ax)
+    n_unit=len(data)
+    sns.histplot(data=data[data.corr_sig], x="pattern_corr", 
+                    bins=bins, color=eval('{}_color[1]'.format(region)), 
+                    ec=eval('{}_color[1]'.format(region)), fill=True, weights=1/n_unit, ax=ax)
+    ratio = np.array(data['corr_sig']).mean()
+    print(region, ratio, len(np.array(data['corr_sig'])), np.array(data['corr_sig']).sum())
+
+    bootstrap_stats = stats.bootstrap([np.array(data['corr_sig']).astype(int)], np.mean, 
+                        confidence_level=0.95, random_state=1, method='percentile')
+    print(bootstrap_stats)
+    ax.legend([region, f'{region} shuffled', f'{region} sig', f'{region} shuffled sig'])
+        
+    ax.set_xlim([0, 1])
+    ax.spines[['right', 'top']].set_visible(False)
+    ax.patch.set_alpha(0)
+    ax.set_xlabel('')
+            
+    ax.set_ylim([0, 0.2])
+    ax.set_ylabel('Proportion', fontsize=fontsize_figure_axes_label)
+    ax.get_yaxis().set_label_coords(-0.12,0.5)
+    ax.tick_params(axis='both', which='major', 
+                   labelsize=fontsize_figure_tick_label, 
+                   pad=2)
+
 # ------------------------------- ne properties 2 -----------------------------------------------------------------
 def plot_ne_stim_response_type(datafolder, savefolder, rf='strf'):
     stim_sig = pd.DataFrame({'exp': [], 'ne': [], 'probe': [], 'ne_sig': [], 'member_sig': []})
@@ -2695,6 +2732,7 @@ def figure5():
     ax.tick_params(axis='both', which='major', 
                    labelsize=fontsize_figure_tick_label, 
                    pad=2)
+    
 
     # panel B: |corr.| distribution of real data and shuffled data
     fig.text(0, 0.6, 'B', fontsize=fontsize_panel_label, weight='bold')
@@ -2702,38 +2740,14 @@ def figure5():
     ne_real = pd.read_json(os.path.join(datafolder, 'cNE_matched.json'))
     ne_shuffled = pd.read_json(os.path.join(datafolder, 'cNE_matched_shuffled.json'))
     bins = np.arange(0, 1.01, 0.05)
-    probe = {'MGB':'H31x64', 'A1':'H22x32'}
+    region = ['MGB' if x == 'H31x64' else 'A1' for x in ne_real['probe']]
+    ne_real['region'] = region
+    region = ['MGB' if x == 'H31x64' else 'A1' for x in ne_shuffled['probe']]
+    ne_shuffled['region'] = region
+    
     for i, region in enumerate(('MGB', 'A1')):
         ax = axes[i+1]
-        data = ne_real[(~ne_real.pattern_corr.apply(np.isnan)) & (ne_real.probe==probe[region])]
-        h1=sns.histplot(data=data, x="pattern_corr", 
-                  bins=bins, color=eval('{}_color[0]'.format(region)),
-                  element="step", fill=False, stat='probability', ax=ax)
-        n_unit = len(data)
-        h2=sns.histplot(data=data[data.corr_sig], x="pattern_corr", 
-                     bins=bins, color=eval('{}_color[0]'.format(region)), 
-                     ec=eval('{}_color[0]'.format(region)), fill=True, weights=1/n_unit, ax=ax)
-        ratio = np.array(data['corr_sig']).mean()
-        print(region, ratio, len(np.array(data['corr_sig'])), np.array(data['corr_sig']).sum())
-        bootstrap_stats = stats.bootstrap([np.array(data['corr_sig']).astype(int)], np.mean, 
-                        confidence_level=0.95, random_state=1, method='percentile')
-        print(bootstrap_stats)
-        data = ne_shuffled[ne_shuffled.probe==probe[region]]
-        h3=sns.histplot(data=data, x="pattern_corr", 
-                     bins=bins, color=eval('{}_color[1]'.format(region)),
-                     element="step", fill=False, stat='probability', ax=ax)
-        n_unit=len(data)
-        h4=sns.histplot(data=data[data.corr_sig], x="pattern_corr", 
-                     bins=bins, color=eval('{}_color[1]'.format(region)), 
-                     ec=eval('{}_color[1]'.format(region)), fill=True, weights=1/n_unit, ax=ax)
-        ratio = np.array(data['corr_sig']).mean()
-        print(region, ratio, len(np.array(data['corr_sig'])), np.array(data['corr_sig']).sum())
-
-        bootstrap_stats = stats.bootstrap([np.array(data['corr_sig']).astype(int)], np.mean, 
-                        confidence_level=0.95, random_state=1, method='percentile')
-        print(bootstrap_stats)
-        n2 = np.array(data['corr_sig']).sum()
-        ax.legend([region, f'{region} shuffled', f'{region} sig', f'{region} shuffled sig'])
+        plot_ne_sig_corr_hist(ax, ne_real, ne_shuffled, region, bins)
         
         handles, labels = ax.legend_.legendHandles,  ax.legend_.texts
         order = [0, 2, 1, 3]
@@ -2741,10 +2755,6 @@ def figure5():
                   ncol=2, fontsize=6, columnspacing=0.8, 
                   frameon=False, loc='upper center', bbox_to_anchor=(.1-i*.2,0,1,1.1)) 
         
-        
-        ax.set_xlim([0, 1])
-        ax.spines[['right', 'top']].set_visible(False)
-        ax.patch.set_alpha(0)
         pos = ax.get_position()
         pos.y0 = pos.y0 - .01
         pos.y1 = pos.y1 - .01
@@ -2754,15 +2764,7 @@ def figure5():
         ax.set_xlabel('')
         if i == 0:
             ax.set_xticklabels([])
-            
-        ax.set_ylim([0, 0.2])
-        ax.set_ylabel('Proportion', fontsize=fontsize_figure_axes_label)
-        ax.get_yaxis().set_label_coords(-0.12,0.5)
-        ax.tick_params(axis='both', which='major', 
-                       labelsize=fontsize_figure_tick_label, 
-                       pad=2)
-
-    ax.set_xlabel('|correlation|', fontsize=fontsize_figure_axes_label)
+    axes[2].set_xlabel('|correlation|', fontsize=fontsize_figure_axes_label)
     
 
 def figure6():
