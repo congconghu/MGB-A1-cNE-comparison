@@ -393,9 +393,7 @@ def plot_ne_construction(ne, savepath):
         else:
             ax.spines['left'].set_visible(False)
             ax.set_yticks([])
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.spines['bottom'].set_visible(False)
+        ax.spines[['top', 'right', 'bottom']].set_visible(False)
         ax.set_xticks([])
         ax.set_ylim([ymin, ymax])
 
@@ -409,9 +407,7 @@ def plot_ne_construction(ne, savepath):
         plot_raster(ax, ne.member_ne_spikes[i], offset='unit', color='r')
         # add scale bar
         ax.set_xlim([t_start, t_end])
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.spines['bottom'].set_visible(False)
+        ax.spines[['top', 'right', 'bottom']].set_visible(False)
         ax.set_xticks([])
         if i == 0:
             ax.plot([t_start, t_start + 200], [0.1, 0.1], color='k', linewidth=5)
@@ -600,8 +596,8 @@ def plot_ICweight(ax, weights, thresh, direction='h', ylim=None):
         if ylim:
             ax.set_xlim(ylim)
         ax.set_xlabel('ICweight')
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
+        ax.spines[['top', 'right']].set_visible(False)
+
 
 
 def plot_corrmat(ax, corr_mat):
@@ -664,14 +660,12 @@ def plot_activity(ax, centers, activity, thresh, t_window, ylim):
     ax.plot(t_window, thresh * np.array([1, 1]), color='r')
     ax.set_xlim(t_window)
 
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
+    ax.spines[['top', 'right', 'bottom']].set_visible(False)
     ax.set_xticks([])
     ax.set_ylim(ylim)
 
 
-def plot_raster(ax, units, offset='idx', color='k', new_order=None):
+def plot_raster(ax, units, offset='idx', color='k', new_order=None, linewidth=1):
     """raster plot of activities of member neurons"""
     for idx, unit in enumerate(units):
         if offset == 'idx':
@@ -680,10 +674,7 @@ def plot_raster(ax, units, offset='idx', color='k', new_order=None):
             idx = unit.unit
         if new_order is not None:
             idx = new_order[idx]
-        ax.eventplot(unit.spiketimes, lineoffsets=idx + 1, linelengths=0.8, colors=color)
-
-
-
+        ax.eventplot(unit.spiketimes, lineoffsets=idx + 1, linelengths=0.8, colors=color, linewidth=linewidth)
 
 
 def plot_xcorr(fig, ax, xcorr, savepath=None):
@@ -1327,8 +1318,7 @@ def plot_matching_ic(ax1, ic1, ic2, color1, color2, stim1, stim2, marker_size=10
     ax1.set_yticks([-0.5, 0, 0.5])
     ax1.set_yticklabels([-0.5, 0, 0.5], fontsize=15)
     ax1.spines['left'].set_color(color1)
-    ax1.spines.top.set_visible(False)
-    ax1.spines.right.set_visible(False)
+    ax1.spines[['top', 'right']].set_visible(False)
     ax1.tick_params(axis='y', colors=color1)
     ax1.text(8, 0.5, '|corr|={:.2f}'.format(np.corrcoef(ic1, ic2)[0][1]), fontsize=12)
     # plot on the right axes
@@ -1342,8 +1332,7 @@ def plot_matching_ic(ax1, ic1, ic2, color1, color2, stim1, stim2, marker_size=10
     ax2.set_yticks([-0.5, 0, 0.5])
     ax2.set_yticklabels([-0.5, 0, 0.5], fontsize=15)
     ax2.invert_yaxis()
-    ax2.spines.top.set_visible(False)
-    ax2.spines.left.set_visible(False)
+    ax1.spines[['top', 'right']].set_visible(False)
     ax2.spines['right'].set_color(color2)
     ax2.tick_params(axis='y', colors=color2)
 
@@ -2110,34 +2099,37 @@ def plot_up_ne_spikes(axes, session, ne, up_down, cne_idx, plot_window=None, sti
     fr_mu = up_down['fr_mu_'+stim]
     fr_edges = np.array(up_down['edges_'+stim])
     fr_centers = (fr_edges[1:] + fr_edges[:-1]) / 2
-    axes[0].ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
-    axes[0].plot(fr_centers, fr_mu, c='k')
+    axes[0].plot(fr_centers, fr_mu, c='k', linewidth=.5)
     axes[0].set_xlim([t_start, t_end])
     idx_tstart = np.where(fr_centers > t_start)[0][0]
     idx_tend = np.where(fr_centers < t_end)[0][-1]
     ymax = max(fr_mu[idx_tstart:idx_tend])
     axes[0].set_ylim([0, ymax*1.1])
-    axes[0].set_xticklabels([])
-    axes[0].set_ylabel('FR (spk/s)')
-    
-    
-    # plot prediction of UP/DPWN states
-    if 'p_up_'+stim in up_down:
-        up_interval = up_down['up_interval_'+stim]
-        idx_tstart = np.where(up_interval[0] > t_start)[0][0]
-        idx_tend = np.where(up_interval[0] < t_end)[0][-1]
-        plot_up_interval_shade(axes[1], up_interval[:, idx_tstart:idx_tend+2], ylim=axes[1].get_ylim())
-        
+    axes[0].set_ylabel('MU FR (Hz)')
+    axes[0].spines[['top', 'right']].set_visible(False)   
+    axes[0].set_ylim([0, 300])
+    axes[0].set_yticks(range(0, 301, 100))
+    axes[0].set_yticklabels(range(0, 301, 100))
+    axes[0].set_xticks(np.arange(t_start, t_end+1, 1000))
+    axes[0].set_xticklabels(range(11))
+    axes[0].set_xlabel('Time (s)')
     # plot member neuron spikes
     members = ne.ne_members[cne_idx]
     units = [session.units[x] for x in members]
-    plot_raster(axes[2], units)
-    plot_raster(axes[2], ne.member_ne_spikes[cne_idx], color='r')
+    plot_raster(axes[1], units, linewidth=.5)
+    plot_raster(axes[1], ne.member_ne_spikes[cne_idx], color='r', linewidth=.5)
     # plot nespike
-    axes[2].eventplot(ne.ne_units[cne_idx].spiketimes, lineoffsets=len(members) + 1, linelengths=0.8, colors='r')
-    axes[2].set_xlabel('time (ms)')
-    axes[2].set_xlim([t_start, t_end])
-    plot_up_interval_shade(axes[2], up_interval[:, idx_tstart:idx_tend+2], ylim=[0, len(members) + 2])
+    axes[1].eventplot(ne.ne_units[cne_idx].spiketimes, lineoffsets=len(members) + 1, 
+                      linelengths=0.5, colors='r', linewidth=.5)
+    axes[1].set_xlim([t_start, t_end])
+    axes[1].set_xticks([])
+    axes[1].set_yticks([])
+    axes[1].spines[['top', 'right', 'bottom', 'left']].set_visible(False)
+
+    up_interval = up_down['up_interval_'+stim]
+    idx_tstart = np.where(up_interval[0] > t_start)[0][0]
+    idx_tend = np.where(up_interval[0] < t_end)[0][-1]
+    plot_up_interval_shade(axes[1], up_interval[:, idx_tstart-1:idx_tend+2], ylim=[0, len(members) + 2])
     return t_start, t_end    
     
     
@@ -2191,8 +2183,14 @@ def plot_ne_event_up_percent(ax, stim='spon', datafolder=r'E:\Congcong\Documents
 
     df = pd.DataFrame({'region': ['MGB' if x == 1 else 'A1' for x in region], 'up_percent': p_up})
     boxplot_scatter(ax, x='region', y='up_percent', data=df, order=['MGB', 'A1'], 
-                          hue='region', palette=[MGB_color[0], A1_color[0]], hue_order=['MGB', 'A1'])
-    ax.set_ylabel('Percent spike in hiAct state')
+                          hue='region', palette=[MGB_color[0], A1_color[0]], hue_order=['MGB', 'A1'],
+                          jitter=.3)
+    ax.set_title('Percent of events\nin hiAct state', pad=1, fontsize=7)
+    ax.set_ylabel('cNE events')
+    ax.set_xlabel('')
+    ax.spines[['top', 'right']].set_visible(False)
+    _, p = stats.mannwhitneyu(df[df['region']=='MGB']['up_percent'], df[df['region']=='A1']['up_percent'])
+    print('C', p)
 
 def plot_ne_spike_prob_up_vs_all(ax, stim='spon', datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl\up_down_spon'):
     files = glob.glob(datafolder + r'\*-20dft-{}.pkl'.format(stim), recursive=False)
@@ -2221,51 +2219,80 @@ def plot_ne_spike_prob_up_vs_all(ax, stim='spon', datafolder=r'E:\Congcong\Docum
                 nspk = len(session.units[member].spiketimes)
                 nspk_up = len(session.units[member].spiketimes_up)
                 p_all.append(nspk_up / nspk * 100)
-                
                 region.append(region_flag)
 
     df = pd.DataFrame({'region': ['MGB' if x == 1 else 'A1' for x in region], 'up_ne': p_ne, 'up_all': p_all})
-    sns.scatterplot(data=df, x='up_all', y='up_ne', alpha=.5,
+    sns.scatterplot(data=df, x='up_all', y='up_ne', alpha=.5, s=marker_size,
                     hue='region', palette=[MGB_color[0], A1_color[0]], hue_order=['MGB', 'A1'])
-    plt.plot([0, 100], [0, 100], 'k')
+    handles, _ = ax.legend_.legendHandles,  ax.legend_.texts
+    for handle in handles:
+        handle._sizes = [marker_size]
+    ax.legend([handle for handle in handles], ['MGB', 'A1'], fontsize=6,
+              handletextpad=0, labelspacing=.1, borderpad=.3,
+              fancybox=False, edgecolor='black', loc='lower right')
+    plt.plot([-5, 105], [-5, 105], 'k', linewidth=.8)
     plt.xlim([-5, 105])
     plt.ylim([-5, 105])
-    ax.set_ylabel('percent of ne spikes in hiAct state')
-    ax.set_xlabel('percent of all spikes in hiAct state')
+    ax.set_ylabel('NE spikes')
+    ax.set_xlabel('All spikes')
+    ax.spines[['top', 'right']].set_visible(False)
+    _, p = stats.wilcoxon(df[df.region=='MGB']['up_all'], df[df.region=='MGB']['up_ne'])
+    print('D')
+    print('MGB', p)
+    _, p = stats.wilcoxon(df[df.region=='A1']['up_all'], df[df.region=='A1']['up_ne'])
+    print('A1', p)
+    
 
-
-def plot_cv_vs_sd(ax, filepath=r'E:\Congcong\Documents\data\comparison\data-summary\firing_rate_parameters.json'):
+def plot_cv_vs_sd(ax, example,
+                  filepath=r'E:\Congcong\Documents\data\comparison\data-summary\firing_rate_parameters.json'):
     df = pd.read_json(filepath)
     sns.scatterplot(data=df, x='silence_density_spon', y='spkcount_cv_spon', hue='region', 
                     palette=[MGB_color[1], A1_color[1]], hue_order=['MGB', 'A1'], 
-                    ax=ax, edgecolor='k', s=marker_size*2)
+                    ax=ax, edgecolor='k', s=marker_size)
     sns.scatterplot(data=df[(df['silence_density_spon'] > .4) & (df['spkcount_cv_spon'] > 1)], 
                     x='silence_density_spon', y='spkcount_cv_spon', hue='region', 
                     palette=[MGB_color[0], A1_color[0]], hue_order=['MGB', 'A1'], 
-                    ax=ax, edgecolor='k', s=marker_size*2)
-    for i in range(2):
-        t = ax.legend().texts[i]
-        t.set_text('')
-    plt.legend(ncol=2, fontsize=6, handletextpad=0, labelspacing=.1, borderpad=.3,
-              fancybox=False, edgecolor='black', loc='upper left', columnspacing=0)
-    ax.legend()._ncol = 2
+                    ax=ax, edgecolor='k', s=marker_size)
+    handles, _ = ax.legend_.legendHandles,  ax.legend_.texts
+    for handle in handles:
+        handle._sizes = [marker_size]
+        handle.set_edgecolor("k")
+        handle.set_linewidth(.5)
+    ax.legend([handle for handle in handles], ['', '', 'MGB', 'A1'],
+              ncol=2, fontsize=6, columnspacing=-1,
+              handletextpad=0, labelspacing=.1, borderpad=.3,
+              fancybox=False, edgecolor='black', loc='upper left')
+    colors = ['brown', 'green', 'purple']
+    i = 0
+    for sd, cv in zip(*example):
+        ax.scatter(sd, cv, color=colors[i], edgecolor='k', s=marker_size, linewidth=.5)
+        i += 1
+    ax.set_xlim([0, .9])
+    ax.set_ylim([0, 2.5])
+    ax.set_yticks(np.arange(0, 3, .5))
+    ax.set_xticks(np.arange(0, 1, .2))
+    ax.plot([.4, .4], [0, 2], 'k--', linewidth=.8)
+    ax.plot([0, .9], [1, 1], 'k--', linewidth=.8)
     ax.set_xlabel('Silence density')
-    ax.set_ylabel('Firing rate c.v.')
+    ax.set_ylabel('SU FR c.v.')
+    ax.spines[['top', 'right']].set_visible(False)
 
 
 def plot_raster_fr_sd_cv(axes, up_down, plot_window, T=10, stim='spon'):
     # plot MU fring rate 
     fr_mu = up_down['fr_mu_'+stim]
     plot_idx = (plot_window / T).astype(int)
-    axes[1].ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
     fr_mu_plot = fr_mu[plot_idx[0]:plot_idx[1]]
-    fr_mu_plot = fr_mu_plot / fr_mu_plot.max()
-    axes[1].plot(np.arange(plot_idx[0], plot_idx[1]), fr_mu_plot, c='k')
+    axes[1].plot(np.arange(plot_idx[0], plot_idx[1]), fr_mu_plot, c='k', linewidth=.5)
     axes[1].set_xlim(plot_idx)
-    axes[1].set_xlabel('time (s)')
-    axes[1].set_ylabel('normalized fr')
-    
-    
+    axes[1].set_xlabel('Time (s)')
+    axes[1].set_ylabel('MU FR (Hz)')
+    axes[1].spines[['top', 'right']].set_visible(False)
+    axes[1].set_ylim([0, 250])
+    axes[1].set_yticks(range(0, 301, 100))
+    axes[1].set_yticklabels(range(0, 301, 100))   
+    axes[1].set_xticks(np.arange(plot_idx[0], plot_idx[1]+1, 100))
+    axes[1].set_xticklabels(range(6))
     trigger = up_down['trigger']
     trigger_start = int(trigger[0]/20) # ms
     trigger_end = int(trigger[-1]/20) # ms
@@ -2281,11 +2308,15 @@ def plot_raster_fr_sd_cv(axes, up_down, plot_window, T=10, stim='spon'):
     unit_unique = dict(zip(unit_unique, range(1, len(unit_unique)+1)))
     unit_idx_su = np.array([unit_unique[x] for x in unit_su])
     idx = np.logical_and(spiketimes_su >= plot_window[0], spiketimes_su <= plot_window[1])
-    axes[0].scatter(spiketimes_su[idx], unit_idx_su[idx], c='k', s=1)
+    axes[0].scatter(spiketimes_su[idx], unit_idx_su[idx], marker='|', c='k', s=50/len(unit_unique), linewidth=.5)
     axes[0].set_xlim([plot_window[0], plot_window[1]])
     axes[0].set_ylim([0, len(unit_unique)+1])
     axes[0].set_xticklabels([])
-    axes[0].set_ylabel('neuron #')
+    axes[0].set_ylabel('')
+    axes[0].spines[['top', 'bottom', 'right', 'left']].set_visible(False)
+    axes[0].set_ylim([0, np.max(unit_idx_su[idx])+1])
+    axes[0].set_yticks([])
+    axes[0].set_xticks([])
 # --------------------------------------- plot figures ----------------------------------------------------------
 def figure2_old(datafolder, figfolder):
     """
@@ -2418,10 +2449,7 @@ def figure2_old(datafolder, figfolder):
         ax.eventplot(ne.ne_units[i].spiketimes, lineoffsets=n_neuron + 1, linelengths=0.8, colors='r')
         plot_raster(ax, ne.member_ne_spikes[i], offset='unit', color='r', new_order=new_order)
         ax.set_xlim([t_start, t_end])
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.spines['bottom'].set_visible(False)
-        ax.spines['left'].set_visible(False)
+        ax.spines[['top', 'right', 'bottom', 'left']].set_visible(False)
         ax.set_xticks([])
 
         if i == 0:
@@ -2764,7 +2792,7 @@ def figure5():
         ax.set_xlabel('')
         if i == 0:
             ax.set_xticklabels([])
-    axes[2].set_xlabel('|correlation|', fontsize=fontsize_figure_axes_label)
+    ax.set_xlabel('|correlation|', fontsize=fontsize_figure_axes_label)
     
 
 def figure6():
@@ -2868,51 +2896,71 @@ def figure8():
     summary_folder = r'E:\Congcong\Documents\data\comparison\data-summary'
     figsize = [figure_size[1][0], 10*cm]
     fig = plt.figure(figsize=figsize)
-    x_start = .08
-    y_start = .05
-    x_fig = .27
-    x_space = .05
-    y_fig = .27
-    y_space = .05
+    x_start = .075
+    y_start = .07
+    x_fig = .25
+    x_space = .08
+    y_fig = .24
+    y_space = .1
     axes_all = []
-    # scatter plot of cv vs sd
-    ax = fig.add_axes([x_start, y_start + 2 * y_fig + 2 * y_space, x_fig, y_fig])
-    plot_cv_vs_sd(ax)
-    axes_all.append(ax)
     
+    sd_example = []
+    cv_example = []
     # example raster
     # no up/down
-    example_file = '200820_230604-site4-5655um-25db-dmr-31min-H31x64-fs20000-up_down.pkl'
+    example_file = '200709_232021-site1-5300um-20db-dmr-31min-H31x64-fs20000-up_down.pkl'
     with open(os.path.join(up_down_folder, example_file), 'rb') as f:
         up_down = pickle.load(f)
-    plot_window = np.array([0, 5e3])
+    plot_window = np.array([5e3, 10e3])
     axes = []
-    axes.append(fig.add_axes([x_start, y_start + 1.5 * y_fig + y_space, x_fig, y_fig/2]))
+    axes.append(fig.add_axes([x_start, y_start + 1.51 * y_fig + y_space, x_fig, y_fig/2]))
     axes.append(fig.add_axes([x_start, y_start + y_fig + y_space, x_fig, y_fig/2]))
     plot_raster_fr_sd_cv(axes, up_down, plot_window)
     axes_all.extend(axes)
+    sd_example.append(up_down['silence_density_spon'].mean())
+    cv_example.append(up_down['spkcount_cv_spon'].mean())
     
     # weak up/down
     example_file = '210603_201616-site2-4800um-20db-dmr-32min-H31x64-fs20000-up_down.pkl'
     with open(os.path.join(up_down_folder, example_file), 'rb') as f:
         up_down = pickle.load(f)
-    plot_window = np.array([0, 5e3])
+    plot_window = np.array([3e3, 8e3])
     axes = []
-    axes.append(fig.add_axes([x_start + x_fig + x_space, y_start + 1.5 * y_fig + y_space, x_fig, y_fig/2]))
-    axes.append(fig.add_axes([x_start + x_fig + x_space, y_start + y_fig + y_space, x_fig, y_fig/2]))
+    # raster [0]
+    axes.append(fig.add_axes([x_start + x_fig + .5 * x_space, y_start + 1.51 * y_fig + y_space, x_fig, y_fig/2]))
+    # firing rate [1]
+    axes.append(fig.add_axes([x_start + x_fig + .5 * x_space, y_start + y_fig + y_space, x_fig, y_fig/2]))
     plot_raster_fr_sd_cv(axes, up_down, plot_window)
+    axes[0].set_ylabel('')
+    axes[1].set_ylabel('')
+    axes[1].set_yticklabels([])
     axes_all.extend(axes)
+    sd_example.append(up_down['silence_density_spon'].mean())
+    cv_example.append(up_down['spkcount_cv_spon'].mean())
+
     
     # strong up/down
-    example_file = '210603_225955-site3-4800um-20db-dmr-33min-H31x64-fs20000-up_down.pkl'
+    example_file = '210119_222752-site2-4800um-20db-dmr-30min-H31x64-fs20000-up_down.pkl'
     with open(os.path.join(up_down_folder, example_file), 'rb') as f:
         up_down = pickle.load(f)
-    plot_window = np.array([0, 5e3])
+    plot_window = np.array([4.5e3, 9.5e3])
     axes = []
-    axes.append(fig.add_axes([x_start + x_fig + x_space, y_start + 2.5 * y_fig + 2 * y_space, x_fig, y_fig/2]))
-    axes.append(fig.add_axes([x_start + x_fig + x_space, y_start + 2 * y_fig + 2 * y_space, x_fig, y_fig/2]))
+    axes.append(fig.add_axes([x_start + x_fig + .5 * x_space, y_start + 2.51 * y_fig + 2 * y_space, x_fig, y_fig/2]))
+    axes.append(fig.add_axes([x_start + x_fig + .5 * x_space, y_start + 2 * y_fig + 2 * y_space, x_fig, y_fig/2]))
     plot_raster_fr_sd_cv(axes, up_down, plot_window)
+    axes[0].set_ylabel('')
+    axes[1].set_ylabel('')
+    axes[1].set_yticklabels([])
     axes_all.extend(axes)
+    sd_example.append(up_down['silence_density_spon'].mean())
+    cv_example.append(up_down['spkcount_cv_spon'].mean())
+    
+    
+    # scatter plot of cv vs sd
+    ax = fig.add_axes([x_start, y_start + 2 * y_fig + 2 * y_space, x_fig, y_fig])
+    plot_cv_vs_sd(ax, example=[sd_example, cv_example])
+    axes_all.append(ax)
+    
     
     # example cNE spikes and shade
     example_file = '210610_163054-site1-5000um-20db-dmr-31min-H31x64-fs20000-up_down.pkl'
@@ -2925,14 +2973,14 @@ def figure8():
     with open(os.path.join(data_folder, session_file), 'rb') as f:
         session = pickle.load(f)
     cne_idx = 0
-    ax = []
+    axes = []
     axes.append(fig.add_axes([x_start, y_start, x_fig * 2 + x_space, y_fig/2]))
     axes.append(fig.add_axes([x_start, y_start + y_fig/2, x_fig * 2 + x_space, y_fig/2]))
-    plot_up_ne_spikes(axes, session, ne, up_down, cne_idx)
+    plot_up_ne_spikes(axes, session, ne, up_down, cne_idx, plot_window=[775000, 785000])
     axes_all.extend(axes)
     
     # box plot of event percentage in hiAct
-    ax = fig.add_axes([x_start + 2* x_fig + 2 * x_space, y_start + 2 * y_fig + 2 * y_space, x_fig, y_fig])
+    ax = fig.add_axes([x_start + 2* x_fig + 2 * x_space, y_start + 2 * y_fig + 1.5 * y_space, x_fig, y_fig])
     plot_ne_event_up_percent(ax)
     axes_all.append(ax)
     # scatter plot of 
@@ -2942,8 +2990,39 @@ def figure8():
     
     # histogram og correlation
     ax = fig.add_axes([x_start + 2* x_fig + 2 * x_space, y_start , x_fig, y_fig])
-    axes_all.append(ax)
+    datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl\up_down_spon'
+    files = glob.glob(datafolder + r'\*ne-20dft-spon_up.pkl', recursive=False)
+    corr = []
+    region = []
+    for file in files:
+        with open(file, 'rb') as f:
+            ne = pickle.load(f)
+        corrmat = ne.corrmat
+        corr.append(np.diag(corrmat))
+        if 'H31x64' in file:
+            region.append(np.ones(corr[-1].shape))
+        else:
+            region.append(np.zeros(corr[-1].shape))
+    corr = np.concatenate(corr)
+    region = np.concatenate(region)
+    bins = np.arange(0, 1.01, .025)
+    bar_A1, _ = np.histogram(corr[region==0], bins)
+    bar_MGB, _ = np.histogram(corr[region==1], bins)
+    centers = (bins[1:] + bins[:-1]) / 2
+    ax.bar(centers, bar_MGB, color=MGB_color[0], width=.025, edgecolor='k', linewidth=.5)
+    ax.bar(centers, bar_A1, bottom=bar_MGB, color=A1_color[0], width=.025, edgecolor='k', linewidth=.5)
+    ax.legend(['MGB (n={})'.format(np.sum(bar_MGB)), 'A1 (n={})'.format(np.sum(bar_A1))], 
+              fontsize=6, handletextpad=1, labelspacing=.1, borderpad=.3,
+              fancybox=False, edgecolor='black', loc='upper left')
+    ax.set_xlabel('|Correlation|')
+    ax.set_ylabel('# of cNEs')
+    print('MGB: ', np.mean(corr[region==1]), np.std(corr[region==1]))
+    print('A1: ', np.mean(corr[region==0]), np.std(corr[region==0]))
+    ax.set_xlim([.5, 1])
+    ax.spines[['top', 'right']].set_visible(False)
     
+    # axes formatting
+    axes_all.append(ax)
     for ax in axes_all:
         for tick in ax.xaxis.get_major_ticks():
             tick.label.set_fontsize(fontsize_figure_tick_label)
@@ -2952,8 +3031,17 @@ def figure8():
         ax.xaxis.label.set_size(fontsize_figure_axes_label)
         ax.yaxis.label.set_size(fontsize_figure_axes_label)
         ax.yaxis.label.set_size(fontsize_figure_axes_label)
-        ax.xaxis.labelpad = 2
-        ax.yaxis.labelpad = 2
-        ax.tick_params(axis='both', which='major', pad=0)
+        ax.xaxis.labelpad = 1
+        ax.yaxis.labelpad = 1
+        ax.tick_params(axis='y', which='major', pad=.5)
+        ax.tick_params(axis='x', which='major', pad=2)
+    fig.text(0, .965, 'A', fontsize=fontsize_panel_label, weight='bold')
+    fig.text(0, .65, 'ii', fontsize=9, weight='bold', color='brown')
+    fig.text(.35, .65, 'iii', fontsize=9, weight='bold', color='green')
+    fig.text(.35, .965, 'i', fontsize=9, weight='bold', color='purple')
+    fig.text(0, .3, 'B', fontsize=fontsize_panel_label, weight='bold')
+    fig.text(0.65, .965, 'C', fontsize=fontsize_panel_label, weight='bold')
+    fig.text(0.65, .65, 'D', fontsize=fontsize_panel_label, weight='bold')
+    fig.text(0.65, .3, 'E', fontsize=fontsize_panel_label, weight='bold')
 
 
