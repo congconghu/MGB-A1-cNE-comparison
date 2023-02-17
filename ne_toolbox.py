@@ -94,7 +94,9 @@ def get_ne_spikes(activity, thresh, spiketimes, edges):
 
 
 def get_binned_spiketimes(spiketimes, edges):
-    spiketimes_binned, _ = np.histogram(spiketimes, edges)
+    spiketimes_binned = []
+    for i in range(len(edges)-1):
+        spiketimes_binned.append(spiketimes[(spiketimes >= edges[i]) & (spiketimes < edges[i+1])])
     return spiketimes_binned
 
 
@@ -784,5 +786,34 @@ def shuffle_spktrain(spktrain):
         spktrain[i] = np.roll(spktrain[i], shift)
     return spktrain
     
-    
+
+def get_num_cne_vs_shuffle(datafolder='E:\Congcong\Documents\data\comparison\data-pkl', 
+                           summary_folder='E:\Congcong\Documents\data\comparison\data-summary'):
+    stims = ('dmr', 'spon')
+    n_ne = {'n_ne': [], 'shuffled': [], 'stim': [], 'region': []}
+    for stim in stims:
+        nefiles = glob.glob(os.path.join(datafolder, '*-ne-20dft-{}.pkl'.format(stim)))
+        for file_idx, file in enumerate(nefiles):
+            print('{}/{} get ne numbers for {}'.format(file_idx + 1, len(nefiles), file))
+            if 'H31x64' in file:
+                n_ne['region'].extend(2*['MGB'])
+            else:
+                n_ne['region'].extend(2*['A1'])
+            # get number of cNEs from real data
+            with open(file, 'rb') as f:
+                ne = pickle.load(f)
+            n_ne['n_ne'].append(len(ne.ne_members))
+            n_ne['shuffled'].append(0)
+            n_ne['stim'].append(stim)
+            # get number of cNEs from shuffled
+            file_null = re.sub('{}.pkl'.format(stim), '{}-shuffled.pkl'.format(stim), file)
+            with open(file_null, 'rb') as f:
+                data = pickle.load(f)
+            n_ne['n_ne'].append(np.median(data['n_ne']))
+            n_ne['shuffled'].append(1)
+            n_ne['stim'].append(stim)
+                
+    n_ne = pd.DataFrame(n_ne)
+    n_ne.to_json(os.path.join(summary_folder, 'num_ne_data_vs_shuffle.json'))
+
     

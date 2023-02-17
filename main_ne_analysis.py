@@ -107,7 +107,6 @@ for idx, file in enumerate(files):
         ne.get_ne_spikes(alpha=alpha)
         ne.save_pkl_file(ne.file_path)
     
-    ne.save_pkl_file(ne.file_path)
     
 # ---------------------------------------- get xcorr of member and nonmember pairs -------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
@@ -191,7 +190,8 @@ for idx, file in enumerate(files):
                 n_ne[idx] = len(ne[-1].ne_members)
         with open(savefile_path, 'wb') as f:
             pickle.dump({'ne': ne, 'n_ne': n_ne}, f)
-            
+netools.get_num_cne_vs_shuffle()
+
 # --------------------------------------- stability across dmr/spon on shuffled data --------------------------------
 # real data
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
@@ -354,7 +354,7 @@ for idx, file in enumerate(files):
 
 # ++++++++++++++++++++++++++++++++++++++++++++++ cNE and UP/DOWN states ++++++++++++++++++++++++++++++++++++++++++
 # ---------------------------------------------get up.down spikes ------------------------------------------------
-datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl\up_down'
 files = glob.glob(datafolder + r'\*-20dft-dmr.pkl', recursive=False)
 for idx, file in enumerate(files):
     
@@ -362,8 +362,59 @@ for idx, file in enumerate(files):
         ne = pickle.load(f)
     
     ne.get_up_down_spikes(datafolder)
-    ne.save_pkl_file()
+    filename = re.findall('\d{6}_\d{6}.*', ne.file_path)[0]
+    ne.save_pkl_file(os.path.join(datafolder, filename))
     
     session = ne.get_session_data()
     session.get_up_down_spikes(datafolder)
-    session.save_pkl_file()
+    filename = re.findall('\d{6}_\d{6}.*',  session.file_path)[0]
+    session.save_pkl_file(os.path.join(datafolder, filename))
+
+# get up spktrain 
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl\up_down_spon'
+files = glob.glob(datafolder + r'\*20000.pkl', recursive=False)
+for idx, file in enumerate(files):
+    with open(file, 'rb') as f:
+        session = pickle.load(f)
+    # save spktrains
+    print('({}/{}) Save spktrain_up for {}'.format(idx+1, len(files), file))
+    session.save_spktrain_up_state()
+
+
+# get cNE from spktrain_up
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl\up_down_spon'
+files = glob.glob(datafolder + r'\*fs20000.pkl', recursive=False)
+for idx, file in enumerate(files):
+    with open(file, 'rb') as f:
+        session = pickle.load(f)
+
+    # cNE analysis
+    print('({}/{}) Get cNEs for {}'.format(idx+1, len(files), file))
+    stim = 'spon_up'
+    savefile_path = re.sub(r'fs20000.pkl', 'fs20000-ne-20dft-{}.pkl'.format(stim), session.file_path)
+    ne = session.get_ne(df=20, stim=stim)
+    if ne:
+        ne.get_members()
+        ne.save_pkl_file(savefile_path)
+
+# match patterns of cNEs
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl\up_down'
+files = glob.glob(datafolder + r'\*ne-20dft-dmr_up.pkl', recursive=False)
+nfile_MGB = 0
+nfile_A1 = 0
+for file in files:
+   
+    file_all = re.sub('20dft-dmr_up', '20dft-dmr', file)
+    if not os.path.exists(file_all):
+        continue
+    
+    with open(file, 'rb') as f:
+        ne = pickle.load(f)
+    with open(file_all, 'rb') as f:
+        ne_all = pickle.load(f)
+    corrmat, order, _ = netools.match_ic_weight(ne.patterns, ne_all.patterns)
+    ne.corrmat = corrmat
+    ne.pattern_order = order
+    ne.save_pkl_file()
+    
+st.save_matched_ne_df(datafolder=datafolder, key='dmr_up')

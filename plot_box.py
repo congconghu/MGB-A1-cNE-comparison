@@ -557,7 +557,7 @@ def plot_crh_ne_and_members(ne, savepath, ri=False):
         plt.close(fig)
 
 
-def plot_ICweight(ax, weights, thresh, direction='h', ylim=None):
+def plot_ICweight(ax, weights, thresh, direction='h', ylim=None, ylabelpad=None):
     """
     stem plot for cNE patterns
     """
@@ -612,7 +612,10 @@ def plot_ICweight(ax, weights, thresh, direction='h', ylim=None):
 
         ax.set_ylim([0, n_neuron + 1])
         ax.set_yticks(range(5, n_neuron + 1, 5))
-        ax.set_ylabel('Neuron #')
+        if ylabelpad:
+            ax.set_ylabel('Neuron #', labelpad=ylabelpad)
+        else:
+            ax.set_ylabel('Neuron #')
         if ylim:
             ax.set_xlim(ylim)
         ax.set_xlabel('ICweight')
@@ -2021,56 +2024,83 @@ def plot_ne_member_strf_crh_nonlinearity_subsample(ne, taxis, faxis, tmfaxis, sm
 
 def plot_icweight_match_binsize(ic_matched, figpath):
     
-    
-    dfs = ic_matched['df']
-    dfs = np.array(dfs) / 2
-    dfs = [int(x) for x in dfs]
-    fig_x = .09
-    fig_y = .5
-    space_x = .04
-    start_x = .08
-    start_y = .4
-    patterns = np.array(ic_matched['patterns'])
-    thresh = 1 / np.sqrt(patterns.shape[2])
     for idx_ne in range(ic_matched['n_ne'][0]):
         fig = plt.figure(figsize = figure_size[0])
-        ymax = patterns[:, idx_ne, :].max() * 1.2
-        ymin = patterns[:, idx_ne, :].min() * 1.2
-        for i, df in enumerate(dfs):
-            pattern = np.array(patterns[i, idx_ne, :])
-            
-            if sum(abs(pattern)) > 0:
-                ax = fig.add_axes([start_x + i*(fig_x + space_x), start_y, fig_x, fig_y])
-                plot_ICweight(ax, pattern, thresh, direction='v', ylim=[ymin, ymax])
-                ax.set_xlabel('{}ms'.format(int(df)))
-                if i > 0:
-                    ax.get_yaxis().set_visible(False)
-            else:
-                break
-        
-        ax = fig.add_axes([start_x, start_y-.15, .88, .08])
-        corr = abs(ic_matched['pearsonr'][idx_ne])
-        corr = corr[corr > 0]
-        ax.plot(corr, 'k.-')
-        p = ic_matched['p'][idx_ne]
-        idx_sig = np.where(p > .01)[0]
-        if not any(idx_sig):
-            ax.plot(corr, 'ko')
-        else:
-            idx_sig = idx_sig[0]
-            ax.plot(corr[:idx_sig], 'ko')
-        ax.set_ylim([0, 1.2])
-        ax.set_xlim([-1, 6])
-        ax.set_xticks(range(6))
-        xticklabels = ['-'.join([str(dfs[x]), str(dfs[x+1])]) for x in range(6)]
-        ax.set_xticklabels(xticklabels)
-        ax.set_ylabel('pearson r')
+        plot_icweight_match_binsize_fig(ic_matched, idx_ne, fig)
         
         fig.savefig('{}-{}.jpg'.format(figpath, idx_ne), dpi=300)
         plt.close()
 
 
-def plot_icweight_match_binsize_summary(ax, datafolder, figfolder, stim, probe):
+def plot_icweight_match_binsize_fig(ic_matched, idx_ne, fig, ylabel=True,
+                                    start_x=.08, start_y= 4, fig_y=.5, fig_x=.09, space_x=.04,
+                                    space_y=.15, fig_x_p=.88, fig_y_p=.08):
+    
+    dfs = ic_matched['df']
+    dfs = np.array(dfs) / 2
+    dfs = [int(x) for x in dfs]
+    patterns = np.array(ic_matched['patterns'])
+    thresh = 1 / np.sqrt(patterns.shape[2])
+    ymax = patterns[:, idx_ne, :].max() + .1
+    ymin = patterns[:, idx_ne, :].min() - .1
+    axes = []
+    for i, df in enumerate(dfs):
+        pattern = np.array(patterns[i, idx_ne, :])
+            
+        if sum(abs(pattern)) > 0:
+            ax = fig.add_axes([start_x + i*(fig_x + space_x), start_y, fig_x, fig_y])
+            plot_ICweight(ax, pattern, thresh, direction='v', ylim=[ymin, ymax], ylabelpad=-1)
+            ax.set_xlabel('{}ms'.format(int(df)), fontsize=6)
+            ax.tick_params(axis='both', labelsize=6)
+            ax.tick_params(axis='x', size=2)
+            ax.yaxis.get_label().set_fontsize(7)
+
+            if i > 0:
+                ax.get_yaxis().set_visible(False)
+
+            if i == 0:
+                axes.append(ax)
+                if not ylabel:
+                    ax.set_ylabel('')
+                
+            ax.set_xticks([])
+            ax.spines[['left', 'bottom']].set_visible(False)
+            
+                
+        else:
+            break
+        
+    ax = fig.add_axes([start_x, start_y - space_y, fig_x_p, fig_y_p])
+    axes.append(ax)
+    corr = abs(ic_matched['pearsonr'][idx_ne])
+    corr = corr[corr > 0]
+    ax.plot(corr, 'k.-')
+    p = ic_matched['p'][idx_ne]
+    idx_sig = np.where(p > .01)[0]
+    if not any(idx_sig):
+        ax.plot(corr, 'ko', markersize=2)
+    else:
+        idx_sig = idx_sig[0]
+        ax.plot(corr[:idx_sig], 'ko', markersize=2)
+    ax.set_ylim([0, 1.2])
+    ax.set_yticks([0, 1])
+    ax.set_yticklabels([0, 1], fontsize=6)
+    ax.set_xlim([-.9, 5.9])
+    ax.set_xticks(range(6))
+    xticklabels = ['-'.join([str(dfs[x]), str(dfs[x+1])]) for x in range(6)]
+    ax.set_xlabel('Binsize pair (ms)', labelpad=1, fontsize=7)
+    ax.set_xticklabels(xticklabels, fontsize=6)
+    if ylabel:
+        ax.set_ylabel('Pearson r', fontsize=7)
+    else:
+        ax.set_ylabel('')
+    return axes
+
+
+def plot_icweight_match_binsize_summary(ax, stim, probe, 
+                                        datafolder='E:\Congcong\Documents\data\comparison\data-pkl'):
+    probe_region = {'H31x64': 'MGB', 'H22x32': 'A1'}
+    region = probe_region[probe]
     files = glob.glob(os.path.join(datafolder, '*{}*-{}-ic_match_tbins.pkl'.format(probe, stim)))
     n_ne = np.zeros(7)
     n_match = np.zeros(7)
@@ -2090,12 +2120,14 @@ def plot_icweight_match_binsize_summary(ax, datafolder, figfolder, stim, probe):
     n_match[0] = n_ne[0]
     df = ic_matched['df']
     df = [x // 2 for x in df]
-    ax.bar(range(7), n_ne, color=[.8, .8, .8])
-    ax.bar(range(7), n_match, color=[.5, .5, .5])
+    ax.bar(range(7), n_ne, color=eval(f'{region}_color[1]'))
+    ax.bar(range(7), n_match, color=eval(f'{region}_color[0]'))
     ax.set_xticks(range(7))
     ax.set_xticklabels(df)
     ax.set_xlabel('bin size (ms)')
     ax.set_ylabel('# of cNEs')
+
+    ax.set_title(region, color=eval(f'{region}_color[0]'), weight='bold')
 
 
 # +++++++++++++++++++++++++++++++++++++++++++++++ UP/DOWN state ++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -2811,6 +2843,81 @@ def figure2(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl',
     fig.savefig(os.path.join(figfolder, 'fig2.tif'), dpi=1000)
     fig.savefig(os.path.join(figfolder, 'fig2.pdf'), dpi=1000)
     plt.close()
+    
+    
+def figure3(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl', 
+            figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summary'):
+    
+    mpl.rcParams['lines.markersize'] = 8
+
+    figsize = [figure_size[1][0], 10*cm]
+    fig = plt.figure(figsize=figsize)
+    
+    x_start = .07
+    y_start = .68
+    x_space = .008
+    x_fig = .055
+    y_fig= .3
+    y_space = .1
+    fig_x_p = .42
+    fig_y_p = .05
+    # plot example - 1
+    file = os.path.join(datafolder,
+                        '210120_003822-site3-4800um-20db-dmr-31min-H31x64-fs20000-ne-320dft-dmr-ic_match_tbins.pkl')
+    with open(file, 'rb') as f:
+        ic_matched = pickle.load(f)
+    axes = plot_icweight_match_binsize_fig(ic_matched, 2, fig,
+                                        start_x=x_start, start_y=y_start, fig_y=y_fig, fig_x=x_fig, space_x=x_space,
+                                        space_y=y_space, fig_x_p=fig_x_p, fig_y_p=fig_y_p)
+    labelx = -.11
+    axes[0].yaxis.set_label_coords(-.85, 0.5)
+    axes[1].yaxis.set_label_coords(labelx, 0.5)
+    
+    # plot example - 2
+    x_start = .57
+    file = os.path.join(datafolder,
+                        '210610_200109-site4-5000um-20db-dmr-31min-H31x64-fs20000-ne-320dft-dmr-ic_match_tbins.pkl')
+    with open(file, 'rb') as f:
+        ic_matched = pickle.load(f)
+    axes = plot_icweight_match_binsize_fig(ic_matched, 3, fig, ylabel=False,
+                                        start_x=x_start, start_y=y_start, fig_y=y_fig, fig_x=x_fig, space_x=x_space,
+                                        space_y=y_space, fig_x_p=fig_x_p, fig_y_p=fig_y_p)
+    trans = axes[0].get_xaxis_transform()
+    axes[0].plot([4, 4.5],[0,0], color="k", transform=trans, clip_on=False, linewidth=.8)
+    axes[0].annotate('ICweight', xy=(4.25, -.12), xycoords=trans, 
+                     ha="center", va="center", fontsize=6)    
+    axes[0].annotate('0.5', xy=(4.25, -.05), xycoords=trans, 
+                     ha="center", va="center", fontsize=6)    
+    
+    x_start = .07
+    y_start = .07
+    x_fig = fig_x_p
+    y_fig = .36
+    ax = fig.add_axes([x_start, y_start, x_fig, y_fig])
+    plot_icweight_match_binsize_summary(ax, stim='spon', probe='H31x64')
+    ax.set_ylim([0, 120])
+    ax.yaxis.set_label_coords(labelx, 0.5)
+    
+    x_start = .57
+    ax = fig.add_axes([x_start, y_start, x_fig, y_fig])
+    plot_icweight_match_binsize_summary(ax, stim='spon', probe='H22x32')
+    ax.set_ylabel('')
+    ax.set_ylim([0, 100])
+    
+    y = .97
+    fig.text(0, y, 'A', fontsize=fontsize_panel_label, weight='bold')
+    fig.text(.03, y, 'i', fontsize=fontsize_panel_label-2, weight='bold')
+    fig.text(.5, y, 'ii', fontsize=fontsize_panel_label-2, weight='bold')
+    y = .47
+    fig.text(0, y, 'B', fontsize=fontsize_panel_label, weight='bold')
+    fig.text(.03, y, 'i', fontsize=fontsize_panel_label - 2, weight='bold')
+    fig.text(.5, y, 'ii', fontsize=fontsize_panel_label - 2, weight='bold')
+    
+    plt.savefig(os.path.join(figfolder, 'fig3.jpg'), dpi=300)
+    plt.savefig(os.path.join(figfolder, 'fig3.tif'), dpi=300)
+    plt.savefig(os.path.join(figfolder, 'fig3.pdf'), dpi=300)
+    plt.close()
+
 
 def figure4(datafolder='E:\Congcong\Documents\data\comparison\data-pkl'):
     """
@@ -3016,6 +3123,7 @@ def figure4(datafolder='E:\Congcong\Documents\data\comparison\data-pkl'):
     plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig4.tif', dpi=300)
     plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig4.pdf', dpi=300)
     plt.close()
+ 
     
 def figure5():
     figsize = [figure_size[2][0], 11*cm]
@@ -3166,6 +3274,17 @@ def figure6():
     plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig6.pdf', dpi=300)
     plt.close()
 
+
+def figure7(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl', 
+            figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summary'):
+    
+    
+    plt.savefig(os.path.join(figfolder, 'fig7.jpg'), dpi=300)
+    #plt.savefig(os.path.join(figfolder, 'fig7.tif'), dpi=300)
+    #plt.savefig(os.path.join(figfolder, 'fig7.pdf'), dpi=300)
+    plt.close()
+
+
 def figure8():
     data_folder = r'E:\Congcong\Documents\data\comparison\data-pkl\up_down_spon'
     up_down_folder = r'E:\Congcong\Documents\data\comparison\data-pkl\up_down'
@@ -3302,3 +3421,4 @@ def figure8():
     plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig8.tif', dpi=300)
     plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig8.pdf', dpi=300)
     plt.close()
+    

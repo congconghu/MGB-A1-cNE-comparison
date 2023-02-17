@@ -128,11 +128,14 @@ class SingleUnit:
 
     def get_strf(self, stim, edges, nlead=20, nlag=0):
         spiketimes = self.spiketimes
-        spktrain, _ = np.histogram(spiketimes, edges)
-        stim_mat = stim.stim_mat
-        taxis = (stim.taxis[1] - stim.taxis[0]) * np.array(range(nlead-1, -nlag-1, -1)) * 1000
-        faxis = stim.faxis
-        strf = netools.calc_strf(stim_mat, spktrain, nlag=nlag, nlead=nlead)
+        strf = []
+        for edge in edges:
+            spktrain, _ = np.histogram(spiketimes, edge)
+            stim_mat = stim.stim_mat
+            taxis = (stim.taxis[1] - stim.taxis[0]) * np.array(range(nlead-1, -nlag-1, -1)) * 1000
+            faxis = stim.faxis
+            strf.append(netools.calc_strf(stim_mat, spktrain, nlag=nlag, nlead=nlead))
+        strf = np.array(strf)
         self.strf = strf
         self.strf_taxis = taxis
         self.strf_faxis = faxis
@@ -219,7 +222,7 @@ class SingleUnit:
     def subsample(self, nspk):
         self.spiketimes = np.array(random.sample(set(self.spiketimes), int(nspk)))
     
-    def get_up_down_spike(self, up_interval):
+    def get_up_down_spikes(self, up_interval):
         spiketimes = self.spiketimes
         spiketimes_up = np.zeros(spiketimes.shape)
         
@@ -234,6 +237,11 @@ class SingleUnit:
         
         self.spiketimes_down = spiketimes[spiketimes_up == 0]
         self.spiketimes_up = spiketimes[spiketimes_up == 1]
+    
+    def get_spktrain(self, binsize=0.5):
+        spiketimes = self.spiketimes
+        spktrain, _ = np.histogram(spiketimes, bins=np.arange(0, spiketimes[-1]+binsize, binsize))
+        return spktrain
 
 
 class Session:
@@ -274,6 +282,10 @@ class Session:
         self.probdata = data_dict['spk']['probdata']
         self.trigger = data_dict['trigger']
         self.units = []
+        if 'stimfile' in data_dict['spk']:
+            stimfile = data_dict['spk']['stimfile']
+            stimfile = re.findall('thalamus/(.*)', stimfile)[0]
+            self.stimfile = stimfile
         for unit in data_dict['spk']['spk']:
             su = SingleUnit(unit=int(unit['unit']), spiketimes=unit['spiketimes'])
             su.add_properties(chan=int(unit['chan']), isolation=float(unit['isolation']), peak_snr=unit['peak_snr'],
@@ -294,36 +306,59 @@ class Session:
     def save_spktrain_from_stim(self, stim_len):
         trigger = self.trigger
         trigger_ms = trigger / self.fs * 1e3
-        nt = int(stim_len / len(trigger_ms))  # number of time points between 2 triggers
-        trigger_ms = np.append(trigger_ms, [trigger_ms[-1] + max(np.diff(trigger_ms))])
-        edges = np.array(
-            [np.linspace(trigger_ms[i], trigger_ms[i + 1], nt + 1)[:-1] for i in range(len(trigger_ms) - 1)])
-        edges = edges.flatten()
-        edges = np.append(edges, trigger_ms[-1])
+        nt = int(stim_len / max(trigger_ms.shape))  # number of time points between 2 triggers
+        if len(trigger.shape) == 2: 
+            n_trigger = trigger.shape[0]
+        else:
+            n_trigger =  1
+            trigger = trigger.reshape(1, -1)
+            trigger_ms = trigger_ms.reshape(1, -1)
+        
+        edges = []
+        spktrain = []
+        for i in range(n_trigger):
+            trigger_ms_tmp = np.append(trigger_ms[i], [trigger_ms[i][-1] + np.max(np.diff(trigger_ms))])
+            edges_tmp = np.array(
+                [np.linspace(trigger_ms_tmp[x], trigger_ms_tmp[x + 1], nt + 1)[:-1] for x in range(len(trigger_ms_tmp) - 1)])
+            edges_tmp = edges_tmp.flatten()
+            edges_tmp = np.append(edges_tmp, trigger_ms_tmp[-1])
+            edges.append(edges_tmp)
 
-        # get spktrain under dmr
-        spktrain = np.zeros([len(self.units), stim_len], 'int8')
-        for idx, unit in enumerate(self.units):
-            spktrain[idx], _ = np.histogram(unit.spiketimes, edges)
-        spktrain[spktrain > 0] = 1
-        self.spktrain_dmr = spktrain
-        self.edges_dmr = edges
+            # get spktrain under dmr
+            spktrain_tmp = np.zeros([len(self.units), stim_len], 'int8')
+            for idx, unit in enumerate(self.units):
+                spktrain_tmp[idx], _ = np.histogram(unit.spiketimes, edges_tmp)
+                spktrain_tmp[spktrain_tmp > 0] = 1
+            spktrain.append(spktrain_tmp)
+        
+        self.spktrain_dmr = np.array(spktrain)
+        self.edges_dmr = np.array(edges)
 
         # get spktrain under spon
-        if trigger_ms[0] / 1e3 / 60 > 5:  # first trigger happens 5minutes after the start of recording -> spon first
-            self.dmr_first = False
-            edges = np.arange(0, trigger_ms[0], 0.5)
+        if n_trigger == 1:
+            if trigger_ms[0][0] / 1e3 / 60 > 5:  # first trigger happens 5minutes after the start of recording -> spon first
+                self.dmr_first = False
+                edges = [np.arange(0, trigger_ms[0][0], 0.5)]
+            else:
+                self.dmr_first = True
+                spiketimes_max = max([unit.spiketimes[-1] for unit in self.units])
+                edges = [np.arange(trigger_ms[0][-1], spiketimes_max + 0.5, 0.5)]
         else:
-            self.dmr_first = True
-            spiketimes_max = max([unit.spiketimes[-1] for unit in self.units])
-            edges = np.arange(trigger_ms[-1], spiketimes_max + 0.5, 0.5)
+            edges = []
+            # first spon part exist before the first trigger
+            edges.append(np.arange(0, trigger_ms[0][0], 0.5))
+            # second spon part exist between 2nd and 3rd trigger
+            edges.append(np.arange(trigger_ms[1][-1] + 1e3, trigger_ms[2][0], 0.5))
 
-        if len(
-                edges) * 0.5 / 1e3 / 60 > 5:  # save spon train when recording of spontanous activity lasts more than 5 minutes
-            spktrain = np.zeros([len(self.units), len(edges) - 1], 'int8')
-            for idx, unit in enumerate(self.units):
-                spktrain[idx], _ = np.histogram(unit.spiketimes, edges)
-            spktrain[spktrain > 0] = 1
+        if len(edges[0]) * 0.5 / 1e3 / 60 > 5:  # save spon train when recording of spontanous activity lasts more than 5 minutes
+            spktrain_all = []    
+            for curr_edges in edges:
+                spktrain = np.zeros([len(self.units), len(curr_edges) - 1], 'int8')
+                for idx, unit in enumerate(self.units):
+                    spktrain[idx], _ = np.histogram(unit.spiketimes, curr_edges)
+                    spktrain[spktrain > 0] = 1
+                spktrain_all.append(spktrain)
+            spktrain = np.concatenate(spktrain_all, axis=1)
             self.spktrain_spon = spktrain
             self.edges_spon = edges
         self.save_pkl_file(self.file_path)
@@ -340,11 +375,21 @@ class Session:
         except AttributeError:
             return np.array([]), np.array([])
         # down sample spktrain
-        nt = spktrain.shape[1] // df
-        spktrain = spktrain[:, :nt * df]
-        edges = edges[0:nt * df + 1:df]
-        spktrain = np.resize(spktrain, (spktrain.shape[0], nt, df))
-        return np.sum(spktrain, axis=2), edges
+        nt = spktrain.shape[-1] // df
+        if spktrain.ndim == 2:
+            spktrain = np.array([spktrain])
+            edges = np.array([edges])
+        else:
+            spktrain_downsampled = []
+            for spktrain_tmp in spktrain:
+                spktrain_tmp = spktrain_tmp[:, :nt * df]
+                spktrain_tmp = np.resize(spktrain_tmp, (spktrain_tmp.shape[0], nt, df))
+                spktrain_downsampled.append(np.sum(spktrain_tmp, axis=2))
+            edges_downsampled = []
+            for edge in edges:
+                edges_downsampled.append(edges[0:nt * df + 1:df])
+        
+        return np.array(spktrain), np.array(edges)
 
     def get_ne(self, df, stim, shuffle=False):
         """get cNEs in each recording session, under dmr and spon"""
@@ -353,6 +398,7 @@ class Session:
         if shuffle:
             spktrain = netools.shuffle_spktrain(spktrain)
         if spktrain.any():
+            spktrain = np.concatenate(spktrain, axis=1)
             patterns = netools.detect_cell_assemblies(spktrain)
             if patterns is None:
                 return None
@@ -411,7 +457,10 @@ class Session:
         edges = self.edges_dmr
         if hasattr(stim, 'df'):
             df = stim.df
-            edges = edges[::df]
+            edges_df = []
+            for edge in edges:
+                edges_df.append(edge[::df])
+            edges = np.array(edges_df)
         for unit in self.units:
             unit.get_strf(stim, edges, nlag=nlag, nlead=nlead)
     
@@ -492,7 +541,10 @@ class Session:
         else:
             return np.nan
     
-    def get_up_down_data(self, datafolder):
+    def get_up_down_data(self, datafolder=None):
+        if datafolder is None:
+            file_path = self.file_path
+            datafolder = re.findall('(.*)\d{6}_\d{6}', file_path)[0]
         exp = self.exp
         depth = self.depth
         up_down_file = glob.glob(os.path.join(datafolder, '{}-*-{}um-*up_down.pkl'.format(exp, depth)))
@@ -501,12 +553,40 @@ class Session:
             up_down = pickle.load(f)
         return up_down
     
-    def get_up_down_spikes(self, datafolder):
+    def get_up_down_spikes(self, datafolder=None, stim='spon'):
         up_down = self.get_up_down_data(datafolder)
-        up_interval = up_down['up_interval']
+        up_interval = up_down['up_interval_'+stim]
         for unit in self.units:
-            unit.get_up_down_spike(up_interval)
-        
+            unit.get_up_down_spikes(up_interval)
+    
+    def save_spktrain_up_state(self, stim='spon'):
+        up_down = self.get_up_down_data()
+        up_intervals = up_down['up_interval_'+stim]
+        spktrain = eval(f'self.spktrain_{stim}')
+        edges = eval(f'self.edges_{stim}')
+        spktrain_up = []
+        edges_up = []
+        p = 0
+        for t_start, t_end in zip(*up_intervals):
+            for idx_start in range(p, len(edges)):
+                if edges[idx_start] >= t_start:
+                    for idx_end in range(idx_start, len(edges)):
+                        if edges[idx_end] >= t_end:
+                            p = idx_end
+                            spktrain_up.append(spktrain[:, idx_start:idx_end])
+                            edges_up.append(edges[idx_start:idx_end])
+                            break
+                    break
+        edges_up.append([edges[-1]])
+        spktrain_up = np.concatenate(spktrain_up, axis=1)
+        edges_up = np.concatenate(edges_up)
+        if stim == 'spon':
+            self.spktrain_spon_up = spktrain_up
+            self.edges_spon_up = edges_up
+        else:
+            self.spktrain_dmr_up = spktrain_up
+            self.edges_dmr_up = edges_up
+        self.save_pkl_file()
 
 
 class NE(Session):
@@ -879,22 +959,27 @@ class NE(Session):
         exp = re.findall('\d{6}_\d{6}', self.file_path)[0]
         depth =  re.findall('\d{3,4}um', self.file_path)[0]
         up_down_file = glob.glob(os.path.join(datafolder, '{}-*-{}-*up_down.pkl'.format(exp, depth)))
+        if len(up_down_file) == 0:
+            return None
         assert(len(up_down_file) == 1)
         with open(up_down_file[0], 'rb') as f:
             up_down = pickle.load(f)
         return up_down
     
-    def get_up_down_spikes(self, datafolder):
+    def get_up_down_spikes(self, datafolder, stim='spon'):
         up_down = self.get_up_down_data(datafolder)
-        up_interval = up_down['up_interval']
+        if up_down is None:
+            return False
+        up_interval = up_down['up_interval_'+stim]
         # cNE events
         for unit in self.ne_units:
-            unit.get_up_down_spikes()
+            unit.get_up_down_spikes(up_interval)
 
         # get member ne spike 
         for _, members in self.member_ne_spikes.items():
             for unit in members:
-                unit.get_up_down_spikes()
+                unit.get_up_down_spikes(up_interval)
+        return True
 
 
 def save_su_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
@@ -905,6 +990,9 @@ def save_su_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
     :param savefolder:
     :return:
     """
+    droplist = ['spiketimes', 'isi_bin', 'waveforms', 'waveforms_mean', 'waveforms_std', 'amps',
+                'adjacent_chan', 'template', 'peak_snr', 'strf_nonlinearity', 'si_null', 'si_spk', 
+                'nonlin_t_bins', 'nonlin_nspk_bins', 'strf_ifrac', 'strf_info_xcenters']
     files = glob.glob(datafolder + r'\*fs20000.pkl', recursive=False)
     units_all = []
     for idx, file in enumerate(files):
@@ -913,11 +1001,10 @@ def save_su_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
             session = pickle.load(f)
 
         units = pd.DataFrame([vars(x) for x in session.units])
-        for i in units.index:
-            units.iloc[0]['strf_nonlinearity']
-        units.drop(['spiketimes', 'isi_bin', 'waveforms', 'waveforms_mean', 'waveforms_std', 'amps',
-                    'adjacent_chan', 'template', 'peak_snr', 'strf_nonlinearity', 'si_null', 'si_spk', 
-                    'nonlin_t_bins', 'nonlin_nspk_bins', 'strf_ifrac', 'strf_info_xcenters'], axis=1, inplace=True)
+        
+        for colname in units.columns:
+            if colname in droplist:
+                units.drop(colname, axis=1, inplace=True)
         units['exp'] = session.exp
         units['depth'] = session.depth
         units['probe'] = session.probe
@@ -982,44 +1069,55 @@ def save_ne_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
         
 
 def save_matched_ne_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
-               savefolder=r'E:\Congcong\Documents\data\comparison\data-summary'):
+               savefolder=r'E:\Congcong\Documents\data\comparison\data-summary', key='dmr'):
     
-    files = glob.glob(datafolder + r'\*ne-20dft-dmr.pkl', recursive=False)
+    files = glob.glob(datafolder + r'\*ne-20dft-{}.pkl'.format(key), recursive=False)
     ne_all = []
     for idx, file in enumerate(files):
         print('({}/{}) save dataframe for {}'.format(idx + 1, len(files), file))
-        file_spon = re.sub('20dft-dmr', '20dft-spon', file)
-        if not os.path.exists(file_spon):
-            print('no spontaneous activity')
+        if key == 'dmr':
+            file2 = re.sub('20dft-dmr', '20dft-spon', file)
+        elif key == 'dmr_up':
+            file2 = re.sub('20dft-dmr_up', '20dft-dmr', file)
+        if not os.path.exists(file2):
+            print('{} does not exist'.format(file2))
             continue
         with open(file, 'rb') as f:
             ne = pickle.load(f)
-        with open(file_spon, 'rb') as f:
-            ne_spon = pickle.load(f)
+        with open(file2, 'rb') as f:
+            ne2 = pickle.load(f)
             
         exp = ne.exp
         probe = ne.probe
         depth = ne.depth
         for i, members in ne.ne_members.items():
-            pattern_dmr = ne.patterns[i]
-            strf_sig = ne.ne_units[i].strf_ri_z > 3
-            crh_sig = ne.ne_units[i].crh_ri_z > 3
+            pattern1 = ne.patterns[i]
+            if hasattr(ne, 'ne_units'):
+                strf_sig = ne.ne_units[i].strf_ri_z > 3
+                crh_sig = ne.ne_units[i].crh_ri_z > 3
+            else:
+                strf_sig = None
+                crh_sig = None
             if i in ne.pattern_order[0]:
                 idx_match = np.where(np.array(ne.pattern_order[0]) == i)[0][0]
-                idx_spon = ne.pattern_order[1][idx_match]
-                pattern_spon = ne_spon.patterns[idx_spon]
+                idx2 = ne.pattern_order[1][idx_match]
+                pattern2 = ne2.patterns[idx2]
                 pattern_corr = ne.corrmat[idx_match, idx_match]
                 
             else:
-                pattern_spon = []
+                pattern2 = []
                 pattern_corr = np.nan
+            if hasattr(ne, 'corr_thresh'):
+                corr_thresh = ne.corr_thresh
+            else:
+                corr_thresh = None
             ne_all.append({'exp': exp, 'probe': probe, 'depth':depth,
                            'cNE': i, 'members': members, 
-                           'pattern_dmr': pattern_dmr, 'pattern_spon': pattern_spon, 
-                           'pattern_corr': pattern_corr, 'corr_thresh': ne.corr_thresh,
+                           'pattern_dmr': pattern1, 'pattern_spon': pattern2, 
+                           'pattern_corr': pattern_corr, 'corr_thresh': corr_thresh,
                            'strf_sig': strf_sig, 'crh_sig': crh_sig})
     ne_all = pd.DataFrame(ne_all)
-    ne_all.to_json(os.path.join(savefolder, 'cNE_matched.json'))
+    ne_all.to_json(os.path.join(savefolder, 'cNE_matched-{}.json'.format(key)))
     
 def save_matched_shuffled_ne_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
                savefolder=r'E:\Congcong\Documents\data\comparison\data-summary'):

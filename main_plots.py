@@ -143,8 +143,8 @@ for idx, file in enumerate(files):
     plots.plot_ne_split_ic_weight_match(ne_split, figure_path)
 
 # --------------------------------------plot ICweight correlation null distribution-------------------------------------
-datafolder = r'/Users/hucongcong/Documents/UCSF/data/data-pkl'
-figure_folder = r'/Users/hucongcong/Documents/UCSF/data/figure/cNE-split-corr-null'
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+figure_folder = r'E:\Congcong\Documents\data\comparison\figure\cNE-split_corr-null'
 files = glob.glob(datafolder + r'/*split.pkl', recursive=False)
 for idx, file in enumerate(files):
     print('({}/{}) plot ICweight match for {}'.format(idx + 1, len(files), file))
@@ -153,6 +153,14 @@ for idx, file in enumerate(files):
     filename = re.findall('\d{6}_\d{6}.*', file)[0]
     figure_path = os.path.join(figure_folder, re.sub('pkl', 'jpg', filename))
     plots.plot_ne_split_ic_weight_null_corr(ne_split, figure_path)
+
+
+# ++++++++++++++++++++++++++++++++++++++++++++++cNE significance ++++++++++++++++++++++++++++++++++++++++++++++++++++
+# ----------------------------------------plot umber of cNEs in real and shuffled data ------------------
+fig = plt.figure()
+ax = fig.add_axes([.1, .1, .8, .8])
+plots.plot_num_cne_vs_shuffle(ax)
+fig.savefig(r'E:\Congcong\Documents\data\comparison\figure\num_cNE_real_vs_shuffle.jpg', dpi=300)
 
 
 # +++++++++++++++++++++++++++++++++++++++ cNE stimulus encoding +++++++++++++++++++++++++++++++++++++++++++++++
@@ -176,12 +184,65 @@ for idx, file in enumerate(files):
 # ------------------------------ plot strf, crh and nonlinearity of subsampled spikes------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-summary\subsample'
 figpath = r'E:\Congcong\Documents\data\comparison\figure\cNE-strf-crh-nonlinearity-subsampled'
-files = glob.glob(datafolder + r'\*subsample_ri.json.pkl', recursive=False)
+files = glob.glob(datafolder + r'\*subsample_ri.json', recursive=False)
 
 for idx, file in enumerate(files):
     print('({}/{}) plot 5ms STRFs for {}'.format(idx, len(files), file))
     with open(file, 'rb') as f:
         ne = pickle.load(f)
     plots.plot_ne_member_strf_crh_nonlinearity_subsample(ne, figpath)
+    
+# ++++++++++++++++++++++++++++++++++++++++++++++ cNE stability across binsize ++++++++++++++++++++++++++++++++++++++++++
+# -------------------------------------------- plot cNE under different binsizes ----------------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+figpath = r'E:\Congcong\Documents\data\comparison\figure\cNE-binsize-stability'
+files = glob.glob(datafolder + r'\*dmr-ic_match_tbins.pkl', recursive=False)
+
+for idx, file in enumerate(files):
+    print('({}/{}) plot matched ICweight for {}'.format(idx, len(files), file))
+    with open(file, 'rb') as f:
+        ic_matched = pickle.load(f)
+    namebase = file[:-4]
+    namebase = os.path.join(figpath, re.findall('\d{6}_\d{6}.*', namebase)[0])
+    plots.plot_icweight_match_binsize(ic_matched, namebase)
+    
+# -------------------------------------------- plot number of matched cNE ----------------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+figfolder = r'E:\Congcong\Documents\data\comparison\figure\cNE-binsize-stability'
+plots.plot_icweight_match_binsize_summary(datafolder, figfolder)
+    
+    
+# ++++++++++++++++++++++++++++++++++++++++++++++ UP/DOWN state ++++++++++++++++++++++++++++++++++++++++++
+# -------------------------------------------- plot cNE under different binsizes ----------------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+figfolder = r'E:\Congcong\Documents\data\comparison\figure\up_down\ne_spikes'
+files = glob.glob(datafolder + r'\*-20dft-dmr.pkl', recursive=False)
+for idx, file in enumerate(files):
+    
+    with open(file, 'rb') as f:
+        ne = pickle.load(f)
+    
+    session = ne.get_session_data()
+    up_down = ne.get_up_down_data(datafolder)
+    
+    plots.plot_raster_fr_prob(session, ne, up_down, figfolder)
+
+# percent of events in up-state
+fig = plt.figure()
+ax = fig.add_axes([.1, .1, .8, .8])
+plots.plot_ne_event_up_percent(ax)
+plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\up_down\ne_event_up_percent.jpg', dpi=300, bbox_inches = 'tight')
+
+# percent of spikes in up_state
+fig = plt.figure()
+ax = fig.add_axes([.1, .1, .8, .8])
+plots.plot_ne_spike_prob_up_vs_all(ax)
+plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\up_down\up_percent_ne_vs_all.jpg', dpi=300, bbox_inches = 'tight')
+
+    
+    
+    
+    
+    
     
     
