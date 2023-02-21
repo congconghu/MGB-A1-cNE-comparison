@@ -173,6 +173,42 @@ def plot_strf_df(units, figfolder, order=None, properties=False, smooth=False):
             fig.savefig(os.path.join(figfolder, '{}-{}.jpg'.format(order, nfig)), dpi=300)
 
 
+def batch_plot_strf_df_probe(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-summary', 
+                             figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\su-strf'):
+    units = pd.read_json(os.path.join(datafolder, 'single_units.json'))
+    groups = list(units.groupby(['exp', 'probe']).groups.keys())
+    
+    for exp, probe in groups:
+        if probe != 'H31x64':
+            continue
+        units_tmp = units[(units.exp == exp) & (units.probe == probe)]
+        plot_strf_df_probe(units_tmp)
+        plt.savefig(os.path.join(figfolder, f'{exp}-{probe}.jpg'))
+        plt.close()
+
+
+def plot_strf_df_probe(units):
+
+    # rearange plot order
+    #depth = np.concatenate(list(units.position))[1::2]
+    #top = min(depth)
+    #bottom = max(depth)
+    fig, axes= plt.subplots(5, 5, figsize=[10, 10])
+    axes = axes.flatten()
+    for i in range(len(units)):
+        strf = np.array(units.iloc[i].strf)
+        plot_strf(axes[i],
+                  strf,
+                  taxis=np.array(units.iloc[i].strf_taxis),
+                  faxis=np.array(units.iloc[i].strf_faxis),
+                  latency=np.array(units.iloc[i].latency),
+                  bf=np.array(units.iloc[i].bf),
+                  smooth=False)
+        axes[i].set_title(units.iloc[i].position[-1])
+        if i == 24:
+            break
+
+
 def plot_crh_df(units, figfolder, order='strf_ri', properties=False):
     if order == 'crh_ri':
         order_idx = (units[order]
@@ -808,6 +844,23 @@ def plot_xcorr_avg(ax, corr):
     ax.set_ylabel('z-scored\ncorrelation')
 
 
+def plot_xcorr_examples(file, figfolder=r'E:\Congcong\Documents\data\comparison\figure\summary'):
+    with open(file, 'rb') as f:
+        session = pickle.load(f)
+    spktrain = session.spktrain_dmr
+    maxlag = 40
+    spktrain_shift = np.roll(spktrain, -maxlag, axis=1)
+    spktrain_shift = spktrain_shift[:, :-2 * maxlag]
+    c = 0
+    idx_neuron = [0, 2, 4, 7]
+    for idx, i in enumerate(idx_neuron):
+        for j in idx_neuron[idx + 1:]:
+            xcorr = np.correlate(spktrain[i], spktrain_shift[j], mode='valid')
+            plt.bar(np.arange(-20, 20.1, .5), xcorr, color='k')
+            plt.title(f'{i}-{j}')
+            plt.savefig(os.path.join(figfolder, f'{c}.jpg'))
+            plt.close()
+            c += 1
 # --------------------------------------------------cNE properties ---------------------------------------------------
 def num_ne_vs_num_neuron(ax, datafolder, stim):
     # get files for recordings in A1 and MGB
@@ -1835,7 +1888,6 @@ def plot_neuron_ne_subsample_strf_crh(subsample_ri, taxis, faxis, tmfaxis, smfax
             r += 1
         
 
-
 def plot_ne_member_strf_crh_nonlinearity(ne, figpath):
 
     # load session file
@@ -2004,8 +2056,6 @@ def plot_ne_member_strf_crh_nonlinearity_subsample(ne, taxis, faxis, tmfaxis, sm
                     axes[nrow][i].set_title(unit_type.replace('_', ' '))
                 
                 # axis labels
-
-
                 axes[nrow][i].set_ylabel(None)
                 axes[nrow][i].set_yticklabels([])
                 axes[nrow][i].set_xlabel(None)
@@ -2390,6 +2440,77 @@ def plot_raster_fr_sd_cv(axes, up_down, plot_window, T=10, stim='spon'):
     axes[0].set_xticks([])
     
     
+# ----------------------------------------- plot fra gradient --------------------------------------------------
+def plot_fra_gradient(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl\fra', 
+                      figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\fra-stack'):
+    files = glob.glob(os.path.join(datafolder, '*thresh.pkl'))     
+    files = files[4:]
+    for file in files:
+        print(file)
+        data = pd.read_pickle(file)
+        for probe in ('H31x64', 'H22x32'):
+            data_tmp = data[data.probe == probe]
+            if probe == 'H31x64':
+                fig, axes = plt.subplots(1, 2)
+            else:
+                fig, axes = plt.subplots(1, 3)
+            plot_fra_stack_cf(axes, data_tmp)
+            exp = re.search('\d{6}_\d{6}', file).group(0)
+            fig.savefig(os.path.join(figfolder, f'{exp}-{probe}-fra.jpg'))
+            plt.close()
+
+def plot_fra_stack_cf(axes, data):
+    #freq = data.freq.iloc[0]
+    probe = data.probe.iloc[0]
+    xlabel = 'Frequency\n(kHz)'
+    ylabel = 'Depth (um)'
+    top = int(data.position.iloc[0][-1])
+    bottom = int(data.position.iloc[-1][-1])
+    n_atten = data.tcmat.iloc[0].shape[0]
+    depth = np.concatenate(list(data.position))[1::2]
+    tc = np.concatenate(list(data.tcmat.apply(lambda x: x[::-1, :])))
+    cf = data.cf
+    if probe == 'H31x64':
+        yticks = range(63 * n_atten + 4, 0, -10*n_atten)
+        yticklabels = range(bottom, top-1, -10*20)
+        plot_fra_stack(axes[0], tc, xlabel, ylabel,yticks, yticklabels)
+        plot_cf_gradient(axes[1], cf, depth, depth[3::10])
+
+    elif probe == 'H22x32':
+        tc2 = tc[:32*n_atten, :]
+        tc1 = tc[32*n_atten:, :]
+        yticks = range(31 * n_atten + 4, -1 * n_atten, -8*n_atten)
+        yticklabels = range(bottom, top - 100, -8*25)
+        plot_fra_stack(axes[0], tc1, xlabel, ylabel, yticks, yticklabels)
+        plot_fra_stack(axes[1], tc2, xlabel, ylabel, yticks, yticklabels)
+        axes[1].set_ylabel('')
+        axes[1].set_yticklabels([])
+        depth = depth[:32]
+        depth = np.concatenate([[depth[0] - 25], depth])
+        plot_cf_gradient(axes[2], cf[:32], depth[1:], depth[::8], color='b')
+        plot_cf_gradient(axes[2], cf[32:], depth[1:], depth[::8], color='k')
+    axes[-1].invert_yaxis()
+    
+def plot_fra_stack(ax, tc, xlabel, ylabel,yticks, yticklabels):
+    ax.imshow(tc, aspect='auto', origin='upper', cmap='viridis')
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_xticks([0, 10, 20])
+    ax.set_xticklabels([.5, 4, 32])
+    ax.set_ylabel(ylabel)
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(yticklabels)
+    
+def plot_cf_gradient(ax, cf, y, yticks, color='k'):
+    cf = cf.apply(float)
+    cf = cf.apply(np.log2)
+    ax.scatter(cf, y, c=color, s=2)
+    ax.set_ylim([min(y)-20, max(y)+20])
+    ax.set_yticks(yticks)
+    ax.set_yticklabels([])
+    ax.set_xlabel('CF\n(kHz)')
+    ax.set_xticks([-1, 2, 5])
+    ax.set_xticklabels([.5, 4, 32])
 # --------------------------------------- plot figures ----------------------------------------------------------
 def figure4_old(datafolder, figfolder):
     """
@@ -2579,6 +2700,158 @@ def figure4_old(datafolder, figfolder):
 
     fig.savefig(os.path.join(figfolder, 'fig2.png'))
     fig.savefig(os.path.join(figfolder, 'fig2.pdf'))
+    
+    
+def figure1(figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summary'):
+    figsize = [figure_size[1][0], 12*cm]
+    fig = plt.figure(figsize=figsize)
+    
+    # example FRA gradient MGB
+    x_start = .1
+    y_start = .37
+    x_space = .03
+    x_fig = .08
+    y_fig = .3
+    
+    file = r'E:\Congcong\Documents\data\comparison\data-pkl\fra' \
+        + r'\200709_231103-site1-5300um-30db-fra10-H31x64-fs20000-thresh.pkl'
+    data = pd.read_pickle(file)
+    data = data[data.probe == 'H31x64']
+    axes = []
+    axes.append(fig.add_axes([x_start, y_start, x_fig, y_fig]))
+    axes.append(fig.add_axes([x_start + x_fig + x_space, y_start, x_fig, y_fig]))
+    plot_fra_stack_cf(axes, data)
+    
+    
+    file = r'E:\Congcong\Documents\data\comparison\data-pkl\fra' \
+        + r'\210218_155422-site1-5026um-35db-fra10-H31x64-fs20000-thresh.pkl'
+    data = pd.read_pickle(file)
+    data = data[data.probe == 'H31x64']
+    axes = []
+    x_start = x_start + 2 * x_fig + x_space + .08
+    axes.append(fig.add_axes([x_start, y_start, x_fig, y_fig]))
+    axes.append(fig.add_axes([x_start + x_fig + x_space, y_start, x_fig, y_fig]))
+    plot_fra_stack_cf(axes, data)
+    axes[0].set_ylabel('')
+    
+    # example FRA gradient A1
+    y_start = .77
+    x_space = .03
+    x_fig = .08
+    y_fig = .2
+    
+    file = r'E:\Congcong\Documents\data\comparison\data-pkl\fra' \
+        + r'\200710_001625-site2-5300um-30db-fra10-H31x64-fs20000-thresh.pkl'
+    data = pd.read_pickle(file)
+    data = data[data.probe == 'H22x32']
+    axes = []
+    axes.append(fig.add_axes([x_start, y_start, x_fig, y_fig]))
+    axes.append(fig.add_axes([x_start + x_fig + x_space, y_start, x_fig, y_fig]))
+    axes.append(fig.add_axes([x_start + 2 * x_fig + 2 * x_space, y_start, x_fig, y_fig]))
+    plot_fra_stack_cf(axes, data)
+    axes[1].set_xlabel('')
+    axes[0].set_title('Shank 1', fontsize=7, pad=1)
+    axes[1].set_title('Shank 2', fontsize=7, pad=1, color='b')
+
+    
+    # example ccg
+    x_start = .12
+    y_start = .06
+    x_fig = .2
+    y_fig = .15
+    maxlag = 40
+    file = r'E:\Congcong\Documents\data\comparison\data-pkl\200709_232021-site1-5300um-20db-dmr-31min-H31x64-fs20000.pkl'
+    with open(file, 'rb') as f:
+        session = pickle.load(f)
+    def plot_ccg(u1, u2, ax):
+        spktrain1 = session.spktrain_dmr[u1, :]
+        spktrain2 = np.roll(session.spktrain_dmr[u2, :], -maxlag)
+        spktrain2 = spktrain2[:-2 * maxlag]
+        xcorr = np.correlate(spktrain1, spktrain2, mode='valid')
+        xcorr = xcorr / (spktrain1.sum() * spktrain2.sum() / 4) * 1e5
+        ax.bar(np.arange(-20, 20.1, .5), xcorr, color='k')
+        ax.set_xlim([-20, 20])
+        ax.set_xlabel('Lag(ms)')
+    ax = fig.add_axes([x_start, y_start, x_fig, y_fig])
+    plot_ccg(0, 7, ax)
+    ax.set_title('1 - 2', pad=0)
+    ax.set_ylabel('Cross covarience\n($\mathregular{x10^{-5} spk^{2}/ms^{2}}$)')
+    ax = fig.add_axes([.37, y_start, x_fig, y_fig])
+    plot_ccg(4, 7, ax)
+    ax.set_title('3 - 2', pad=0)
+    
+    # example STRFs
+    datafolder = r'E:\Congcong\Documents\data\comparison\data-summary'
+    units = pd.read_json(os.path.join(datafolder, 'single_units.json'))
+    exp = 200709232021
+    units = units[(units.exp == exp) & (units.probe == 'H31x64')]
+    units = units.iloc[[0, 2, 4, 7, 8, 9, 13, 15]]
+    x_start = .85
+    x_fig = .12
+    y_fig = .1
+    y_space = .018
+    y_start = .06
+    axes = []
+    for i in range(8):
+        axes.append(fig.add_axes([x_start, y_start + i*(y_fig + y_space), x_fig, y_fig]))
+    axes = axes[::-1]
+    depth = []
+    for i in range(8):
+        strf = np.array(units.iloc[i].strf)
+        depth.append(units.iloc[i].position[-1])
+        plot_strf(axes[i],
+                  strf,
+                  taxis=np.array(units.iloc[i].strf_taxis),
+                  faxis=np.array(units.iloc[i].strf_faxis),
+                  smooth=False)
+        if i < 7:
+            axes[i].set_xticklabels([])
+            axes[i].set_xlabel('')
+            axes[i].set_ylabel('')
+        else:
+            axes[i].set_xlabel('Time (ms)', labelpad=1)
+            axes[i].set_ylabel('Frequency (kHz)', labelpad=1)
+    axes[0].text(17, 50, 1)
+    axes[3].text(17, 50, 2)
+    axes[2].text(17, 50, 3)
+    
+    # probe
+    x_start = .72
+    y_start = .22
+    x_fig=.03
+    y_fig = .45
+    ax = fig.add_axes([x_start, y_start, x_fig, y_fig])
+    ax.scatter(np.zeros(64), range(4020, 5281, 20), s=3, linewidth=.3, 
+               facecolors='none', edgecolors='k')
+    ax.scatter(np.zeros(8), depth, s=3, linewidth=.3, color='k')
+    ax.spines[['left', 'bottom']].set_visible(False)
+    ax.plot([-.3, .3], [4000, 4000], 'k', linewidth=.3)
+    ax.plot([-.3, -.3], [4000, 5280], 'k', linewidth=.3)
+    ax.plot([.3, .3], [4000, 5280], 'k', linewidth=.3)
+    ax.plot([-.3, 0], [5280, 5340], 'k', linewidth=.3)
+    ax.plot([0, .3], [5340, 5280], 'k', linewidth=.3)
+    ax.set_xticks([])
+    ax.set_ylim([4000, 5340])
+    ax.set_yticks(range(4080, 5281, 200))
+    ax.set_ylabel('Depth (um)')
+    ax.invert_yaxis()
+    
+    y = .974
+    fig.text(0, y, 'A', fontsize=fontsize_panel_label, weight='bold')
+    fig.text(.25, y, 'B', fontsize=fontsize_panel_label, weight='bold')
+    fig.text(.7, y, 'D', fontsize=fontsize_panel_label, weight='bold')
+    
+    fig.text(0, .65, 'C', fontsize=fontsize_panel_label, weight='bold')
+    
+    y = .24
+    fig.text(0, y, 'E', fontsize=fontsize_panel_label, weight='bold')
+    fig.text(.03, y, 'i', fontsize=fontsize_panel_label-1, weight='bold')
+    fig.text(.3, y, 'ii', fontsize=fontsize_panel_label-1, weight='bold')
+    
+    fig.savefig(os.path.join(figfolder, 'fig1.jpg'), dpi=1000)
+    fig.savefig(os.path.join(figfolder, 'fig1.tif'), dpi=1000)
+    fig.savefig(os.path.join(figfolder, 'fig1.pdf'), dpi=1000)
+    plt.close()
     
 
 def figure2(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl', 
@@ -3275,9 +3548,11 @@ def figure6():
     plt.close()
 
 
-def figure7(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl', 
+def figure7(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-summary', 
             figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summary'):
     
+    
+    data = pd.read_json(os.path.join(datafolder, 'subsample_ri'))
     
     plt.savefig(os.path.join(figfolder, 'fig7.jpg'), dpi=300)
     #plt.savefig(os.path.join(figfolder, 'fig7.tif'), dpi=300)
@@ -3288,7 +3563,6 @@ def figure7(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl',
 def figure8():
     data_folder = r'E:\Congcong\Documents\data\comparison\data-pkl\up_down_spon'
     up_down_folder = r'E:\Congcong\Documents\data\comparison\data-pkl\up_down'
-    summary_folder = r'E:\Congcong\Documents\data\comparison\data-summary'
     figsize = [figure_size[1][0], 10*cm]
     fig = plt.figure(figsize=figsize)
     x_start = .075
