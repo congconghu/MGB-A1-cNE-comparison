@@ -317,7 +317,7 @@ with open(os.path.join(stimfolder, stimfile), 'rb') as f:
     stim_strf = pickle.load(f)
 stim_strf.down_sample(df=10)
 # get stimulus for crh calculation (mtf)
-stimfile = r'rn1-500flo-40000fhi-0-4SM-0-40TM-40db-96khz-48DF-15min-seed190506_mtf.pkl'
+stimfile = r'rn1-500flo-40000fhi-0-4SM-0-40TM-40db-96khz-48DF-15min-seed190506_DFt1_DFf5-mtf.pkl'
 with open(os.path.join(stimfolder, stimfile), 'rb') as f:
     stim_crh = pickle.load(f)
 

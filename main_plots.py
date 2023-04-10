@@ -20,10 +20,18 @@ datafolder = r'E:\Congcong\Documents\data\comparison\data-summary'
 units = pd.read_json(os.path.join(datafolder, 'single_units.json'))
 figfolder = r'E:\Congcong\Documents\data\comparison\figure\su-strf'
 plots.plot_strf_df(units, figfolder, order='strf_ri_z', properties=True, smooth=True)
+plots.batch_plot_strf_df_probe()
 figfolder = r'E:\Congcong\Documents\data\comparison\figure\su-crh'
 plots.plot_crh_df(units, figfolder, order='crh_ri_z', properties=True)
 figfolder = r'E:\Congcong\Documents\data\comparison\figure\su-strf\nonlinearity'
 plots.plot_strf_nonlinearity_df(units, figfolder)
+
+# example file unit strf, waveform and ccg
+sessionfile = r'E:\Congcong\Documents\data\comparison\data-pkl\200709_232021-site1-5300um-20db-dmr-31min-H31x64-fs20000.pkl'
+with open(sessionfile, 'rb') as f:
+    session = pickle.load(f)
+plots.plot_session_waveforms(session.units)
+plots.plot_session_ccgs([session.spktrain_dmr[x] for x in [0, 1, 2, 3, 5, 6, 7]])
 
 # +++++++++++++++++++++++++++++++++++++++++++ cNE properties ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ------------------------------ plot 5ms binned strf of cNEs and member neurons-----------------------------------------

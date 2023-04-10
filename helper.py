@@ -2,6 +2,8 @@ import time
 import glob
 import os
 import math
+import re
+import pickle
 
 import numpy as np
 from scipy import stats
@@ -22,9 +24,9 @@ class Timer:
         print('Elapsed: %s' % (time.time() - self.tstart))
 
 
-def get_A1_MGB_files(datafolder, stim):
+def get_A1_MGB_files(datafolder, stim, df=20):
     # get files for recordings in A1 and MGB
-    files_all = glob.glob(os.path.join(datafolder, '*' + stim + '.pkl'))
+    files_all = glob.glob(os.path.join(datafolder, '*ne-{}dft-{}.pkl'.format(df, stim)))
     files = {'A1': [x for x in files_all if 'H22x32' in x],
              'MGB': [x for x in files_all if 'H31x64' in x]}
     return files
@@ -89,7 +91,22 @@ def strf2rtf(strf, taxis, faxis, maxtm, maxsm, tmodbins, smodbins):
     return tmf, smf, rtf
 
 
-
+def get_stim(stimfile, 
+             stimfolder=r'E:\Congcong\Documents\stimulus\thalamus',
+             rf=('strf', 'crh')):
+    stimfile = re.sub('_stim.mat', '.pkl', stimfile)
+    stim_srtf = []
+    stim_crh = []
+    if 'strf' in rf:
+        with open(os.path.join(stimfolder, stimfile), 'rb') as f:
+            stim_strf = pickle.load(f)
+    if 'crh' in rf:
+        stimfile = re.sub('\.pkl', '-mtf.pkl', stimfile)
+        with open(os.path.join(stimfolder, stimfile), 'rb') as f:
+            stim_crh = pickle.load(f)
+    
+    return stim_strf, stim_crh
+    
 
 
 

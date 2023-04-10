@@ -95,8 +95,12 @@ def get_ne_spikes(activity, thresh, spiketimes, edges):
 
 def get_binned_spiketimes(spiketimes, edges):
     spiketimes_binned = []
-    for i in range(len(edges)-1):
-        spiketimes_binned.append(spiketimes[(spiketimes >= edges[i]) & (spiketimes < edges[i+1])])
+    if not type(edges) == list:
+        edges = [edges]
+    for edge in edges:
+        edge = edge.flatten()
+        for i in range(len(edge)-1):
+            spiketimes_binned.append(spiketimes[(spiketimes >= edge[i]) & (spiketimes < edge[i+1])])
     return spiketimes_binned
 
 
@@ -137,9 +141,7 @@ def get_member_nonmember_xcorr(files, df=2, maxlag=200):
             elif nefile.endswith('spon.pkl'):
                 stim = 'spon'
 
-            member_pairs = set()
-            for members in ne.ne_members.values():
-                member_pairs.update(set(combinations(members, 2)))
+            member_pairs = get_member_pairs(ne)
             nonmember_pairs = all_pairs.difference(member_pairs)
 
             spktrain, _ = session.downsample_spktrain(df=df, stim=stim)
@@ -166,6 +168,11 @@ def get_member_nonmember_xcorr(files, df=2, maxlag=200):
     xcorr = pd.DataFrame(xcorr)
     return xcorr
 
+def get_member_pairs(ne):
+    member_pairs = set()
+    for members in ne.ne_members.values():
+        member_pairs.update(set(combinations(members, 2)))
+    return member_pairs
 
 # ------------ get cNE on split activities and related analysis of dmr/spon stability ------------------------
 def get_split_ne_ic_weight_match(ne_split):
@@ -613,7 +620,9 @@ def create_spatial_autocorr_weight_mat(nrows, ncols, diagopt=True):
 
 def calc_strf_nonlinearity(strf, spktrain, stim):
     
-    ntbins = strf.shape[1]
+    if strf.ndim == 3:
+        strf = np.sum(strf, axis=0)
+    ntbins = strf.shape[-1]
     similarity_null = get_strf_proj_xprior(strf, stim)
     
     sd = similarity_null.std()
@@ -645,8 +654,7 @@ def calc_strf_nonlinearity(strf, spktrain, stim):
 
 
 def calc_strf_mi(spiketimes, edges, stim, frac=[90, 92.5, 95, 97.5, 100], nreps=10, nblocks=2):
-    rand.seed(0)
-    spktrain = get_binned_spiketimes(spiketimes, edges)
+    spktrain, _ = np.histogram(spiketimes, edges)
     spiketimes = spiketimes[(spiketimes >= edges[0]) & (spiketimes <= edges[-1])]
     np.random.shuffle(spiketimes)
     nspk_block = int(spktrain.sum()/nblocks)
@@ -656,7 +664,7 @@ def calc_strf_mi(spiketimes, edges, stim, frac=[90, 92.5, 95, 97.5, 100], nreps=
     
     for i in range(nblocks):
         spiketimes_tmp = spiketimes[i*nspk_block: (i+1)*nspk_block]
-        spktrain_train = get_binned_spiketimes(spiketimes_tmp, edges)
+        spktrain_train, _ = np.histogram(spiketimes_tmp, edges)
         spktrain_test = spktrain - spktrain_train
         info[i], ifrac[i], xbins_centers[i] = cal_mi(spktrain_train, spktrain_test, stim)
     
@@ -673,12 +681,12 @@ def cal_mi(spktrain_train, spktrain_test, stim, frac=[90, 92.5, 95, 97.5, 100], 
     info_mn = np.mean(ifrac, axis=0)
     x = 100 / np.array(frac)
     
-    _, info = scipy.polyfit(x, info_mn, 1)
+    _, info = np.polyfit(x, info_mn, 1)
     
     return info, ifrac, xbins_centers
 
+
 def info_from_fraction(xprior, xpost, frac=[90, 92.5, 95, 97.5, 100], nreps=10):
-    rand.seed(0)
     ifrac = np.empty([nreps, len(frac)])
     n_event = len(xpost)
     

@@ -129,6 +129,8 @@ class SingleUnit:
     def get_strf(self, stim, edges, nlead=20, nlag=0):
         spiketimes = self.spiketimes
         strf = []
+        if edges.ndim == 1:
+            edges = [edges]
         for edge in edges:
             spktrain, _ = np.histogram(spiketimes, edge)
             stim_mat = stim.stim_mat
@@ -238,12 +240,21 @@ class SingleUnit:
         self.spiketimes_down = spiketimes[spiketimes_up == 0]
         self.spiketimes_up = spiketimes[spiketimes_up == 1]
     
-    def get_spktrain(self, binsize=0.5):
+    def get_spktrain(self, binsize=0.5, edges=None):
         spiketimes = self.spiketimes
-        spktrain, _ = np.histogram(spiketimes, bins=np.arange(0, spiketimes[-1]+binsize, binsize))
+        if edges is not None:
+            spktrain, _ = np.histogram(spiketimes, bins=edges)
+        else:
+            spktrain, _ = np.histogram(spiketimes, bins=np.arange(0, spiketimes[-1]+binsize, binsize))
         return spktrain
-
-
+    
+    def get_waveform_tpd(self):
+        idx = np.where(self.adjacent_chan == self.chan)
+        waveform = self.waveforms_mean[idx].flatten()
+        idx_trough = np.argmin(waveform)
+        idx_peak = np.argmax(waveform[idx_trough:])
+        self.waveform_tpd = idx_peak * .05
+    
 class Session:
 
     def __init__(self, exp=None, site=None, depth=None, filt_params=None, fs=None, probe=None, probdata=None, units=[],
@@ -329,6 +340,12 @@ class Session:
             for idx, unit in enumerate(self.units):
                 spktrain_tmp[idx], _ = np.histogram(unit.spiketimes, edges_tmp)
                 spktrain_tmp[spktrain_tmp > 0] = 1
+                spiketimes_dmr = unit.spiketimes[(unit.spiketimes >= edges_tmp[0]) & (unit.spiketimes < edges_tmp[-1])]
+                if hasattr(self, 'spiketimes_dmr'):
+                    unit.spiketimes_dmr = np.concatenate(unit.spiketimes_dmr, spiketimes_dmr, axis=0)
+                else:
+                    unit.spiketimes_dmr = spiketimes_dmr
+                
             spktrain.append(spktrain_tmp)
         
         self.spktrain_dmr = np.array(spktrain)
@@ -357,9 +374,14 @@ class Session:
                 for idx, unit in enumerate(self.units):
                     spktrain[idx], _ = np.histogram(unit.spiketimes, curr_edges)
                     spktrain[spktrain > 0] = 1
+                    spiketimes_spon = unit.spiketimes[(unit.spiketimes >= curr_edges[0]) & (unit.spiketimes < curr_edges[-1])]
+                    if hasattr(self, 'spiketimes_spon'):
+                        unit.spiketimes_spon = np.concatenate(unit.spiketimes_spon, spiketimes_spon, axis=0)
+                    else:
+                        unit.spiketimes_spon = spiketimes_spon
                 spktrain_all.append(spktrain)
-            spktrain = np.concatenate(spktrain_all, axis=1)
-            self.spktrain_spon = spktrain
+               
+            self.spktrain_spon = spktrain_all
             self.edges_spon = edges
         self.save_pkl_file(self.file_path)
 
@@ -374,22 +396,26 @@ class Session:
             edges = eval('self.edges_{}'.format(stim))
         except AttributeError:
             return np.array([]), np.array([])
-        # down sample spktrain
-        nt = spktrain.shape[-1] // df
-        if spktrain.ndim == 2:
+        
+        
+        if type(spktrain) == np.array and spktrain.ndim == 2:
             spktrain = np.array([spktrain])
             edges = np.array([edges])
-        else:
-            spktrain_downsampled = []
-            for spktrain_tmp in spktrain:
-                spktrain_tmp = spktrain_tmp[:, :nt * df]
-                spktrain_tmp = np.resize(spktrain_tmp, (spktrain_tmp.shape[0], nt, df))
-                spktrain_downsampled.append(np.sum(spktrain_tmp, axis=2))
-            edges_downsampled = []
-            for edge in edges:
-                edges_downsampled.append(edges[0:nt * df + 1:df])
-        
-        return np.array(spktrain), np.array(edges)
+        # down sample spktrain
+        spktrain_downsampled = []
+        for spktrain_tmp in spktrain:
+            nt = spktrain_tmp.shape[-1] // df
+            spktrain_tmp = spktrain_tmp[:, :nt * df]
+            spktrain_tmp = np.resize(spktrain_tmp, (spktrain_tmp.shape[0], nt, df))
+            spktrain_downsampled.append(np.sum(spktrain_tmp, axis=2))
+        spktrain = np.concatenate(spktrain_downsampled, axis=1)
+        # down sample edges
+        edges_downsampled = []
+        for edge in edges:
+            nt = edge.shape[-1] // df
+            edges_downsampled.append(edge[0:(nt * df + 1):df])
+        edges = edges_downsampled
+        return spktrain, edges
 
     def get_ne(self, df, stim, shuffle=False):
         """get cNEs in each recording session, under dmr and spon"""
@@ -398,7 +424,6 @@ class Session:
         if shuffle:
             spktrain = netools.shuffle_spktrain(spktrain)
         if spktrain.any():
-            spktrain = np.concatenate(spktrain, axis=1)
             patterns = netools.detect_cell_assemblies(spktrain)
             if patterns is None:
                 return None
@@ -697,7 +722,14 @@ class NE(Session):
         edges = session.edges_dmr
         if hasattr(stim, 'df'):
             df = stim.df
-            edges = edges[::df]
+            if isinstance(edges, list) or edges.ndim > 1:
+                edges_tmp = []
+                for edge in edges:
+                    edge = edge.flatten()
+                    edges_tmp.append(edge[::df])
+                edges = np.array(edges_tmp)
+            else:
+                edges = edges[::df]
         for unit in self.ne_units:
             unit.get_strf(stim, edges, nlag=nlag, nlead=nlead)
 
@@ -854,14 +886,21 @@ class NE(Session):
         for i, members in self.ne_members.items():
             print('ne #{}/{}'.format(i, len(self.ne_members)))
             ne_unit = self.ne_units[i]
+            isi = np.diff(ne_unit.spiketimes, prepend=0)
+            ne_unit.spiketimes = ne_unit.spiketimes[isi > 10]
             if ne_unit.spiketimes.shape[0] < nspk_thresh:
                 continue
             
             for m, member in enumerate(members):
                 ne_spike_unit = self.member_ne_spikes[i][m]
+                isi = np.diff(ne_spike_unit.spiketimes, prepend=0)
+                ne_spike_unit.spiketimes = ne_spike_unit.spiketimes[isi > 10]
                 if ne_spike_unit.spiketimes.shape[0] < nspk_thresh:
                     continue
                 unit = session.units[member]
+                isi = np.diff(unit.spiketimes, prepend=0)
+                unit.spiketimes = unit.spiketimes[isi > 10]
+                unit.spiketimes = unit.spiketimes[(unit.spiketimes > edges[0]) & (unit.spiketimes < edges[-1])]
                 min_events = min(ne_unit.spiketimes.shape[0], ne_spike_unit.spiketimes.shape[0])
                 n_events = np.floor(min_events * 0.9)
                 # repeat 10 times for subsampling
@@ -873,6 +912,7 @@ class NE(Session):
                 nonlin_centers  = [[], [], []]
                 nonlin_fr = [[], [], []]
                 mi = np.empty((3, nsample))
+                mi_raw = np.empty((3, nsample))
                 
                 for rf in ('strf', 'crh'):
                     rf_strf_crh[rf] = np.empty((3, *eval('unit.{}.shape'.format(rf)), nsample))
@@ -885,12 +925,11 @@ class NE(Session):
                     ne_spike_unit_tmp = deepcopy(ne_spike_unit)
                 
                     for u, curr_unit in enumerate((unit_tmp, ne_unit_tmp, ne_spike_unit_tmp)):
-                        random.seed(n)
                         curr_unit.subsample(n_events)
                         
                         for rf in ('strf', 'crh'):
-                            eval('curr_unit.get_{}(stim_{}, edges_{})'.format(rf, rf, rf))
-                            eval('curr_unit.get_{}_ri(stim_{}, edges_{}, return_null=False)'.format(rf, rf, rf))
+                            eval('curr_unit.get_{rf}(stim_{rf}, edges_{rf})'.format(rf=rf))
+                            eval('curr_unit.get_{rf}_ri(stim_{rf}, edges_{rf}, return_null=False)'.format(rf=rf))
                             rf_strf_crh[rf][u, :, :, n] = eval('curr_unit.{}'.format(rf))
                             ri_strf_crh[rf][u, :, n] = eval('curr_unit.{}_ri'.format(rf))
                         
@@ -904,6 +943,7 @@ class NE(Session):
                         nonlin_centers[u].append(curr_unit.nonlin_centers)
                         nonlin_fr[u].append(curr_unit.nonlin_fr)
                         mi[u, n] =  np.mean(curr_unit.strf_info)
+                        mi_raw[u, n] = curr_unit.strf_ifrac[:, :, -1].mean()
                 
                 ri = {'exp': session.exp, 'depth': session.depth, 'probe': session.probe, 
                                 'cNE': i, 'member': member, 'n_events': n_events}
@@ -917,7 +957,7 @@ class NE(Session):
                                rf + '_ri_cNE': ri_strf_crh[rf][1],
                                rf + '_ri_ne_spike': ri_strf_crh[rf][2]})
                 
-                for param in ('ptd', 'morani', 'asi', 'mi', 'nonlin_centers', 'nonlin_fr'):
+                for param in ('ptd', 'morani', 'asi', 'mi','mi_raw', 'nonlin_centers', 'nonlin_fr'):
                     ri.update({param + '_neuron': eval(param + '[0]'), 
                            param + '_cNE': eval(param + '[1]'), 
                            param + '_ne_spike': eval(param + '[2]')})
@@ -1155,16 +1195,17 @@ def ne_neuron_subsample(stim_strf=None, stim_crh=None,
     
     subsample = []
     
-    files = glob.glob(os.path.join(datafolder, '*20dft-dmr.pkl'))
+    files = glob.glob(os.path.join(datafolder, '*-20dft-dmr.pkl'))
     for idx, file in enumerate(files):
         print('({}/{}) getting subsampled ri for {}'.format(idx + 1, len(files), file))
         with open(file, 'rb') as f:
             ne = pickle.load(f)
         exp = ne.exp
         probe = ne.probe
-        subsample = ne.get_subsampled_properties(stim_strf=stim_strf, stim_crh=stim_crh)
+        subsample = ne.get_subsampled_properties(stim_strf=stim_strf, stim_crh=stim_crh, nspk_thresh=100)
         subsample.reset_index(drop=True, inplace=True)
         subsample.to_json(os.path.join(savefolder, '{}-{}-subsample_ri.json'.format(exp, probe)))
+    
     
 def ne_neuron_subsample_combine(datafolder='E:\Congcong\Documents\data\comparison\data-summary\subsample'):
     ri_file = glob.glob(os.path.join(datafolder, '*subsample_ri.json'))
@@ -1173,7 +1214,7 @@ def ne_neuron_subsample_combine(datafolder='E:\Congcong\Documents\data\compariso
         subsample_ri.append(pd.read_json(file))
     subsample_ri = pd.concat(subsample_ri)
     subsample_ri.reset_index(drop=True, inplace=True)
-    subsample_ri.to_json('E:\Congcong\Documents\data\comparison\data-summary\subsample_ri.json')
+    subsample_ri.to_json('E:\Congcong\Documents\data\comparison\data-summary\subsample_ne_neuron.json')
     region = ['MGB' if x == 'H31x64' else 'A1' for x in subsample_ri.probe]
     subsample_ri['region'] = region
 

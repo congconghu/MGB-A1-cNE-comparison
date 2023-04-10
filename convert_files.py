@@ -2,14 +2,14 @@ import os
 import glob
 import pickle
 import re
-import mmap
+import mat73
 
 import session_toolbox as mtp
 import helper
 from scipy.io import loadmat
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 # ------------------------------------------- pickle single units-------------------------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-Matlab'
@@ -84,4 +84,22 @@ savefile = re.sub('mtf.mat', 'mtf.pkl', matfile)
 with open(os.path.join(stimfolder, savefile), 'wb') as outfile:
     pickle.dump(mtf, outfile, pickle.HIGHEST_PROTOCOL)
 
+# ------------------------------------------------ pickle FRA response ----------------------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-Matlab\fra'
+files = glob.glob(datafolder + r'\*fra10.mat', recursive=False)
 
+for idx, file in enumerate(files):
+    print('({}/{})Save pickle file:'.format(idx+1, len(files)), file)
+    data_dict = mat73.loadmat(file) # contains trigger, thresh, tcparams, tc
+    
+    thresh = pd.DataFrame(data_dict['thresh'])
+    thresh.chan = thresh.chan.apply(lambda x: int(x))
+    tc = pd.DataFrame(data_dict['tc'])
+    tc.chan = tc.chan.apply(lambda x: int(x))
+    tc = tc.drop(['probe', 'atten'], axis=1)
+    data = thresh.merge(tc, on=['amplifier', 'chan'])
+
+    file_pkl = re.sub('-fra10.mat', '.pkl', file)
+    file_pkl = re.sub('Matlab', 'pkl', file_pkl)
+    with open(file_pkl, 'wb') as f:
+        pickle.dump(data, f)

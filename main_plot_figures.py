@@ -6,7 +6,23 @@ Created on Tue Dec 13 16:01:56 2022
 """
 
 import plot_box as plots
+import matplotlib.pyplot as plt
 
-datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
-figfolder = r'E:\Congcong\Documents\data\comparison\figure\summary'
-plots.figure1(datafolder, figfolder)
+
+#plots.figure1()
+
+#plots.figure1_2()
+
+plots.figure2()
+
+#plots.figure3()
+
+#plots.figure4()
+
+#plots.figure5()
+
+#plots.figure6()
+
+#plots.figure7()
+
+#plots.figure8()
