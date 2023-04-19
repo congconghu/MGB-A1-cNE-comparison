@@ -52,8 +52,8 @@ mpl.rcParams['lines.linewidth'] = .8
 mpl.rcParams['lines.markersize'] = 10
 mpl.rcParams['patch.linewidth'] = .6
 
-cm = 1/2.54  # centimeters in inches
-figure_size = [(17.6*cm, 17*cm), (11.6*cm, 17*cm), (8.5*cm, 17*cm)]
+cm = 1 / 2.54  # centimeters in inches
+figure_size = [(17.6 * cm, 17 * cm), (11.6 * cm, 17 * cm), (8.5 * cm, 17 * cm)]
 activity_alpha = 99.5
 colors = sns.color_palette("Paired")
 A1_color = (colors[1], colors[0])
@@ -103,6 +103,7 @@ def plot_significance_star(ax, p, x_bar, y_bar, y_star, linewidth=.8, fontsize=1
             ax.text((x_bar[0] + x_bar[1]) / 2, y_star, '*',
                     horizontalalignment='center', verticalalignment='center', fontsize=fontsize)
 
+
 # -------------------------------------- single unit properties -------------------------------------------------------
 def plot_strf_df(units, figfolder, order=None, properties=False, smooth=False):
     """
@@ -137,11 +138,10 @@ def plot_strf_df(units, figfolder, order=None, properties=False, smooth=False):
             order_idx = units[order].sort_values(ascending=True)
         elif order in ('strf_ri_z', 'strf_ptd'):
             order_idx = units[order].sort_values(ascending=False)
-        elif  order == 'strf_info':
+        elif order == 'strf_info':
             order_idx = units[order].apply(np.mean).sort_values(ascending=False)
     else:
         order_idx = units.reset_index()['index']
-        
 
     # plot all units sorted by order
     fig, axes = plt.subplots(ncols=4, nrows=5, figsize=figure_size[0])
@@ -178,11 +178,11 @@ def plot_strf_df(units, figfolder, order=None, properties=False, smooth=False):
             fig.savefig(os.path.join(figfolder, '{}-{}.jpg'.format(order, nfig)), dpi=300)
 
 
-def batch_plot_strf_df_probe(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-summary', 
-                             figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\su-strf'):
+def batch_plot_strf_df_probe(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-summary',
+                             figfolder: str = r'E:\Congcong\Documents\data\comparison\figure\su-strf'):
     units = pd.read_json(os.path.join(datafolder, 'single_units.json'))
     groups = list(units.groupby(['exp', 'probe']).groups.keys())
-    
+
     for exp, probe in groups:
         if probe != 'H31x64':
             continue
@@ -193,12 +193,11 @@ def batch_plot_strf_df_probe(datafolder:str=r'E:\Congcong\Documents\data\compari
 
 
 def plot_strf_df_probe(units):
-
     # rearange plot order
-    #depth = np.concatenate(list(units.position))[1::2]
-    #top = min(depth)
-    #bottom = max(depth)
-    fig, axes= plt.subplots(5, 5, figsize=[10, 10])
+    # depth = np.concatenate(list(units.position))[1::2]
+    # top = min(depth)
+    # bottom = max(depth)
+    fig, axes = plt.subplots(5, 5, figsize=[10, 10])
     axes = axes.flatten()
     for i in range(len(units)):
         strf = np.array(units.iloc[i].strf)
@@ -276,7 +275,7 @@ def plot_strf_nonlinearity_df(units, figfolder):
                   strf,
                   taxis=np.array(units.iloc[i].strf_taxis),
                   faxis=np.array(units.iloc[i].strf_faxis))
-       
+
         c += 1
         axes[c].clear()
         plot_nonlinearity(axes[c], centers, fr, fr_mean)
@@ -291,6 +290,7 @@ def plot_strf_nonlinearity_df(units, figfolder):
         for i in range(c, 20):
             axes[i].remove()
             fig.savefig(os.path.join(figfolder, 'nonlinearity-{}.jpg'.format(nfig)), dpi=300)
+
 
 def plot_strf(ax, strf, taxis, faxis, latency=None, bf=None, smooth=False, vmax=None):
     """
@@ -318,7 +318,7 @@ def plot_strf(ax, strf, taxis, faxis, latency=None, bf=None, smooth=False, vmax=
     if vmax is None:
         vmax = max_val
     im = ax.imshow(strf, aspect='auto', origin='lower', cmap='RdBu_r',
-              vmin=-vmax, vmax=vmax)
+                   vmin=-vmax, vmax=vmax)
 
     tlabels = np.array([75, 50, 25, 0])
     xticks = np.searchsorted(-taxis, -tlabels)
@@ -340,6 +340,7 @@ def plot_strf(ax, strf, taxis, faxis, latency=None, bf=None, smooth=False, vmax=
         ax.plot([0, idx_t], [idx_f, idx_f], 'k--')
         ax.plot([idx_t, idx_t], [0, idx_f], 'k--')
     return im
+
 
 def plot_crh(ax, crh, tmfaxis, smfaxis, btmf=None, bsmf=None):
     """
@@ -369,15 +370,15 @@ def plot_crh(ax, crh, tmfaxis, smfaxis, btmf=None, bsmf=None):
         idx_f = np.where(smfaxis <= bsmf)[0][-1] + 0.5
         ax.text(idx_t, idx_f, '*', color='k', fontsize=30, ha='center', va='center')
 
+
 def plot_nonlinearity(ax, centers, fr, fr_mean):
-    
-    #ax.plot(centers, fr, 'ko-', ms=3)
+    # ax.plot(centers, fr, 'ko-', ms=3)
     ax.plot(fr, 'ko-', ms=3)
-    #ax.plot([centers[0]-1, centers[-1]+1], [fr_mean, fr_mean], 'k--')
+    # ax.plot([centers[0]-1, centers[-1]+1], [fr_mean, fr_mean], 'k--')
     ax.set_xlabel('similarity (s.d.)')
     ax.set_ylabel('fr (spk/s)')
-    
-    
+
+
 # -------------------------------cNE method illustration ---------------------------------------
 def plot_ne_construction(ne, savepath):
     """
@@ -703,7 +704,7 @@ def plot_ICweigh_imshow(ax, patterns, members):
     patterns = np.transpose(patterns)
     max_val = abs(patterns).max() * 1.01
     im = ax.imshow(patterns, aspect='auto', origin='lower', cmap='RdBu_r',
-              vmin=-max_val, vmax=max_val)
+                   vmin=-max_val, vmax=max_val)
     ax.spines[['top', 'right']].set_visible(True)
     # highlight members
     for idx, member in members.items():
@@ -762,7 +763,7 @@ def plot_xcorr(fig, ax, xcorr, savepath=None):
         if row == 0 and col == 1: ax[row][col].set_yticks([0, 1000, 2000, 3000])
         if row == 2 and col == 0: ax[row][col].set_yticks([0, 300, 600, 900])
         if row == 2 and col == 1: ax[row][col].set_yticks([0, 1000, 2000, 3000])
-            
+
         plot_xcorr_avg(ax[row + 1][col], corr)
     for row in range(4):
         for col in range(2):
@@ -771,7 +772,7 @@ def plot_xcorr(fig, ax, xcorr, savepath=None):
 
             if row == 3:
                 ax[row][col].set_xticks(range(-200, 201, 50))
-                ax[row][col].set_xticklabels(["-200", '', '-100', '', 0, '',  '100', '', "200"])
+                ax[row][col].set_xticklabels(["-200", '', '-100', '', 0, '', '100', '', "200"])
                 for line in ax[row][col].xaxis.get_minorticklines():
                     line.set_visible(False)
                 ax[row][col].set_xlabel('Lag (ms)')
@@ -823,7 +824,7 @@ def plot_xcorr_imshow(ax, data):
     idx_peak = corr.argmax(axis=1)
     order = np.argsort(idx_peak)
     corr = corr[order]
-    im = ax.imshow(corr, aspect='auto', origin='lower', vmax=3, vmin=0, cmap='viridis')    
+    im = ax.imshow(corr, aspect='auto', origin='lower', vmax=3, vmin=0, cmap='viridis')
     ax.set_xticks(range(0, len(corr[0]), 100))
     ax.set_xticklabels(range(-200, 201, 100))
     ax.set_ylabel('Neuron\npair #')
@@ -864,6 +865,8 @@ def plot_xcorr_examples(file, figfolder=r'E:\Congcong\Documents\data\comparison\
             plt.savefig(os.path.join(figfolder, f'{c}.jpg'))
             plt.close()
             c += 1
+
+
 # --------------------------------------------------cNE properties ---------------------------------------------------
 def num_ne_vs_num_neuron(ax, datafolder, stim):
     # get files for recordings in A1 and MGB
@@ -883,7 +886,7 @@ def num_ne_vs_num_neuron(ax, datafolder, stim):
     for i, region in enumerate(('MGB', 'A1')):
         a, b, r, _, _ = stats.linregress(n_neuron[region], n_ne[region])
         print(region, a, b)
-        ax.text(30, 2-i, 'R\u00b2 = {:.2}'.format(r), color=eval(region + '_color[0]'), fontsize=6)
+        ax.text(30, 2 - i, 'R\u00b2 = {:.2}'.format(r), color=eval(region + '_color[0]'), fontsize=6)
         x = np.linspace(5, 45, num=10)
         ax.plot(x, a * x + b, color=eval(region + '_color[0]'), linewidth=.8)
         sc.append(ax.scatter(n_neuron[region], n_ne[region], color=eval(region + '_color[0]'),
@@ -897,8 +900,8 @@ def num_ne_vs_num_neuron(ax, datafolder, stim):
     n_max = n_neuron_MGB[-2]
     MGB_included = n_neuron_MGB[(n_neuron_MGB >= n_min) & (n_neuron_MGB <= n_max)]
     A1_included = n_neuron_A1[(n_neuron_A1 >= n_min) & (n_neuron_A1 <= n_max)]
-    ax.plot([n_min-.5, n_min-.5], [0, 7], 'k--', linewidth=.6)
-    ax.plot([n_max+.5, n_max+.5], [0, 7], 'k--', linewidth=.6)
+    ax.plot([n_min - .5, n_min - .5], [0, 7], 'k--', linewidth=.6)
+    ax.plot([n_max + .5, n_max + .5], [0, 7], 'k--', linewidth=.6)
     print(n_min, n_max)
     print(MGB_included.mean(), MGB_included.std())
     print(A1_included.mean(), A1_included.std())
@@ -951,14 +954,14 @@ def ne_size_vs_num_neuron(ax, datafolder, stim, plot_type='mean', relative=False
                                                   'size': ne_size[region]})],
                                    axis=0)
             print(region,
-                  np.mean(ne_size_df[ne_size_df['region'] == region]['size']), 
+                  np.mean(ne_size_df[ne_size_df['region'] == region]['size']),
                   np.std(ne_size_df[ne_size_df['region'] == region]['size']))
         boxplot_scatter(ax, x='region', y='size', data=ne_size_df,
                         order=('MGB', 'A1'), hue='region',
                         palette=(MGB_color[0], A1_color[0]), hue_order=('MGB', 'A1'))
-        
+
         ax.set_xticklabels(['MGB\n(n={})'.format(len(ne_size['MGB'])),
-                       'A1\n(n={})'.format(len(ne_size['A1']))])
+                            'A1\n(n={})'.format(len(ne_size['A1']))])
         ax.set_ylabel('Relative cNE size')
         ax.set_xlabel('')
 
@@ -1005,12 +1008,12 @@ def num_ne_participate(ax, datafolder, stim, n_neuron_filter=()):
     n = []
     obs = []
     for region in ('MGB', 'A1'):
-        obs.append( np.histogram(n_participation[region], bins=range(5))[0])
+        obs.append(np.histogram(n_participation[region], bins=range(5))[0])
         n.append(obs[-1].sum())
         proportion = obs[-1] / obs[-1].sum()
-        b.append(ax.bar(np.arange(4)-0.25 + c * 0.5, proportion, width=0.4, color=eval(region + '_color[0]')))
+        b.append(ax.bar(np.arange(4) - 0.25 + c * 0.5, proportion, width=0.4, color=eval(region + '_color[0]')))
         c += 1
-    ax.legend(b, ['MGB (n={})'.format(n[0]), 'A1 (n={})'.format(n[1])], 
+    ax.legend(b, ['MGB (n={})'.format(n[0]), 'A1 (n={})'.format(n[1])],
               fontsize=6, handletextpad=.2, labelspacing=.1, frameon=False, bbox_to_anchor=(0.5, .9))
     ax.set_xlabel('# of cNEs a neuron belongs to')
     ax.set_ylabel('Proportion')
@@ -1060,7 +1063,7 @@ def ne_member_distance(ax, datafolder, stim, probe, direction='vertical', df=20,
         ax.set_xlabel('Pairwise distance (\u03BCm)')
         ax.set_xlim([0, 800])
         x2 = np.mean(dist_member)
-        y_space=.009
+        y_space = .009
         ax.scatter(x2, .12, marker='v', facecolor='white', edgecolor=color, s=12, linewidth=.6)
         x1 = np.median(dist_member)
         ax.scatter(x1, .12, marker='v', color=color, s=12, linewidth=.6)
@@ -1073,7 +1076,7 @@ def ne_member_distance(ax, datafolder, stim, probe, direction='vertical', df=20,
         print('p=', p)
         ax.set_xticks(np.arange(0, 800, 200))
         ax.text(500, .12, 'p = {:.1e}'.format(p), fontsize=6)
-        
+
     elif direction == 'horizontal':
         ax.hist(dist_member, 2, color=color, align='left', rwidth=0.8,
                 weights=np.repeat([1 / len(dist_member)], len(dist_member)))
@@ -1128,12 +1131,12 @@ def ne_member_span(ax, datafolder, stim, probe, df=20, linewidth=1.2):
     x2 = np.mean(span_member)
     ax.scatter(x2, y, marker='v', facecolor='white', edgecolor=color, s=12, linewidth=.6)
     x1 = np.median(span_member)
-    ax.scatter(x1, y-y_space, marker='v', color=color, s=12, linewidth=.6)
+    ax.scatter(x1, y - y_space, marker='v', color=color, s=12, linewidth=.6)
     x4 = np.mean(span_random)
-    ax.scatter(x4, y-2*y_space, marker='v', facecolor='white', edgecolor='k', s=12, linewidth=.6)
+    ax.scatter(x4, y - 2 * y_space, marker='v', facecolor='white', edgecolor='k', s=12, linewidth=.6)
     x3 = np.median(span_random)
-    ax.scatter(x3, y-3*y_space, marker='v', color='k', s=12, linewidth=.6)
-    
+    ax.scatter(x3, y - 3 * y_space, marker='v', color='k', s=12, linewidth=.6)
+
     print('span', x1, x2, x3, x4)
     _, p = stats.mannwhitneyu(span_member, span_random)
     print('p=', p)
@@ -1146,8 +1149,8 @@ def ne_member_span(ax, datafolder, stim, probe, df=20, linewidth=1.2):
         ax.set_xlim([0, 800])
         ax.set_xticks(range(0, 800, 250))
         ax.text(500, .14, 'p = {:.3f}'.format(p), fontsize=6)
-        
-        
+
+
 def ne_member_shank_span(ax, datafolder, stim, probe, df=20):
     files = glob.glob(os.path.join(datafolder, '*-{}dft-{}.pkl'.format(df, stim)))
     random.seed(0)
@@ -1215,14 +1218,15 @@ def ne_freq_span_vs_all_freq_span(ax, datafolder, stim):
         span_all[region] = span_all[region][idx]
         a, b, r, p, _ = stats.linregress(span_all[region], span_ne[region])
         x = np.linspace(0, 6, num=10)
-        ax.text(.3, 3.5-0.6*i, 'R\u00b2 = {:.2}'.format(r), color=eval(region + '_color[0]'), fontsize=6)
+        ax.text(.3, 3.5 - 0.6 * i, 'R\u00b2 = {:.2}'.format(r), color=eval(region + '_color[0]'), fontsize=6)
         print(region, a, b, p)
         ax.plot(x, a * x + b, color=eval(region + '_color[0]'), linewidth=.8)
         sc.append(ax.scatter(span_all[region], span_ne[region], color=eval(region + '_color[0]'),
                              edgecolors='black', linewidth=.2, alpha=.8, s=marker_size))
         n.append(len(span_all[region]))
-    ax.legend(sc, ['MGB (n={})'.format(n[0]), 'A1(n={})'.format(n[1])], fontsize=6, handletextpad=0, labelspacing=.1, borderpad=.2,
-                 fancybox=False, edgecolor='black')
+    ax.legend(sc, ['MGB (n={})'.format(n[0]), 'A1(n={})'.format(n[1])], fontsize=6, handletextpad=0, labelspacing=.1,
+              borderpad=.2,
+              fancybox=False, edgecolor='black')
     legend = ax.get_legend()
     legend.get_frame().set_linewidth(.6)
     ax.set_xlabel('All neurons')
@@ -1371,7 +1375,7 @@ def plot_ne_split_ic_weight_match(ne_split, axes=None, figpath=None):
         plt.close()
 
 
-def plot_matching_ic(ax1, ic1, ic2, color1, color2, stim1, stim2, marker_size=3, ymax=None, 
+def plot_matching_ic(ax1, ic1, ic2, color1, color2, stim1, stim2, marker_size=3, ymax=None,
                      yticklabels=[True, True], linewidth=.8):
     """
     stem plot of matching patterns
@@ -1436,7 +1440,7 @@ def plot_matching_ic(ax1, ic1, ic2, color1, color2, stim1, stim2, marker_size=3,
     ax2.spines['bottom'].set_visible(False)
 
 
-def plot_matching_ic_3_conditions(ne_split, axes, idx_match, marker_size=3, ymax=None, 
+def plot_matching_ic_3_conditions(ne_split, axes, idx_match, marker_size=3, ymax=None,
                                   yticklabels=[True, True]):
     dmr_first = ne_split['dmr_first']
     colors = colors_split
@@ -1451,7 +1455,7 @@ def plot_matching_ic_3_conditions(ne_split, axes, idx_match, marker_size=3, ymax
         order = ne_split['order']['spon'][1][idx_match]
         ic_spon = ne_split['spon1'].patterns[order]
 
-    plot_matching_ic(axes[0], ic_spon, ic_dmr, colors[0], colors[2], 'spon2', 'dmr1', 
+    plot_matching_ic(axes[0], ic_spon, ic_dmr, colors[0], colors[2], 'spon2', 'dmr1',
                      marker_size, yticklabels=yticklabels)
     order0 = ne_split['order']['spon'][0][idx_match]
     order1 = ne_split['order']['spon'][1][idx_match]
@@ -1469,7 +1473,7 @@ def plot_matching_ic_3_conditions(ne_split, axes, idx_match, marker_size=3, ymax
                      ne_split['dmr0'].patterns[order0],
                      colors[3], colors[2], 'dmr2', 'dmr1',
                      marker_size, ymax, yticklabels=yticklabels)
-   
+
     axes[2].set_xlabel('Neuron #')
 
 
@@ -1480,7 +1484,7 @@ def plot_ne_split_ic_weight_corr(ne_split, ax=None, figpath=None):
     corr_mat = ne_split['corr_mat']
     n_dmr = len(ne_split['order']['dmr'][0])
     n_spon = len(ne_split['order']['spon'][0])
-    corr_mat = np.concatenate([corr_mat[n_dmr:,:], corr_mat[0:n_dmr,:]])
+    corr_mat = np.concatenate([corr_mat[n_dmr:, :], corr_mat[0:n_dmr, :]])
     corr_mat = np.concatenate([corr_mat[:, n_dmr:], corr_mat[:, 0:n_dmr]], axis=1)
     if not ax:
         fig = plt.figure(figsize=(10, 8))
@@ -1551,10 +1555,11 @@ def plot_ne_split_ic_weight_null_corr(ne_split, figpath):
     fig.savefig(figpath)
     plt.close(fig)
 
+
 def plot_ne_split_ic_weight_null_corr_panel(ax, thresh, corr_real, corr_null, color=None):
     handles = []
     _, _, handle = ax.hist(corr_null, np.linspace(0, 1, 51), color='k',
-            weights=np.repeat([1 / len(corr_null)], len(corr_null)))
+                           weights=np.repeat([1 / len(corr_null)], len(corr_null)))
     handles.append(handle)
     y = ax.get_ylim()
     h, = ax.plot([thresh, thresh], y, 'r--', linewidth=.8)
@@ -1572,6 +1577,7 @@ def plot_ne_split_ic_weight_null_corr_panel(ax, thresh, corr_real, corr_null, co
         ax.set_ylabel('Proportion')
     return handles
 
+
 # ------------------------------- cNE significance-----------------------------------------------------------------
 def plot_num_cne_vs_shuffle(ax, datafolder='E:\Congcong\Documents\data\comparison\data-summary'):
     df = pd.read_json(os.path.join(datafolder, 'num_ne_data_vs_shuffle.json'))
@@ -1582,10 +1588,10 @@ def plot_num_cne_vs_shuffle(ax, datafolder='E:\Congcong\Documents\data\compariso
     # order of bar plot:
     # 'spon_MGB_0', 'spon_MGB_1', 'spon_A1_0', 'spon_A1_1', 'dmr_MGB_0', 'dmr_MGB_1', 'dmr_A1_0', 'dmr_A1_1'
     my_order = my_order[[6, 7, 4, 5, 2, 3, 0, 1]]
-    my_order = {key:i for i, key in enumerate(my_order)}
-    m = df.groupby('stim_region_shuffle')['n_ne'].mean() # mean number of cNE
+    my_order = {key: i for i, key in enumerate(my_order)}
+    m = df.groupby('stim_region_shuffle')['n_ne'].mean()  # mean number of cNE
     print(m)
-    sd = df.groupby('stim_region_shuffle')['n_ne'].std() # std for errorbar
+    sd = df.groupby('stim_region_shuffle')['n_ne'].std()  # std for errorbar
     print(sd)
     m = m.reset_index()
     sd = sd.reset_index()
@@ -1594,12 +1600,13 @@ def plot_num_cne_vs_shuffle(ax, datafolder='E:\Congcong\Documents\data\compariso
     m = m['n_ne']
     sd = sd.iloc[key.argsort()]
     sd = sd['n_ne']
-    
+
     m.plot.bar(color=np.concatenate([MGB_color, A1_color, MGB_color, A1_color]), ax=ax)
     ax.errorbar(range(8), m, yerr=sd, fmt='None', color="k", capsize=5, linewidth=1)
-    
+
     c = 0
-    line_color = np.ones(3)*.5
+    line_color = np.ones(3) * .5
+    p_all = []
     for stim in ('dmr', 'spon'):
         for region in ('MGB', 'A1'):
             df_tmp = df[(df['stim'] == stim) & (df['region'] == region)]
@@ -1607,12 +1614,17 @@ def plot_num_cne_vs_shuffle(ax, datafolder='E:\Congcong\Documents\data\compariso
             n2 = np.array(df_tmp.iloc[1::2]['n_ne'])
             # significance test
             _, p = stats.wilcoxon(n1, n2)
+            p_all.append(p)
             print(len(n1), p)
-            plot_significance_star(ax, p, [c, c+1], 8.2, 8.5)
             for i in range(len(n1)):
-                ax.plot([c, c+1], [n1[i], n2[i]], color=line_color, linewidth=.6)
+                ax.plot([c, c + 1], [n1[i], n2[i]], color=line_color, linewidth=.6)
             c += 2
-    ax.set_xticklabels(['\N{MINUS SIGN}', '+']*4, rotation=0)
+    p_corrected = multipletests(p_all, alpha=0.05, method='h')[1]
+    print(p_corrected)
+    for c in range(0, 7, 2):
+        plot_significance_star(ax, p_corrected[c // 2], [c, c + 1], 8.2, 8.5)
+
+    ax.set_xticklabels(['\N{MINUS SIGN}', '+'] * 4, rotation=0)
     ax.set_ylabel('# of cNEs', fontsize=fontsize_figure_axes_label)
     ax.set_yticks(range(0, 10, 2))
     # add label for shuffle
@@ -1624,48 +1636,49 @@ def plot_num_cne_vs_shuffle(ax, datafolder='E:\Congcong\Documents\data\compariso
     ax.annotate('MGB', xy=(4.5, -.3), xycoords=trans, ha="center", va="center", fontsize=fontsize_figure_tick_label)
     ax.annotate('A1', xy=(6.5, -.3), xycoords=trans, ha="center", va="center", fontsize=fontsize_figure_tick_label)
     # add label for spon and dmr
-    ax.plot([-.2, 3.2],[-.4,-.4], color="k", transform=trans, clip_on=False, linewidth=.8)
-    ax.plot([4 -.2, 7.2],[-.4,-.4], color="k", transform=trans, clip_on=False, linewidth=.8)
+    ax.plot([-.2, 3.2], [-.4, -.4], color="k", transform=trans, clip_on=False, linewidth=.8)
+    ax.plot([4 - .2, 7.2], [-.4, -.4], color="k", transform=trans, clip_on=False, linewidth=.8)
     ax.annotate('spon', xy=(1.5, -.5), xycoords=trans, ha="center", va="center", fontsize=fontsize_figure_tick_label)
     ax.annotate('dmr', xy=(5.5, -.5), xycoords=trans, ha="center", va="center", fontsize=fontsize_figure_tick_label)
-        
+
 
 def plot_ne_sig_corr_hist(ax, ne_real, ne_shuffled, region, bins, linewidth=1.2):
-    data = ne_real[(~ne_real.pattern_corr.apply(np.isnan)) & (ne_real.region==region)]
-    sns.histplot(data=data, x="pattern_corr", 
-                      bins=bins, color=eval('{}_color[0]'.format(region)),
-                      element="step", fill=False, stat='probability', ax=ax, linewidth=linewidth)
+    data = ne_real[(~ne_real.pattern_corr.apply(np.isnan)) & (ne_real.region == region)]
+    sns.histplot(data=data, x="pattern_corr",
+                 bins=bins, color=eval('{}_color[0]'.format(region)),
+                 element="step", fill=False, stat='probability', ax=ax, linewidth=linewidth)
     n_unit = len(data)
-    sns.histplot(data=data[data.corr_sig], x="pattern_corr", 
-                    bins=bins, color=eval('{}_color[0]'.format(region)), 
-                    ec=eval('{}_color[0]'.format(region)), fill=True, weights=1/n_unit, ax=ax, linewidth=linewidth)
+    sns.histplot(data=data[data.corr_sig], x="pattern_corr",
+                 bins=bins, color=eval('{}_color[0]'.format(region)),
+                 ec=eval('{}_color[0]'.format(region)), fill=True, weights=1 / n_unit, ax=ax, linewidth=linewidth)
     ratio = np.array(data['corr_sig']).mean()
     print(region, ratio, len(np.array(data['corr_sig'])), np.array(data['corr_sig']).sum())
-    bootstrap_stats = stats.bootstrap([np.array(data['corr_sig']).astype(int)], np.mean, 
-                        confidence_level=0.95, random_state=1, method='percentile')
+    bootstrap_stats = stats.bootstrap([np.array(data['corr_sig']).astype(int)], np.mean,
+                                      confidence_level=0.95, random_state=1, method='percentile')
     print(bootstrap_stats)
-    data = ne_shuffled[ne_shuffled.region==region]
-    sns.histplot(data=data, x="pattern_corr", 
-                    bins=bins, color=eval('{}_color[1]'.format(region)),
-                    element="step", fill=False, stat='probability', ax=ax, linewidth=linewidth)
-    n_unit=len(data)
-    sns.histplot(data=data[data.corr_sig], x="pattern_corr", 
-                    bins=bins, color=eval('{}_color[1]'.format(region)), 
-                    ec=eval('{}_color[1]'.format(region)), fill=True, weights=1/n_unit, ax=ax, linewidth=linewidth)
+    data = ne_shuffled[ne_shuffled.region == region]
+    sns.histplot(data=data, x="pattern_corr",
+                 bins=bins, color=eval('{}_color[1]'.format(region)),
+                 element="step", fill=False, stat='probability', ax=ax, linewidth=linewidth)
+    n_unit = len(data)
+    sns.histplot(data=data[data.corr_sig], x="pattern_corr",
+                 bins=bins, color=eval('{}_color[1]'.format(region)),
+                 ec=eval('{}_color[1]'.format(region)), fill=True, weights=1 / n_unit, ax=ax, linewidth=linewidth)
     ratio = np.array(data['corr_sig']).mean()
     print(region, ratio, len(np.array(data['corr_sig'])), np.array(data['corr_sig']).sum())
 
-    bootstrap_stats = stats.bootstrap([np.array(data['corr_sig']).astype(int)], np.mean, 
-                        confidence_level=0.95, random_state=1, method='percentile')
+    bootstrap_stats = stats.bootstrap([np.array(data['corr_sig']).astype(int)], np.mean,
+                                      confidence_level=0.95, random_state=1, method='percentile')
     print(bootstrap_stats)
     ax.legend([region, f'{region} shuffled', f'{region} sig', f'{region} shuffled sig'])
-        
+
     ax.set_xlim([0, 1])
     ax.patch.set_alpha(0)
     ax.set_xlabel('')
-            
+
     ax.set_ylim([0, 0.2])
     ax.set_ylabel('Proportion', fontsize=fontsize_figure_axes_label)
+
 
 # ------------------------------- ne properties 2 -----------------------------------------------------------------
 def plot_ne_stim_response_type(datafolder, savefolder, rf='strf'):
@@ -1834,15 +1847,15 @@ def plot_ne_neuron_strf_sig_hist(datafolder, savefolder):
     fig.savefig(os.path.join(savefolder, 'hist_ne_neuron_strf_encoding.png'))
 
 
-def plot_neuron_ne_subsample_strf_crh(subsample_ri, taxis, faxis, tmfaxis, smfaxis, 
+def plot_neuron_ne_subsample_strf_crh(subsample_ri, taxis, faxis, tmfaxis, smfaxis,
                                       savefolder=r'E:\Congcong\Documents\data\comparison\figure\cNE-subsample-strf_crh'):
     """
     plot sub sampled strf and crh for each member neuron
     """
     nrows = 8
-    fig, axes = plt.subplots(nrows=nrows, ncols=6, figsize = figure_size)
+    fig, axes = plt.subplots(nrows=nrows, ncols=6, figsize=figure_size)
     r = 0
-    nfig=1
+    nfig = 1
     for i in subsample_ri.index:
         unit = subsample_ri.iloc[i]
         # plot strf
@@ -1850,13 +1863,13 @@ def plot_neuron_ne_subsample_strf_crh(subsample_ri, taxis, faxis, tmfaxis, smfax
         m = 0
         for c, unit_type in enumerate(unit_types):
             axes[r][c].clear()
-            strf = np.array(unit['strf_{}'.format(unit_type)])[:,:,0]
+            strf = np.array(unit['strf_{}'.format(unit_type)])[:, :, 0]
             m = max(np.abs(strf).max(), m)
-            plot_strf(ax=axes[r][c], 
-                      strf=strf, 
+            plot_strf(ax=axes[r][c],
+                      strf=strf,
                       taxis=taxis, faxis=faxis)
-            axes[r][c].set_title('{:.2f} / {:.1f}'\
-                                 .format(np.array(unit['strf_ri_{}'.format(unit_type)]).mean(), 
+            axes[r][c].set_title('{:.2f} / {:.1f}' \
+                                 .format(np.array(unit['strf_ri_{}'.format(unit_type)]).mean(),
                                          unit['strf_ptd_{}'.format(unit_type)]))
             if r != nrows - 1:
                 axes[r][c].set_xlabel('')
@@ -1865,22 +1878,22 @@ def plot_neuron_ne_subsample_strf_crh(subsample_ri, taxis, faxis, tmfaxis, smfax
                 axes[r][c].set_yticklabels('')
         for c in range(3):
             axes[r][c].clim(-m, m)
-        
+
         # plot crh
         for j, unit_type in enumerate(unit_types):
-            c = j+3
+            c = j + 3
             axes[r][c].clear()
-            plot_crh(ax=axes[r][c], 
-                     crh=np.array(unit['crh_{}'.format(unit_type)])[:,:,0], 
+            plot_crh(ax=axes[r][c],
+                     crh=np.array(unit['crh_{}'.format(unit_type)])[:, :, 0],
                      tmfaxis=tmfaxis, smfaxis=smfaxis)
-            axes[r][c].set_title('{:.2f}'\
+            axes[r][c].set_title('{:.2f}' \
                                  .format(np.array(unit['crh_ri_{}'.format(unit_type)]).mean()))
             if r != nrows - 1:
                 axes[r][c].set_xlabel('')
             if c > 3:
                 axes[r][c].set_ylabel('')
                 axes[r][c].set_yticklabels('')
-        
+
         if r == nrows - 1:
             plt.tight_layout()
             plt.savefig(os.path.join(savefolder, 'subsampled_strf_ri-{}.jpg'.format(nfig)))
@@ -1889,25 +1902,24 @@ def plot_neuron_ne_subsample_strf_crh(subsample_ri, taxis, faxis, tmfaxis, smfax
             nfig += 1
         else:
             r += 1
-        
+
 
 def plot_ne_member_strf_crh_nonlinearity(ne, figpath):
-
     # load session file
     session = ne.get_session_data()
     n_neuron = ne.spktrain.shape[0]
     member_thresh = 1 / np.sqrt(n_neuron)  # threshol for membership
 
     for i, cne in enumerate(ne.ne_units):
-        
+
         idx_ne = cne.unit
         members = ne.ne_members[idx_ne]
-        nrows = max(len(members)+1, 5)
+        nrows = max(len(members) + 1, 5)
         fig, axes = plt.subplots(nrows, 6, figsize=figure_size[0])
-    
+
         for idx in range(3):
             axes[0][idx].remove()
-    
+
         taxis = cne.strf_taxis
         faxis = cne.strf_faxis
         tmfaxis = cne.tmfaxis
@@ -1924,18 +1936,18 @@ def plot_ne_member_strf_crh_nonlinearity(ne, figpath):
         plot_nonlinearity(axes[0][5], centers=cne.nonlin_centers, fr=cne.nonlin_fr, fr_mean=cne.nonlin_fr_mean)
         axes[0][5].set_title('{:.2f} / {:.2f}'.format(cne.nonlin_asi, np.mean(cne.strf_info)))
         for c in range(3, 6):
-           axes[0][c].set_xlabel('')
-           axes[0][c].set_ylabel('')
-           axes[0][c].set_yticklabels([])
-           axes[0][c].set_xticklabels([])
+            axes[0][c].set_xlabel('')
+            axes[0][c].set_ylabel('')
+            axes[0][c].set_yticklabels([])
+            axes[0][c].set_xticklabels([])
 
         # plot member strf
-        
+
         for idx, member_idx in enumerate(members):
             unit = session.units[member_idx]
             member = ne.member_ne_spikes[idx_ne][idx]
             nrow = idx + 1
-            
+
             # plot neuron strf
             plot_strf(axes[nrow][0], unit.strf, taxis=taxis, faxis=faxis)
             axes[nrow][0].set_title('{:.2f} / {:.2f}'.format(np.mean(unit.strf_ri), unit.strf_ptd))
@@ -1943,9 +1955,10 @@ def plot_ne_member_strf_crh_nonlinearity(ne, figpath):
             plot_crh(axes[nrow][1], unit.crh, tmfaxis=tmfaxis, smfaxis=smfaxis)
             axes[nrow][1].set_title('{:.2f} / {:.2f}'.format(np.mean(unit.crh_ri), unit.crh_morani))
             # plot neuron nonlinearity
-            plot_nonlinearity(axes[nrow][2], centers=unit.nonlin_centers, fr=unit.nonlin_fr, fr_mean=unit.nonlin_fr_mean)
+            plot_nonlinearity(axes[nrow][2], centers=unit.nonlin_centers, fr=unit.nonlin_fr,
+                              fr_mean=unit.nonlin_fr_mean)
             axes[nrow][2].set_title('{:.2f} / {:.2f}'.format(unit.nonlin_asi, np.mean(unit.strf_info)))
-            
+
             # plot neuron strf
             plot_strf(axes[nrow][3], member.strf, taxis=taxis, faxis=faxis)
             axes[nrow][3].set_title('{:.2f} / {:.2f}'.format(np.mean(member.strf_ri), member.strf_ptd))
@@ -1953,9 +1966,10 @@ def plot_ne_member_strf_crh_nonlinearity(ne, figpath):
             plot_crh(axes[nrow][4], member.crh, tmfaxis=tmfaxis, smfaxis=smfaxis)
             axes[nrow][4].set_title('{:.2f} / {:.2f}'.format(np.mean(member.crh_ri), member.crh_morani))
             # plot neuron nonlinearity
-            plot_nonlinearity(axes[nrow][5], centers=member.nonlin_centers, fr=member.nonlin_fr, fr_mean=member.nonlin_fr_mean)
+            plot_nonlinearity(axes[nrow][5], centers=member.nonlin_centers, fr=member.nonlin_fr,
+                              fr_mean=member.nonlin_fr_mean)
             axes[nrow][5].set_title('{:.2f} / {:.2f}'.format(member.nonlin_asi, np.mean(member.strf_info)))
-            
+
             if nrow < len(members):
                 for c in range(6):
                     axes[nrow][c].set_xlabel('')
@@ -1963,10 +1977,8 @@ def plot_ne_member_strf_crh_nonlinearity(ne, figpath):
                     axes[nrow][c].set_yticklabels([])
                     axes[nrow][c].set_xticklabels([])
 
-                    
-            
         plt.tight_layout()
-        for r in range(len(members)+1, 5):
+        for r in range(len(members) + 1, 5):
             for c in range(6):
                 axes[r][c].remove()
         name_base = re.findall('\d{6}_\d{6}.*', ne.file_path)
@@ -1977,19 +1989,18 @@ def plot_ne_member_strf_crh_nonlinearity(ne, figpath):
             region = 'A1'
         fig.savefig(os.path.join(figpath, region, name_base), dpi=300)
         plt.close(fig)
-        
+
 
 def plot_ne_member_strf_crh_nonlinearity_subsample(ne, taxis, faxis, tmfaxis, smfaxis, figpath):
-    
     cnes = ne.cNE.unique()
     # load session file
 
     for idx_ne, cne in enumerate(cnes):
-        
+
         curr_ne = ne[ne.cNE == cne]
         nrows = max(len(curr_ne), 9)
-        fig, axes = plt.subplots(nrows, 9, figsize=np.array(figure_size[0])*2)
-        
+        fig, axes = plt.subplots(nrows, 9, figsize=np.array(figure_size[0]) * 2)
+
         nrow = 0
         for idx in curr_ne.index:
             unit = curr_ne.loc[idx]
@@ -1997,9 +2008,9 @@ def plot_ne_member_strf_crh_nonlinearity_subsample(ne, taxis, faxis, tmfaxis, sm
             # plot strf
             m = np.max(np.abs([unit.strf_neuron, unit.strf_ne_spike, unit.strf_cNE]))
             for i, unit_type in enumerate(('neuron', 'ne_spike', 'cNE')):
-                strf = np.array(eval('unit.strf_{}'.format(unit_type)))[:,:,5]
+                strf = np.array(eval('unit.strf_{}'.format(unit_type)))[:, :, 5]
                 plot_strf(axes[nrow][i], strf, taxis, faxis, vmax=m)
-                
+
                 # infromation about strf: RI/PTD
                 strf_ri = np.nanmean(np.array(eval('unit.strf_ri_{}'.format(unit_type)), dtype=np.float64))
                 strf_ptd = np.array(eval('unit.ptd_{}'.format(unit_type))).mean()
@@ -2008,11 +2019,10 @@ def plot_ne_member_strf_crh_nonlinearity_subsample(ne, taxis, faxis, tmfaxis, sm
                 axes[nrow][i].text(1, 40, 'PTD:{:.2f}'.format(strf_ptd))
                 axes[nrow][i].text(1, 30, 'PTD:{:.3f}'.format(strf_mi))
 
-                
                 # title
                 if nrow == 0:
                     axes[nrow][i].set_title(unit_type.replace('_', ' '))
-                
+
                 # axis labels
                 axes[nrow][i].set_ylabel(None)
                 axes[nrow][i].set_yticklabels([])
@@ -2020,29 +2030,29 @@ def plot_ne_member_strf_crh_nonlinearity_subsample(ne, taxis, faxis, tmfaxis, sm
                 axes[nrow][i].set_xticklabels([])
                 if i == 0:
                     axes[nrow][i].set_title(unit.member, pad=0)
-                    
+
             # plot crh
             for i, unit_type in enumerate(('neuron', 'ne_spike', 'cNE')):
                 i += 3
-                crh = np.array(eval('unit.crh_{}'.format(unit_type)))[:,:,0]
+                crh = np.array(eval('unit.crh_{}'.format(unit_type)))[:, :, 0]
                 plot_crh(axes[nrow][i], crh, tmfaxis, smfaxis)
-                
+
                 # infromation about strf: RI/PTD
                 crh_ri = np.nanmean(np.array(eval('unit.crh_ri_{}'.format(unit_type)), dtype=np.float64))
                 crh_morani = np.array(eval('unit.morani_{}'.format(unit_type))).mean()
                 axes[nrow][i].text(1, 13, 'RI:{:.2f}'.format(crh_ri), color='w')
                 axes[nrow][i].text(1, 10, '{:.2f}'.format(crh_morani), color='w')
-                
+
                 # title
                 if nrow == 0:
                     axes[nrow][i].set_title(unit_type.replace('_', ' '))
-                
+
                 # axis labels
                 axes[nrow][i].set_ylabel(None)
                 axes[nrow][i].set_yticklabels([])
                 axes[nrow][i].set_xlabel(None)
                 axes[nrow][i].set_xticklabels([])
-            
+
             # plot nonlinearity
             for i, unit_type in enumerate(('neuron', 'ne_spike', 'cNE')):
                 i += 6
@@ -2051,19 +2061,19 @@ def plot_ne_member_strf_crh_nonlinearity_subsample(ne, taxis, faxis, tmfaxis, sm
                 fr = eval('unit.nonlin_fr_{}'.format(unit_type))[-1]
                 # fr_mean = eval('unit.nonlin_fr_mean_{}'.format(unit_type))[-1]
                 plot_nonlinearity(axes[nrow][i], centers, fr, 0)
-                
+
                 # infromation about strf: RI/PTD
-                #asi = np.array(eval('unit.asi_{}'.format(unit_type))).mean()
-                #mi = np.array(eval('unit.mi_{}'.format(unit_type))).mean()
+                # asi = np.array(eval('unit.asi_{}'.format(unit_type))).mean()
+                # mi = np.array(eval('unit.mi_{}'.format(unit_type))).mean()
                 _, ymax = axes[nrow][i].get_ylim()
                 xmin, _ = axes[nrow][i].get_xlim()
-                #axes[nrow][i].text(xmin+1, ymax * 0.8, 'ASI:{:.2f}'.format(asi))
-                #axes[nrow][i].text(xmin+1, ymax * 0.6, 'MI:{:.2f}'.format(mi))
-                
+                # axes[nrow][i].text(xmin+1, ymax * 0.8, 'ASI:{:.2f}'.format(asi))
+                # axes[nrow][i].text(xmin+1, ymax * 0.6, 'MI:{:.2f}'.format(mi))
+
                 # title
                 if nrow == 0:
                     axes[nrow][i].set_title(unit_type.replace('_', ' '))
-                
+
                 # axis labels
                 axes[nrow][i].set_ylabel(None)
                 axes[nrow][i].set_yticklabels([])
@@ -2080,81 +2090,45 @@ def plot_ne_member_strf_crh_nonlinearity_subsample(ne, taxis, faxis, tmfaxis, sm
 
 
 def plot_icweight_match_binsize(ic_matched, figpath):
-    
-    for idx_ne in range(ic_matched['n_ne'][0]):
-        fig = plt.figure(figsize = figure_size[0])
-        plot_icweight_match_binsize_fig(ic_matched, idx_ne, fig)
-        
+    for idx_ne in range(ic_matched['patterns'].shape[0]):
+        fig = plt.figure(figsize=figure_size[0])
+        plot_icweight_match_binsize_fig(
+            fig, ic_matched['patterns'][idx_ne, :, :], ic_matched['pearsonr'][idx_ne, :], ic_matched['df'])
+
         fig.savefig('{}-{}.jpg'.format(figpath, idx_ne), dpi=300)
         plt.close()
 
 
-def plot_icweight_match_binsize_fig(ic_matched, idx_ne, fig, ylabel=True,
-                                    start_x=.08, start_y= 4, fig_y=.5, fig_x=.09, space_x=.04,
-                                    space_y=.15, fig_x_p=.88, fig_y_p=.08):
-    
-    dfs = ic_matched['df']
+def plot_icweight_match_binsize_fig(fig, patterns, corr, dfs, ylabel=True,
+                                    start_x=.05, start_y=.1, fig_y=.8, fig_x=.1, space_x=.02):
     dfs = np.array(dfs) / 2
     dfs = [int(x) for x in dfs]
-    patterns = np.array(ic_matched['patterns'])
-    thresh = 1 / np.sqrt(patterns.shape[2])
-    ymax = patterns[:, idx_ne, :].max() + .1
-    ymin = patterns[:, idx_ne, :].min() - .1
+    thresh = 1 / np.sqrt(patterns.shape[1])
+    ymax = patterns.max() + .1
+    ymin = patterns.min() - .1
     axes = []
     for i, df in enumerate(dfs):
-        pattern = np.array(patterns[i, idx_ne, :])
-            
-        if sum(abs(pattern)) > 0:
-            ax = fig.add_axes([start_x + i*(fig_x + space_x), start_y, fig_x, fig_y])
-            plot_ICweight(ax, pattern, thresh, direction='v', ylim=[ymin, ymax], ylabelpad=-1)
-            ax.set_xlabel('{}ms'.format(int(df)), fontsize=6)
-            ax.tick_params(axis='both', labelsize=6)
-            ax.tick_params(axis='x', size=2)
-            ax.yaxis.get_label().set_fontsize(7)
+        pattern = patterns[i]
 
-            if i > 0:
-                ax.get_yaxis().set_visible(False)
+        ax = fig.add_axes([start_x + i * (fig_x + space_x), start_y, fig_x, fig_y])
+        plot_ICweight(ax, pattern, thresh, direction='v', ylim=[ymin, ymax], ylabelpad=-1)
+        ax.set_xlabel('{}ms'.format(int(df)), fontsize=6)
+        ax.tick_params(axis='both', labelsize=6)
+        ax.tick_params(axis='x', size=2)
+        ax.yaxis.get_label().set_fontsize(7)
 
-            if i == 0:
-                axes.append(ax)
-                if not ylabel:
-                    ax.set_ylabel('')
-                
-            ax.set_xticks([])
-            ax.spines[['left', 'bottom']].set_visible(False)
-            
-                
-        else:
-            break
-        
-    ax = fig.add_axes([start_x, start_y - space_y, fig_x_p, fig_y_p])
-    axes.append(ax)
-    corr = abs(ic_matched['pearsonr'][idx_ne])
-    corr = corr[corr > 0]
-    ax.plot(corr, 'k.-')
-    p = ic_matched['p'][idx_ne]
-    idx_sig = np.where(p > .01)[0]
-    if not any(idx_sig):
-        ax.plot(corr, 'ko', markersize=2)
-    else:
-        idx_sig = idx_sig[0]
-        ax.plot(corr[:idx_sig], 'ko', markersize=2)
-    ax.set_ylim([0, 1.2])
-    ax.set_yticks([0, 1])
-    ax.set_yticklabels([0, 1], fontsize=6)
-    ax.set_xlim([-.9, 5.9])
-    ax.set_xticks(range(6))
-    xticklabels = ['-'.join([str(dfs[x]), str(dfs[x+1])]) for x in range(6)]
-    ax.set_xlabel('Binsize pair (ms)', labelpad=1, fontsize=7)
-    ax.set_xticklabels(xticklabels, fontsize=6)
-    if ylabel:
-        ax.set_ylabel('Pearson r', fontsize=7)
-    else:
-        ax.set_ylabel('')
+        if i > 0:
+            ax.get_yaxis().set_visible(False)
+        if i == 0:
+            if not ylabel:
+                ax.set_ylabel('')
+        ax.set_title('{:.2}'.format(corr[i]))
+        axes.append(ax)
+
     return axes
 
 
-def plot_icweight_match_binsize_summary(ax, stim, probe, 
+def plot_icweight_match_binsize_summary(ax, stim, probe,
                                         datafolder='E:\Congcong\Documents\data\comparison\data-pkl'):
     probe_region = {'H31x64': 'MGB', 'H22x32': 'A1'}
     region = probe_region[probe]
@@ -2164,7 +2138,7 @@ def plot_icweight_match_binsize_summary(ax, stim, probe,
     for file in files:
         with open(file, 'rb') as f:
             ic_matched = pickle.load(f)
-            
+
         n_ne = n_ne + np.array(ic_matched['n_ne'])
         for idx_ne in range(ic_matched['n_ne'][0]):
             p = ic_matched['p'][idx_ne]
@@ -2173,7 +2147,7 @@ def plot_icweight_match_binsize_summary(ax, stim, probe,
                 idx_sig = 7
             else:
                 idx_sig = idx_sig[0]
-            n_match[1:idx_sig+1] = n_match[1:idx_sig+1] + 1
+            n_match[1:idx_sig + 1] = n_match[1:idx_sig + 1] + 1
     n_match[0] = n_ne[0]
     df = ic_matched['df']
     df = [x // 2 for x in df]
@@ -2186,15 +2160,57 @@ def plot_icweight_match_binsize_summary(ax, stim, probe,
 
     ax.set_title(region, color=eval(f'{region}_color[0]'), weight='bold')
 
+
+def plot_icweight_corr_vs_binsize_summary(ax, stim, jsonfile, property='corr'):
+    """
+    violin plot of icweight corr for different binsizes. The 2 halves of violins represent MGB and A1.
+    """
+    data = pd.read_json(jsonfile)
+    if property == 'corr':
+        data_MGB = data[data.probe == 'H31x64'].groupby('df')['corr'].apply(list)
+        data_A1 = data[data.probe == 'H22x32'].groupby('df')['corr'].apply(list)
+    else:
+        if property == 'member_overlap_prc':
+            data['overlap_prc'] = data['n_member_overlap'] / data['n_member']
+        elif property == 'member_overlap_prc_ref':
+            data['overlap_prc'] = data['n_member_overlap'] / data['n_member_ref']
+        elif property == 'member_overlap_prc_all':
+            data['overlap_prc'] = data['n_member_overlap'] / data['n_member_all']
+        data_MGB = data[data.probe == 'H31x64'].groupby('df')['overlap_prc'].apply(list)
+        data_A1 = data[data.probe == 'H22x32'].groupby('df')['overlap_prc'].apply(list)
+    positions = [0, 1, 3, 4, 5, 6]
+
+    v1 = ax.violinplot(data_MGB, points=100, positions=positions, showextrema=False, widths=.8)
+    set_violin_half(v1, half='l', color=MGB_color[0])
+
+    v2 = ax.violinplot(data_A1, points=100, positions=positions, showextrema=False, widths=.8)
+    set_violin_half(v2, half='r', color=A1_color[0])
+    ax.set_ylim([0, 1])
+    plt.setp(ax.collections, alpha=1)
+    ax.legend([v1['bodies'][0], v2['bodies'][0]], ['MGB', 'A1'])
+
+
+def set_violin_half(v, half='l', color='r'):
+    for b in v['bodies']:
+        # get the center
+        m = np.mean(b.get_paths()[0].vertices[:, 0])
+        # modify the paths to not go further right than the center
+        if half == 'l':
+            b.get_paths()[0].vertices[:, 0] = np.clip(b.get_paths()[0].vertices[:, 0], -np.inf, m)
+        elif half == 'r':
+            b.get_paths()[0].vertices[:, 0] = np.clip(b.get_paths()[0].vertices[:, 0], m, np.inf)
+        b.set_color(color)
+
+
 def plot_waveform(ax, waveform_mean, waveform_std, color='k', color_shade='lightgrey'):
-    
     x = range(waveform_mean.shape[0])
     ax.fill_between(x, waveform_mean + waveform_std, waveform_mean - waveform_std, color=color_shade)
     ax.plot(x, waveform_mean, color=color, linewidth=.6)
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
     ax.set_xlim([x[0], x[-1]])
-    
+
+
 def plot_session_waveforms(units):
     nrows = int(np.ceil(np.sqrt(len(units))))
     fig, axes = plt.subplots(nrows, nrows)
@@ -2209,14 +2225,15 @@ def plot_session_waveforms(units):
         plot_waveform(ax, waveform_mean, waveform_std)
         ax.set_title(unit.unit)
 
+
 def plot_session_ccg(spktrains, maxlag=40):
     n = len(spktrains)
-    nrows = int(np.ceil(np.sqrt(n * (n-1) / 2 )))
+    nrows = int(np.ceil(np.sqrt(n * (n - 1) / 2)))
     fig, axes = plt.subplots(nrows, nrows)
     axes = axes.flatten()
     c = 0
     for i in range(n):
-        for j in range(i+1, n):
+        for j in range(i + 1, n):
             ax = axes[c]
             c += 1
             spktrain1 = spktrains[i]
@@ -2227,20 +2244,20 @@ def plot_session_ccg(spktrains, maxlag=40):
             ax.set_xlim([-20, 20])
             ax.set_xlabel('Lag(ms)')
             ax.set_title(f'{i}-{j}')
-    
+
+
 # +++++++++++++++++++++++++++++++++++++++++++++++ UP/DOWN state ++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # raster plot of MU and ne spikes, firing rate of multi-neuron
 def plot_raster_fr_prob(session, ne, up_down, figfolder, plot_window=None, stim='spon'):
-
     probdata = session.probdata
     chan_position = np.array([probdata['xcoords'], probdata['ycoords']])
-    chan_order = np.lexsort((chan_position[0,:], chan_position[1,:]))
-    
+    chan_order = np.lexsort((chan_position[0, :], chan_position[1, :]))
+
     for cne_idx in ne.ne_members:
         fig, axes = plt.subplots(3, 1, figsize=(8, 4))
-        
+
         t_start, t_end = plot_up_ne_spikes(axes[1:], session, ne, up_down, cne_idx, plot_window=None, stim='spon')
-        
+
         # plot multiunit data
         spiketimes_mu = up_down['spiketimes_mu']
         chan_mu = up_down['chan_mu']
@@ -2251,39 +2268,38 @@ def plot_raster_fr_prob(session, ne, up_down, figfolder, plot_window=None, stim=
         axes[0].set_xticklabels([])
         axes[0].set_ylabel('channel #')
         axes[0].set_title('MU')
-        
+
         plt.tight_layout()
         fig.savefig(os.path.join(figfolder, '{}-{}um-cNE_{}.jpg'.format(session.exp, session.depth, cne_idx)), dpi=300)
         plt.close()
-        
+
 
 def plot_up_ne_spikes(axes, session, ne, up_down, cne_idx, plot_window=None, stim='spon'):
-    
     # find the 5s with most ne spikes
     if plot_window is None:
         ne_spikes = ne.ne_units[cne_idx].spiketimes
-        nspk, edges = np.histogram(ne_spikes, bins=up_down['edges_'+stim][::500])
+        nspk, edges = np.histogram(ne_spikes, bins=up_down['edges_' + stim][::500])
         idx = np.argmax(nspk)
         t_start = edges[idx]
         t_end = edges[idx + 1]
     else:
         t_start, t_end = plot_window
-    
+
     # plot MU fring rate and predicted state
-    fr_mu = up_down['fr_mu_'+stim]
-    fr_edges = np.array(up_down['edges_'+stim])
+    fr_mu = up_down['fr_mu_' + stim]
+    fr_edges = np.array(up_down['edges_' + stim])
     fr_centers = (fr_edges[1:] + fr_edges[:-1]) / 2
     axes[0].plot(fr_centers, fr_mu, c='k', linewidth=.5)
     axes[0].set_xlim([t_start, t_end])
     idx_tstart = np.where(fr_centers > t_start)[0][0]
     idx_tend = np.where(fr_centers < t_end)[0][-1]
     ymax = max(fr_mu[idx_tstart:idx_tend])
-    axes[0].set_ylim([0, ymax*1.1])
+    axes[0].set_ylim([0, ymax * 1.1])
     axes[0].set_ylabel('MU FR (Hz)')
     axes[0].set_ylim([0, 300])
     axes[0].set_yticks(range(0, 301, 100))
     axes[0].set_yticklabels(range(0, 301, 100))
-    axes[0].set_xticks(np.arange(t_start, t_end+1, 1000))
+    axes[0].set_xticks(np.arange(t_start, t_end + 1, 1000))
     axes[0].set_xticklabels(range(11))
     axes[0].set_xlabel('Time (s)')
     # plot member neuron spikes
@@ -2292,37 +2308,37 @@ def plot_up_ne_spikes(axes, session, ne, up_down, cne_idx, plot_window=None, sti
     plot_raster(axes[1], units, linewidth=.5)
     plot_raster(axes[1], ne.member_ne_spikes[cne_idx], color='r', linewidth=.5)
     # plot nespike
-    axes[1].eventplot(ne.ne_units[cne_idx].spiketimes, lineoffsets=len(members) + 1, 
+    axes[1].eventplot(ne.ne_units[cne_idx].spiketimes, lineoffsets=len(members) + 1,
                       linelengths=0.5, colors='r', linewidth=.5)
     axes[1].set_xlim([t_start, t_end])
     axes[1].set_xticks([])
     axes[1].set_yticks([])
     axes[1].spines[['bottom', 'left']].set_visible(False)
 
-    up_interval = up_down['up_interval_'+stim]
+    up_interval = up_down['up_interval_' + stim]
     idx_tstart = np.where(up_interval[0] > t_start)[0][0]
     idx_tend = np.where(up_interval[0] < t_end)[0][-1]
-    plot_up_interval_shade(axes[1], up_interval[:, idx_tstart-1:idx_tend+2], ylim=[0, len(members) + 2])
-    return t_start, t_end    
-    
-    
-        
+    plot_up_interval_shade(axes[1], up_interval[:, idx_tstart - 1:idx_tend + 2], ylim=[0, len(members) + 2])
+    return t_start, t_end
+
+
 def plot_up_interval_shade(ax, up_interval, ylim=[0, 1]):
     for start, end in zip(*up_interval):
         p = mpl.patches.Rectangle((start, ylim[0]),
-                    end-start, ylim[1]-ylim[0], alpha=.5, color='orange')
+                                  end - start, ylim[1] - ylim[0], alpha=.5, color='orange')
         ax.add_patch(p)
+
 
 def plot_p_up_corr_fr(ax, datafolder, figfolder):
     files = glob.glob(datafolder + r'\*-up_down.pkl', recursive=False)
-    
+
     corr = []
     up_duration = []
     for idx, file in enumerate(files):
-        
+
         with open(file, 'rb') as f:
             up_down = pickle.load(f)
-        
+
         if 'p_up' not in up_down:
             continue
         p_up = up_down['p_up']
@@ -2333,17 +2349,18 @@ def plot_p_up_corr_fr(ax, datafolder, figfolder):
         up_duration.append(up_dur.mean())
     corr = np.array(corr)
     up_duration = np.array(up_duration)
-        
 
-def plot_ne_event_up_percent(ax, stim='spon', datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl\up_down_spon'):
+
+def plot_ne_event_up_percent(ax, stim='spon',
+                             datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl\up_down_spon'):
     files = glob.glob(datafolder + r'\*-20dft-{}.pkl'.format(stim), recursive=False)
     p_up = []
     region = []
     for idx, file in enumerate(files):
-        
+
         with open(file, 'rb') as f:
             ne = pickle.load(f)
-        
+
         if 'H31x64' in file:
             region_flag = 1
         else:
@@ -2355,39 +2372,41 @@ def plot_ne_event_up_percent(ax, stim='spon', datafolder=r'E:\Congcong\Documents
             region.append(region_flag)
 
     df = pd.DataFrame({'region': ['MGB' if x == 1 else 'A1' for x in region], 'up_percent': p_up})
-    boxplot_scatter(ax, x='region', y='up_percent', data=df, order=['MGB', 'A1'], 
-                          hue='region', palette=[MGB_color[0], A1_color[0]], hue_order=['MGB', 'A1'],
-                          jitter=.3)
+    boxplot_scatter(ax, x='region', y='up_percent', data=df, order=['MGB', 'A1'],
+                    hue='region', palette=[MGB_color[0], A1_color[0]], hue_order=['MGB', 'A1'],
+                    jitter=.3)
     ax.set_title('Percent of events\nin hiAct state', pad=1, fontsize=7)
     ax.set_ylabel('cNE events')
     ax.set_xlabel('')
-    _, p = stats.mannwhitneyu(df[df['region']=='MGB']['up_percent'], df[df['region']=='A1']['up_percent'])
+    _, p = stats.mannwhitneyu(df[df['region'] == 'MGB']['up_percent'], df[df['region'] == 'A1']['up_percent'])
     print('C', p)
 
-def plot_ne_spike_prob_up_vs_all(ax, stim='spon', datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl\up_down_spon'):
+
+def plot_ne_spike_prob_up_vs_all(ax, stim='spon',
+                                 datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl\up_down_spon'):
     files = glob.glob(datafolder + r'\*-20dft-{}.pkl'.format(stim), recursive=False)
     p_ne = []
     p_all = []
     region = []
     for idx, file in enumerate(files):
-        
+
         with open(file, 'rb') as f:
             ne = pickle.load(f)
-        
+
         session = ne.get_session_data()
-        
+
         if 'H31x64' in file:
             region_flag = 1
         else:
             region_flag = 0
-            
+
         for idx, members in ne.ne_members.items():
             for m in range(len(members)):
                 member = members[m]
                 nspk = len(ne.member_ne_spikes[idx][m].spiketimes)
                 nspk_up = len(ne.member_ne_spikes[idx][m].spiketimes_up)
                 p_ne.append(nspk_up / nspk * 100)
-                
+
                 nspk = len(session.units[member].spiketimes)
                 nspk_up = len(session.units[member].spiketimes_up)
                 p_all.append(nspk_up / nspk * 100)
@@ -2396,7 +2415,7 @@ def plot_ne_spike_prob_up_vs_all(ax, stim='spon', datafolder=r'E:\Congcong\Docum
     df = pd.DataFrame({'region': ['MGB' if x == 1 else 'A1' for x in region], 'up_ne': p_ne, 'up_all': p_all})
     sns.scatterplot(data=df, x='up_all', y='up_ne', alpha=.5, s=marker_size,
                     hue='region', palette=[MGB_color[0], A1_color[0]], hue_order=['MGB', 'A1'])
-    handles, _ = ax.legend_.legendHandles,  ax.legend_.texts
+    handles, _ = ax.legend_.legendHandles, ax.legend_.texts
     for handle in handles:
         handle._sizes = [marker_size]
     ax.legend([handle for handle in handles], ['MGB', 'A1'], fontsize=6,
@@ -2407,24 +2426,24 @@ def plot_ne_spike_prob_up_vs_all(ax, stim='spon', datafolder=r'E:\Congcong\Docum
     plt.ylim([-5, 105])
     ax.set_ylabel('NE spikes')
     ax.set_xlabel('All spikes')
-    _, p = stats.wilcoxon(df[df.region=='MGB']['up_all'], df[df.region=='MGB']['up_ne'])
+    _, p = stats.wilcoxon(df[df.region == 'MGB']['up_all'], df[df.region == 'MGB']['up_ne'])
     print('D')
     print('MGB', p)
-    _, p = stats.wilcoxon(df[df.region=='A1']['up_all'], df[df.region=='A1']['up_ne'])
+    _, p = stats.wilcoxon(df[df.region == 'A1']['up_all'], df[df.region == 'A1']['up_ne'])
     print('A1', p)
-    
+
 
 def plot_cv_vs_sd(ax, example,
                   filepath=r'E:\Congcong\Documents\data\comparison\data-summary\firing_rate_parameters.json'):
     df = pd.read_json(filepath)
-    sns.scatterplot(data=df, x='silence_density_spon', y='spkcount_cv_spon', hue='region', 
-                    palette=[MGB_color[1], A1_color[1]], hue_order=['MGB', 'A1'], 
+    sns.scatterplot(data=df, x='silence_density_spon', y='spkcount_cv_spon', hue='region',
+                    palette=[MGB_color[1], A1_color[1]], hue_order=['MGB', 'A1'],
                     ax=ax, edgecolor='k', s=marker_size)
-    sns.scatterplot(data=df[(df['silence_density_spon'] > .4) & (df['spkcount_cv_spon'] > 1)], 
-                    x='silence_density_spon', y='spkcount_cv_spon', hue='region', 
-                    palette=[MGB_color[0], A1_color[0]], hue_order=['MGB', 'A1'], 
+    sns.scatterplot(data=df[(df['silence_density_spon'] > .4) & (df['spkcount_cv_spon'] > 1)],
+                    x='silence_density_spon', y='spkcount_cv_spon', hue='region',
+                    palette=[MGB_color[0], A1_color[0]], hue_order=['MGB', 'A1'],
                     ax=ax, edgecolor='k', s=marker_size)
-    handles, _ = ax.legend_.legendHandles,  ax.legend_.texts
+    handles, _ = ax.legend_.legendHandles, ax.legend_.texts
     for handle in handles:
         handle._sizes = [marker_size]
         handle.set_edgecolor("k")
@@ -2450,7 +2469,7 @@ def plot_cv_vs_sd(ax, example,
 
 def plot_raster_fr_sd_cv(axes, up_down, plot_window, T=10, stim='spon'):
     # plot MU fring rate 
-    fr_mu = up_down['fr_mu_'+stim]
+    fr_mu = up_down['fr_mu_' + stim]
     plot_idx = (plot_window / T).astype(int)
     fr_mu_plot = fr_mu[plot_idx[0]:plot_idx[1]]
     axes[1].plot(np.arange(plot_idx[0], plot_idx[1]), fr_mu_plot, c='k', linewidth=.5)
@@ -2459,14 +2478,14 @@ def plot_raster_fr_sd_cv(axes, up_down, plot_window, T=10, stim='spon'):
     axes[1].set_ylabel('MU FR (Hz)')
     axes[1].set_ylim([0, 250])
     axes[1].set_yticks(range(0, 301, 100))
-    axes[1].set_yticklabels(range(0, 301, 100))   
-    axes[1].set_xticks(np.arange(plot_idx[0], plot_idx[1]+1, 100))
+    axes[1].set_yticklabels(range(0, 301, 100))
+    axes[1].set_xticks(np.arange(plot_idx[0], plot_idx[1] + 1, 100))
     axes[1].set_xticklabels(range(6))
     trigger = up_down['trigger']
-    trigger_start = int(trigger[0]/20) # ms
-    trigger_end = int(trigger[-1]/20) # ms
-    trigger_diff = int(np.max(np.diff(trigger))/20)
-    if stim == 'spon' and trigger_start < 1e3*60*5:
+    trigger_start = int(trigger[0] / 20)  # ms
+    trigger_end = int(trigger[-1] / 20)  # ms
+    trigger_diff = int(np.max(np.diff(trigger)) / 20)
+    if stim == 'spon' and trigger_start < 1e3 * 60 * 5:
         plot_window = plot_window + trigger_end + trigger_diff
     elif stim == 'dmr':
         plot_window = plot_window + trigger_start
@@ -2474,24 +2493,24 @@ def plot_raster_fr_sd_cv(axes, up_down, plot_window, T=10, stim='spon'):
     spiketimes_su = up_down['spiketimes_su']
     unit_su = up_down['unit_su']
     unit_unique = np.unique(unit_su)
-    unit_unique = dict(zip(unit_unique, range(1, len(unit_unique)+1)))
+    unit_unique = dict(zip(unit_unique, range(1, len(unit_unique) + 1)))
     unit_idx_su = np.array([unit_unique[x] for x in unit_su])
     idx = np.logical_and(spiketimes_su >= plot_window[0], spiketimes_su <= plot_window[1])
-    axes[0].scatter(spiketimes_su[idx], unit_idx_su[idx], marker='|', c='k', s=50/len(unit_unique), linewidth=.5)
+    axes[0].scatter(spiketimes_su[idx], unit_idx_su[idx], marker='|', c='k', s=50 / len(unit_unique), linewidth=.5)
     axes[0].set_xlim([plot_window[0], plot_window[1]])
-    axes[0].set_ylim([0, len(unit_unique)+1])
+    axes[0].set_ylim([0, len(unit_unique) + 1])
     axes[0].set_xticklabels([])
     axes[0].set_ylabel('')
     axes[0].spines[['bottom', 'left']].set_visible(False)
-    axes[0].set_ylim([0, np.max(unit_idx_su[idx])+1])
+    axes[0].set_ylim([0, np.max(unit_idx_su[idx]) + 1])
     axes[0].set_yticks([])
     axes[0].set_xticks([])
-    
-    
+
+
 # ----------------------------------------- plot fra gradient --------------------------------------------------
-def plot_fra_gradient(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl\fra', 
-                      figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\fra-stack'):
-    files = glob.glob(os.path.join(datafolder, '*thresh.pkl'))     
+def plot_fra_gradient(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-pkl\fra',
+                      figfolder: str = r'E:\Congcong\Documents\data\comparison\figure\fra-stack'):
+    files = glob.glob(os.path.join(datafolder, '*thresh.pkl'))
     files = files[4:]
     for file in files:
         print(file)
@@ -2507,8 +2526,9 @@ def plot_fra_gradient(datafolder:str=r'E:\Congcong\Documents\data\comparison\dat
             fig.savefig(os.path.join(figfolder, f'{exp}-{probe}-fra.jpg'))
             plt.close()
 
+
 def plot_fra_stack_cf(axes, data):
-    #freq = data.freq.iloc[0]
+    # freq = data.freq.iloc[0]
     probe = data.probe.iloc[0]
     xlabel = 'Freq. (kHz)'
     ylabel = 'Depth (um)'
@@ -2519,16 +2539,16 @@ def plot_fra_stack_cf(axes, data):
     tc = np.concatenate(list(data.tcmat.apply(lambda x: x[::-1, :])))
     cf = data.cf
     if probe == 'H31x64':
-        yticks = range(63 * n_atten + 4, 0, -10*n_atten)
-        yticklabels = range(bottom, top-1, -10*20)
-        im = plot_fra_stack(axes[0], tc, xlabel, ylabel,yticks, yticklabels)
+        yticks = range(63 * n_atten + 4, 0, -10 * n_atten)
+        yticklabels = range(bottom, top - 1, -10 * 20)
+        im = plot_fra_stack(axes[0], tc, xlabel, ylabel, yticks, yticklabels)
         plot_cf_gradient(axes[1], cf, depth, depth[3::10])
 
     elif probe == 'H22x32':
-        tc2 = tc[:32*n_atten, :]
-        tc1 = tc[32*n_atten:, :]
-        yticks = range(31 * n_atten + 4, -1 * n_atten, -8*n_atten)
-        yticklabels = range(bottom, top - 100, -8*25)
+        tc2 = tc[:32 * n_atten, :]
+        tc1 = tc[32 * n_atten:, :]
+        yticks = range(31 * n_atten + 4, -1 * n_atten, -8 * n_atten)
+        yticklabels = range(bottom, top - 100, -8 * 25)
         plot_fra_stack(axes[0], tc1, xlabel, ylabel, yticks, yticklabels)
         im = plot_fra_stack(axes[1], tc2, xlabel, ylabel, yticks, yticklabels)
         axes[1].set_ylabel('')
@@ -2539,8 +2559,9 @@ def plot_fra_stack_cf(axes, data):
         plot_cf_gradient(axes[2], cf[32:], depth[1:], depth[::8], color='k')
     axes[-1].invert_yaxis()
     return im
-    
-def plot_fra_stack(ax, tc, xlabel, ylabel,yticks, yticklabels):
+
+
+def plot_fra_stack(ax, tc, xlabel, ylabel, yticks, yticklabels):
     tc = tc / np.max(tc)
     im = ax.imshow(tc, aspect='auto', origin='upper', cmap='viridis')
     ax.set_xlabel(xlabel)
@@ -2551,237 +2572,43 @@ def plot_fra_stack(ax, tc, xlabel, ylabel,yticks, yticklabels):
     ax.set_yticks(yticks)
     ax.set_yticklabels(yticklabels)
     return im
-    
+
+
 def plot_cf_gradient(ax, cf, y, yticks, color='k'):
     cf = cf.apply(float)
     cf = cf.apply(np.log2)
     ax.scatter(cf, y, c=color, s=2)
-    ax.set_ylim([min(y)-20, max(y)+20])
+    ax.set_ylim([min(y) - 20, max(y) + 20])
     ax.set_yticks(yticks)
     ax.set_yticklabels([])
     ax.set_xlabel('CF (kHz)')
     ax.set_xticks([-1, 2, 5])
     ax.set_xticklabels([.5, 4, 32])
+
+
 # --------------------------------------- plot figures ----------------------------------------------------------
-def figure4_old(datafolder, figfolder):
-    """
-    Figure2: stability of cNEs on spantaneous and sensory-evoked activity blocks
-    schematics of activity blocks
-    correlation matrix of cNE patterns
-    example stem plot of matching cNEs
-    distribution of significant correlation values
-    box plot and scatter plot comparing corss-condition and within condition pattern correlation
-
-    Input:
-        datafolder: path to *ne-20dft-dmr.pkl files
-        figfolder: path to save figure
-    Return:
-        None
-    """
-    # use example recording to plot correlation matrix
-    ne_file = os.path.join(datafolder, '200821_015617-site6-5655um-25db-dmr-31min-H31x64-fs20000-ne-20dft-split.pkl')
-    with open(ne_file, 'rb') as f:
-        ne_split = pickle.load(f)
-
-    fig = plt.figure(figsize=figure_size)
-    y_start = 0.79
-    x_start = 0.06
-
-    # correlation matrix
-    ax = fig.add_axes([x_start, y_start, 0.12, 0.09])
-    plot_ne_split_ic_weight_corr(ne_split, ax=ax)
-    ybox1 = TextArea("dmr1 ", textprops=dict(color=colors_split[0], size=15, rotation=90, ha='left', va='bottom'))
-    ybox2 = TextArea("spon1", textprops=dict(color=colors_split[2], size=15, rotation=90, ha='left', va='bottom'))
-    ybox = VPacker(children=[ybox1, ybox2], align="bottom", pad=0, sep=30)
-    anchored_ybox = AnchoredOffsetbox(loc=8, child=ybox, pad=0., frameon=False, bbox_to_anchor=(-0.15, 0.12),
-                                      bbox_transform=ax.transAxes, borderpad=0.)
-    ax.add_artist(anchored_ybox)
-
-    xbox1 = TextArea("dmr2 ", textprops=dict(color=colors_split[1], size=15, ha='center', va='center'))
-    xbox2 = TextArea("spon2", textprops=dict(color=colors_split[3], size=15, ha='center', va='center'))
-    xbox = HPacker(children=[xbox1, xbox2], align="left", pad=0, sep=30)
-    anchored_xbox = AnchoredOffsetbox(loc=8, child=xbox, pad=0., frameon=False, bbox_to_anchor=(0.5, 1.05),
-                                      bbox_transform=ax.transAxes, borderpad=0.)
-    ax.add_artist(anchored_xbox)
-
-    ax.set_ylabel('cNE #')
-    ax.set_xlabel('cNE #')
-    ax.text(4.75, 1.25, 'A', color='w', weight='bold', fontsize=15)
-    ax.text(5.75, 2.25, 'B', color='w', weight='bold', fontsize=15)
-    # stem plot for matching patterns
-    x_start = 0.27
-    fig_y = 0.045
-    fig_x = 0.1
-    space_x = 0.15
-    space_y = 0.07
-    axes = []
-    for i in range(3):
-        axes.append(fig.add_axes([x_start, 0.79 + (2 - i) * space_y, fig_x, fig_y]))
-    axes[0].set_ylabel('ICweight')
-    axes[0].set_title('A', pad=20)
-    plot_matching_ic_3_conditions(ne_split, axes, 1, marker_size=7, ymax=0.7)
-    axes = []
-    for i in range(3):
-        axes.append(fig.add_axes([x_start + space_x, 0.79 + (2 - i) * space_y, fig_x, fig_y]))
-    plot_matching_ic_3_conditions(ne_split, axes, 2, marker_size=7, ymax=0.7)
-    axes[0].set_title('B', pad=20)
-
-    # distribution of significant correlations
-    x_start = x_start + 2 * space_x + 0.02
-    fig_y = 0.05
-    fig_x = 0.12
-    df = pd.read_json(os.path.join(re.sub('pkl', 'summary', datafolder), 'split_cNE.json'))
-    bins = np.linspace(0.5, 1, 21)
-    for i, stim in enumerate(['cross', 'spon', 'dmr']):
-        ax = fig.add_axes([x_start, 0.79 + i * space_y, fig_x, fig_y])
-        sns.histplot(data=df[(df.stim == stim) & df.corr_sig], x='corr', bins=bins,
-                     hue="region", palette=[MGB_color[0], A1_color[0]], hue_order=['MGB', 'A1'],
-                     ax=ax, legend=False, stat='proportion', common_norm=False)
-        ax.set_title(stim)
-        ax.set_ylim([0, 0.16])
-        n_ne_sig = np.empty(2)
-        n_ne = np.empty(2)
-        text_y = 0.13
-        for ii, region in enumerate(['MGB', 'A1']):
-            corr_sig = df[(df.stim == stim) & (df.region == region)]['corr_sig']
-            ratio = corr_sig.mean()
-            n_ne_sig[ii] = corr_sig.sum()
-            n_ne[ii] = len(corr_sig)
-            ax.text(0.5, text_y - 0.022 * ii, '{:.1f}%'.format(ratio * 100),
-                    color=eval('{}_color[0]'.format(region)), fontsize=12)
-        _, p = chi_square(n_ne_sig, n_ne)
-        ax.text(0.5, text_y - 0.022 * 2, 'p = {:.3f}'.format(p), color='k', fontsize=12)
-
-        if i == 0:
-            plt.legend(loc='upper right', labels=['A1', 'MGB'], fontsize=12)
-            ax.set_xlabel('|correlation|')
-            ax.set_ylabel('Proportion')
-        else:
-            ax.set_xlabel('')
-            ax.set_ylabel('')
-
-    # summary plots comparing significant correlation values
-    x_start = x_start + fig_x + 0.06
-    fig_x = 0.2
-    ax = fig.add_axes([x_start, 0.79 + 1.5 * space_y, fig_x, fig_y + 0.5 * space_y])
-    df['region_stim'] = df[['region', 'stim']].apply(tuple, axis=1)
-    df['region_stim'] = df['region_stim'].apply(lambda x: '_'.join([str(y) for y in x]))
-    my_order = df.groupby(by=['region', 'stim'])['corr'].mean().iloc[::-1].index
-    my_order = ['_'.join([str(y) for y in x]) for x in my_order]
-    order_idx = [1, 4, 0, 3, 2, 5]
-    my_order = [my_order[i] for i in order_idx]
-    boxplot_scatter(ax, x='region_stim', y='corr', data=df,
-                    order=my_order, hue='region_stim', palette=colors_split, hue_order=my_order,
-                    jitter=0.3, legend=False, notch=True, size=2, alpha=1,
-                    linewidth=1)
-    ax.set_xticklabels(['\n'.join(x.split('_')) for x in my_order], fontsize=15)
-    ax.set_xlim([-1, 6])
-    ax.set_ylabel('|Correlation|')
-    p_all = []
-    # significance test between MGB and A1
-    for i in range(3):
-        _, p = stats.mannwhitneyu(x=df[df['region_stim'] == my_order[i * 2]]['corr'],
-                                  y=df[df['region_stim'] == my_order[i * 2 + 1]]['corr'])
-        p_all.append(p)
-        plot_significance_star(ax, p, [i * 2, i * 2 + 1], 1.05, 1.07)
-    # significance test between dmr and spon
-    for i in range(2):
-        _, p = stats.mannwhitneyu(x=df[df['region_stim'] == my_order[i]]['corr'],
-                                  y=df[df['region_stim'] == my_order[i + 2]]['corr'])
-        p_all.append(p)
-        plot_significance_star(ax, p, [i, i + 2], 1.05, 1.07)
-    # significance test between cross condition and within condition in MGB
-    for i in range(2):
-        _, p = stats.mannwhitneyu(x=df[df['region_stim'] == my_order[4]]['corr'],
-                                  y=df[df['region_stim'] == my_order[2 - i * 2]]['corr'])
-        plot_significance_star(ax, p, [2 - i * 2, 4], 1.05 + i * 0.06, 1.04 + i * 0.06)
-        p_all.append(p)
-    # significance test between dmr and cross
-    for i in range(2):
-        _, res = stats.mannwhitneyu(x=df[df['region_stim'] == my_order[5]]['corr'],
-                                    y=df[df['region_stim'] == my_order[3 - i * 2]]['corr'])
-        plot_significance_star(ax, p, [3 - i * 2, 5], 1.16 + i * 0.06, 1.15 + i * 0.06)
-        p_all.append(p)
-    corrected_p = multipletests(p_all, alpha=0.05, method='bonferroni')
-    print(corrected_p)
-    ax.set_ylim([0, 1.3])
-    ax.set_xlabel('')
-
-    # scatter plots
-    fig_x = 0.08
-    space_x = 0.12
-    df_cross = pd.concat([
-        df[(df.stim == 'cross') & (df.dmr_first)].merge(
-            df[(df.stim == 'dmr') & (df.dmr_first)],
-            left_on=['exp', 'region', 'idx1'], right_on=['exp', 'region', 'idx2'],
-            suffixes=(None, '_dmr'), how='left').merge(
-            df[(df.stim == 'spon') & (df.dmr_first)],
-            left_on=['exp', 'region', 'idx2'], right_on=['exp', 'region', 'idx1'],
-            suffixes=(None, '_spon'), how='left'),
-        df[(df.stim == 'cross') & (~df.dmr_first)].merge(
-            df[(df.stim == 'dmr') & (~df.dmr_first)],
-            left_on=['exp', 'region', 'idx2'], right_on=['exp', 'region', 'idx1'],
-            suffixes=(None, '_dmr'), how='left').merge(
-            df[(df.stim == 'spon') & (~df.dmr_first)],
-            left_on=['exp', 'region', 'idx1'], right_on=['exp', 'region', 'idx2'],
-            suffixes=(None, '_spon'), how='left')
-    ])
-    regions = ['MGB', 'A1']
-    for i in range(2):
-        ax = fig.add_axes([x_start + i * space_x, 0.79, fig_x, fig_y])
-        sns.scatterplot(data=df_cross[df_cross.region == regions[i]],
-                        x='corr', y='corr_dmr',
-                        ax=ax, color=colors_split[0], s=10)
-        sns.scatterplot(data=df_cross[df_cross.region == regions[i]],
-                        x='corr', y='corr_spon',
-                        ax=ax, color=colors_split[2], s=10)
-        ax.plot([0, 1], [0, 1], color='k')
-
-        if i == 0:
-            ax.set_xlabel('cross condition')
-            ax.set_ylabel('within condition')
-        else:
-            ax.set_xlabel('')
-            ax.set_ylabel('')
-
-        ax.set_xlim([0, 1])
-        ax.set_ylim([0, 1])
-        ax.set_title(regions[i], color=eval('{}_color[0]'.format(regions[i])))
-
-        _, p = stats.wilcoxon(x=df_cross[df_cross.region == regions[i]]['corr'],
-                              y=df_cross[df_cross.region == regions[i]]['corr_dmr'])
-        ax.text(0.35, 0.1, 'p = {:.1e}'.format(p), color=colors_split[0], fontsize=12)
-        _, p = stats.wilcoxon(x=df_cross[df_cross.region == regions[i]]['corr'],
-                              y=df_cross[df_cross.region == regions[i]]['corr_spon'])
-        ax.text(0.35, 0.25, 'p = {:.1e}'.format(p), color=colors_split[2], fontsize=12)
-
-    fig.savefig(os.path.join(figfolder, 'fig2.png'))
-    fig.savefig(os.path.join(figfolder, 'fig2.pdf'))
-    
-    
-def figure1(figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summary'):
-    figsize = [figure_size[1][0], 8.5*cm]
+def figure1(figfolder: str = r'E:\Congcong\Documents\data\comparison\figure\summary'):
+    figsize = [figure_size[1][0], 8.5 * cm]
     fig = plt.figure(figsize=figsize)
-    
+
     # example FRA gradient MGB
     x_start = .4
     y_start = .08
     x_space = .03
     x_fig = .1
     y_fig = .42
-    
+
     file = r'E:\Congcong\Documents\data\comparison\data-pkl\fra' \
-        + r'\200709_231103-site1-5300um-30db-fra10-H31x64-fs20000-thresh.pkl'
+           + r'\200709_231103-site1-5300um-30db-fra10-H31x64-fs20000-thresh.pkl'
     data = pd.read_pickle(file)
     data = data[data.probe == 'H31x64']
     axes = []
     axes.append(fig.add_axes([x_start, y_start, x_fig, y_fig]))
     axes.append(fig.add_axes([x_start + x_fig + x_space, y_start, x_fig, y_fig]))
     plot_fra_stack_cf(axes, data)
-    
-    
+
     file = r'E:\Congcong\Documents\data\comparison\data-pkl\fra' \
-        + r'\210218_155422-site1-5026um-35db-fra10-H31x64-fs20000-thresh.pkl'
+           + r'\210218_155422-site1-5026um-35db-fra10-H31x64-fs20000-thresh.pkl'
     data = pd.read_pickle(file)
     data = data[data.probe == 'H31x64']
     axes = []
@@ -2790,14 +2617,14 @@ def figure1(figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summary
     axes.append(fig.add_axes([x_start2 + x_fig + x_space, y_start, x_fig, y_fig]))
     plot_fra_stack_cf(axes, data)
     axes[0].set_ylabel('')
-    
+
     # example FRA gradient A1
     y_start = .62
     x_space = .03
     y_fig = .28
-    
+
     file = r'E:\Congcong\Documents\data\comparison\data-pkl\fra' \
-        + r'\200710_001625-site2-5300um-30db-fra10-H31x64-fs20000-thresh.pkl'
+           + r'\200710_001625-site2-5300um-30db-fra10-H31x64-fs20000-thresh.pkl'
     data = pd.read_pickle(file)
     data = data[data.probe == 'H22x32']
     axes = []
@@ -2822,15 +2649,16 @@ def figure1(figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summary
     cb.ax.set_yticks([0, 1])
     cb.ax.set_yticklabels([0, 'Max'])
     axins.tick_params(axis='both', which='major', labelsize=6)
-    
+
     fig.savefig(os.path.join(figfolder, 'fig1_1.jpg'), dpi=1000)
     fig.savefig(os.path.join(figfolder, 'fig1_1.pdf'), dpi=1000)
     plt.close()
-    
-def figure1_2(figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summary'):
-    figsize = [7.5*cm, 8.1*cm]
+
+
+def figure1_2(figfolder: str = r'E:\Congcong\Documents\data\comparison\figure\summary'):
+    figsize = [7.5 * cm, 8.1 * cm]
     fig = plt.figure(figsize=figsize)
-    
+
     # example STRFs
     datafolder = r'E:\Congcong\Documents\data\comparison\data-summary'
     units = pd.read_json(os.path.join(datafolder, 'single_units.json'))
@@ -2845,9 +2673,9 @@ def figure1_2(figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summa
     y_start = .42
     axes = []
     for i in range(4):
-        axes.append(fig.add_axes([x_start, y_start + i*(y_fig + y_space), x_fig, y_fig]))
+        axes.append(fig.add_axes([x_start, y_start + i * (y_fig + y_space), x_fig, y_fig]))
     for i in range(4):
-        axes.append(fig.add_axes([x_start+.65, y_start + i*(y_fig + y_space), x_fig, y_fig]))
+        axes.append(fig.add_axes([x_start + .65, y_start + i * (y_fig + y_space), x_fig, y_fig]))
     axes = np.array(axes)
     axes = axes[[3, 2, 1, 0, 7, 6, 5, 4]]
     depth = []
@@ -2856,11 +2684,11 @@ def figure1_2(figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summa
         depth.append(units.iloc[i].position[-1])
         vmax = np.max(abs(strf))
         im = plot_strf(axes[i],
-                  strf,
-                  taxis=np.array(units.iloc[i].strf_taxis),
-                  faxis=np.array(units.iloc[i].strf_faxis),
-                  smooth=False,
-                  vmax=vmax)
+                       strf,
+                       taxis=np.array(units.iloc[i].strf_taxis),
+                       faxis=np.array(units.iloc[i].strf_faxis),
+                       smooth=False,
+                       vmax=vmax)
         if i == 3:
             axes[i].set_xlabel('Time before spikes (ms)', labelpad=1, fontsize=5.5)
             axes[i].set_ylabel('Frequency (kHz)', labelpad=1, fontsize=5.5)
@@ -2897,9 +2725,9 @@ def figure1_2(figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summa
     y_start = .42 + y_shrink
     axes = []
     for i in range(4):
-        axes.append(fig.add_axes([x_start, y_start + i*(y_fig + y_space), x_fig, y_fig]))
+        axes.append(fig.add_axes([x_start, y_start + i * (y_fig + y_space), x_fig, y_fig]))
     for i in range(4):
-        axes.append(fig.add_axes([x_start+.35, y_start + i*(y_fig + y_space), x_fig, y_fig]))
+        axes.append(fig.add_axes([x_start + .35, y_start + i * (y_fig + y_space), x_fig, y_fig]))
     axes = np.array(axes)
     axes = axes[[3, 2, 1, 0, 7, 6, 5, 4]]
     sessionfile = r'E:\Congcong\Documents\data\comparison\data-pkl\200709_232021-site1-5300um-20db-dmr-31min-H31x64-fs20000.pkl'
@@ -2918,10 +2746,10 @@ def figure1_2(figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summa
 
     # probe
     x_start = .48
-    x_fig=.03
+    x_fig = .03
     y_fig = .5
-    ax = fig.add_axes([x_start, y_start-y_shrink, x_fig, y_fig])
-    ax.scatter(np.zeros(64), range(4020, 5281, 20), s=3, linewidth=.3, 
+    ax = fig.add_axes([x_start, y_start - y_shrink, x_fig, y_fig])
+    ax.scatter(np.zeros(64), range(4020, 5281, 20), s=3, linewidth=.3,
                facecolors='none', edgecolors='k')
     ax.scatter(np.zeros(8), depth, s=3, linewidth=.3, color='k')
     ax.spines[['left', 'bottom']].set_visible(False)
@@ -2935,7 +2763,7 @@ def figure1_2(figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summa
     ax.set_yticks([4000, 5280])
     ax.set_title('Depth (um)', fontsize=6)
     ax.invert_yaxis()
-    
+
     # example ccg
     x_start = .12
     y_start = .08
@@ -2945,20 +2773,22 @@ def figure1_2(figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summa
     file = r'E:\Congcong\Documents\data\comparison\data-pkl\200709_232021-site1-5300um-20db-dmr-31min-H31x64-fs20000.pkl'
     with open(file, 'rb') as f:
         session = pickle.load(f)
+
     def plot_ccg(u1, u2, ax):
         spktrain1 = session.spktrain_dmr[u1, :]
         spktrain2 = np.roll(session.spktrain_dmr[u2, :], -maxlag)
         spktrain2 = spktrain2[:-2 * maxlag]
         xcorr = np.correlate(spktrain1, spktrain2, mode='valid')
-        #xcorr = xcorr / (spktrain1.sum() * spktrain2.sum() / 4) * 1e5
+        # xcorr = xcorr / (spktrain1.sum() * spktrain2.sum() / 4) * 1e5
         ax.bar(np.arange(-25, 25.1, .5), xcorr, color='k')
-        ax.plot([-maxlag/2, maxlag/2], 
-                np.ones(2)*np.mean((xcorr[0:10] + xcorr[-10:])/2), 
+        ax.plot([-maxlag / 2, maxlag / 2],
+                np.ones(2) * np.mean((xcorr[0:10] + xcorr[-10:]) / 2),
                 ls='--', color='grey', linewidth=.6)
         ax.plot([0, 0], [0, 25], ls='-', color='grey', linewidth=.6)
-        ax.set_xlim([-maxlag/2, maxlag/2])
+        ax.set_xlim([-maxlag / 2, maxlag / 2])
         ax.set_xlabel('Lag (ms)')
         ax.set_ylim([0, 25])
+
     ax = fig.add_axes([x_start, y_start, x_fig, y_fig])
     plot_ccg(0, 7, ax)
     ax.set_title('1 - 3', pad=0)
@@ -2966,14 +2796,14 @@ def figure1_2(figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summa
     ax = fig.add_axes([.5, y_start, x_fig, y_fig])
     plot_ccg(3, 7, ax)
     ax.set_title('2 - 3', pad=0)
-    
+
     fig.savefig(os.path.join(figfolder, 'fig1_2.jpg'), dpi=1000)
     fig.savefig(os.path.join(figfolder, 'fig1_2.pdf'), dpi=1000)
     plt.close()
-    
 
-def figure2(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl', 
-            figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summary'):
+
+def figure2(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-pkl',
+            figfolder: str = r'E:\Congcong\Documents\data\comparison\figure\summary'):
     """
     Figure2: groups of neurons with coordinated activities exist in A1 and MGB
     Plot construction procedures for cNEs and  correlated firing around cNE events
@@ -2987,7 +2817,6 @@ def figure2(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl',
     """
     mpl.rcParams['axes.labelpad'] = 1
 
-
     # use example recording to plot construction procedure
     ne_file = os.path.join(datafolder, '210119_222752-site2-4800um-20db-dmr-30min-H31x64-fs20000-ne-20dft-spon.pkl')
     with open(ne_file, 'rb') as f:
@@ -2995,8 +2824,8 @@ def figure2(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl',
     session_file = re.sub('-ne-20dft-spon', '', ne.file_path)
     with open(session_file, 'rb') as f:
         session = pickle.load(f)
-    
-    figsize = [figure_size[0][0], 13*cm]
+
+    figsize = [figure_size[0][0], 13 * cm]
     fig = plt.figure(figsize=figsize)
 
     # positions for first 2 plots
@@ -3036,9 +2865,9 @@ def figure2(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl',
     ystart = .48
     ax = fig.add_axes([xstart, ystart, figx, figy])
     patterns = ne.patterns
-    
-    patterns[0], patterns[1] =np.array(patterns[1]), np.array(patterns[0])
-    
+
+    patterns[0], patterns[1] = np.array(patterns[1]), np.array(patterns[0])
+
     members = ne.ne_members
     members[0], members[1] = members[1], members[0]
     im = plot_ICweigh_imshow(ax, ne.patterns, ne.ne_members)
@@ -3057,7 +2886,6 @@ def figure2(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl',
     cb.ax.set_yticks(np.arange(-.6, .61, .3))
     cb.ax.set_yticklabels([-.6, -.3, .0, .3, .6])
     axins.tick_params(axis='both', which='major', labelsize=6)
-
 
     # stem plots for ICweights
     xstart = xstart + figx + xspace + 0.04
@@ -3120,7 +2948,7 @@ def figure2(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl',
 
     # scale bar
     ax.plot([t_start, t_start + 200], [0.1, 0.1], color='k', linewidth=1)
-    ax.text(t_start+20, -0.8, '0.2 s', fontsize=8)
+    ax.text(t_start + 20, -0.8, '0.2 s', fontsize=8)
     ax.set_yticks([n_neuron + 1])
     ax.tick_params(axis='y', length=0)
     ax.set_yticklabels(['cNE'], fontsize=6, color='r')
@@ -3183,13 +3011,13 @@ def figure2(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl',
     p_all = []
     for i in range(2):
         res = stats.wilcoxon(x=peak_mean[peak_mean['region_stim_member'] == my_order[i * 2]]['peak'],
-                                 y=peak_mean[peak_mean['region_stim_member'] == my_order[i * 2 + 1]]['peak'],
-                                 alternative='greater')
+                             y=peak_mean[peak_mean['region_stim_member'] == my_order[i * 2 + 1]]['peak'],
+                             alternative='greater')
         p_all.append(res.pvalue)
     p_corrected = multipletests(p_all, method='h')
     p_corrected = p_corrected[1]
     for i in range(2):
-        plot_significance_star(ax, p_corrected[i], [2*i, 2*i + 1], 9, 9.1)
+        plot_significance_star(ax, p_corrected[i], [2 * i, 2 * i + 1], 9, 9.1)
         print(my_order[i * 2].split('_')[0], p_corrected[i])
     # significance test for z-scored CCG peak value: A1 vs MGB
     print('A1 vs MGB: Mann–Whitney U test (corrected)')
@@ -3221,7 +3049,7 @@ def figure2(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl',
                                  y=xcorr[xcorr['region_stim_member'] == my_order[i * 2 + 1]]['corr'],
                                  alternative='greater')
         p_all.append(res.pvalue)
-       
+
     # significance test for correlation value: A1 vs MGB
     for i in range(2):
         res = stats.mannwhitneyu(x=xcorr[xcorr['region_stim_member'] == my_order[i]]['corr'],
@@ -3237,39 +3065,37 @@ def figure2(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl',
     print('within:', p_corrected[2])
     print('outside:', p_corrected[3])
     for i in range(2):
-        plot_significance_star(ax, p_corrected[i], [i*2, i*2 + 1], 0.4, 0.402)
+        plot_significance_star(ax, p_corrected[i], [i * 2, i * 2 + 1], 0.4, 0.402)
     for i in range(2):
-         plot_significance_star(ax, p_corrected[i+2], [i, i +2], 0.45, 0.452)
+        plot_significance_star(ax, p_corrected[i + 2], [i, i + 2], 0.45, 0.452)
     ax.set_yticks([0, 0.2, 0.5])
-    
+
     ax.set_xlabel('')
     ax.set_ylabel('Pairwise correlation')
     ticklabels = []
     for region in ['MGB', 'A1']:
         for membership in ['(w)', '(o)']:
-            n = len(xcorr[(xcorr.region==region) & (xcorr.member==membership)])
+            n = len(xcorr[(xcorr.region == region) & (xcorr.member == membership)])
             ticklabels.append('{}\n{}\n{}'.format(region, membership, n))
     ax.set_xticklabels(ticklabels)
-    
-    
+
     fig.savefig(os.path.join(figfolder, 'fig2.jpg'), dpi=1000)
     fig.savefig(os.path.join(figfolder, 'fig2.pdf'), dpi=1000)
     plt.close()
-    
-    
-def figure3(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl', 
-            figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summary'):
-    
+
+
+def figure3(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-pkl',
+            figfolder: str = r'E:\Congcong\Documents\data\comparison\figure\summary'):
     mpl.rcParams['lines.markersize'] = 8
 
-    figsize = [figure_size[1][0], 10*cm]
+    figsize = [figure_size[1][0], 10 * cm]
     fig = plt.figure(figsize=figsize)
-    
+
     x_start = .07
     y_start = .68
     x_space = .008
     x_fig = .055
-    y_fig= .3
+    y_fig = .3
     y_space = .1
     fig_x_p = .42
     fig_y_p = .05
@@ -3279,12 +3105,12 @@ def figure3(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl',
     with open(file, 'rb') as f:
         ic_matched = pickle.load(f)
     axes = plot_icweight_match_binsize_fig(ic_matched, 2, fig,
-                                        start_x=x_start, start_y=y_start, fig_y=y_fig, fig_x=x_fig, space_x=x_space,
-                                        space_y=y_space, fig_x_p=fig_x_p, fig_y_p=fig_y_p)
+                                           start_x=x_start, start_y=y_start, fig_y=y_fig, fig_x=x_fig, space_x=x_space,
+                                           space_y=y_space, fig_x_p=fig_x_p, fig_y_p=fig_y_p)
     labelx = -.11
     axes[0].yaxis.set_label_coords(-.85, 0.5)
     axes[1].yaxis.set_label_coords(labelx, 0.5)
-    
+
     # plot example - 2
     x_start = .57
     file = os.path.join(datafolder,
@@ -3292,15 +3118,15 @@ def figure3(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl',
     with open(file, 'rb') as f:
         ic_matched = pickle.load(f)
     axes = plot_icweight_match_binsize_fig(ic_matched, 3, fig, ylabel=False,
-                                        start_x=x_start, start_y=y_start, fig_y=y_fig, fig_x=x_fig, space_x=x_space,
-                                        space_y=y_space, fig_x_p=fig_x_p, fig_y_p=fig_y_p)
+                                           start_x=x_start, start_y=y_start, fig_y=y_fig, fig_x=x_fig, space_x=x_space,
+                                           space_y=y_space, fig_x_p=fig_x_p, fig_y_p=fig_y_p)
     trans = axes[0].get_xaxis_transform()
-    axes[0].plot([4, 4.5],[0,0], color="k", transform=trans, clip_on=False, linewidth=.8)
-    axes[0].annotate('ICweight', xy=(4.25, -.12), xycoords=trans, 
-                     ha="center", va="center", fontsize=6)    
-    axes[0].annotate('0.5', xy=(4.25, -.05), xycoords=trans, 
-                     ha="center", va="center", fontsize=6)    
-    
+    axes[0].plot([4, 4.5], [0, 0], color="k", transform=trans, clip_on=False, linewidth=.8)
+    axes[0].annotate('ICweight', xy=(4.25, -.12), xycoords=trans,
+                     ha="center", va="center", fontsize=6)
+    axes[0].annotate('0.5', xy=(4.25, -.05), xycoords=trans,
+                     ha="center", va="center", fontsize=6)
+
     x_start = .07
     y_start = .07
     x_fig = fig_x_p
@@ -3309,24 +3135,23 @@ def figure3(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-pkl',
     plot_icweight_match_binsize_summary(ax, stim='spon', probe='H31x64')
     ax.set_ylim([0, 120])
     ax.yaxis.set_label_coords(labelx, 0.5)
-    
+
     x_start = .57
     ax = fig.add_axes([x_start, y_start, x_fig, y_fig])
     plot_icweight_match_binsize_summary(ax, stim='spon', probe='H22x32')
     ax.set_ylabel('')
     ax.set_ylim([0, 100])
-    
+
     y = .97
     fig.text(0, y, 'A', fontsize=fontsize_panel_label, weight='bold')
-    fig.text(.03, y, 'i', fontsize=fontsize_panel_label-2, weight='bold')
-    fig.text(.5, y, 'ii', fontsize=fontsize_panel_label-2, weight='bold')
+    fig.text(.03, y, 'i', fontsize=fontsize_panel_label - 2, weight='bold')
+    fig.text(.5, y, 'ii', fontsize=fontsize_panel_label - 2, weight='bold')
     y = .47
     fig.text(0, y, 'B', fontsize=fontsize_panel_label, weight='bold')
     fig.text(.03, y, 'i', fontsize=fontsize_panel_label - 2, weight='bold')
     fig.text(.5, y, 'ii', fontsize=fontsize_panel_label - 2, weight='bold')
-    
+
     plt.savefig(os.path.join(figfolder, 'fig3.jpg'), dpi=300)
-    plt.savefig(os.path.join(figfolder, 'fig3.tif'), dpi=300)
     plt.savefig(os.path.join(figfolder, 'fig3.pdf'), dpi=300)
     plt.close()
 
@@ -3373,9 +3198,9 @@ def figure4(datafolder='E:\Congcong\Documents\data\comparison\data-pkl'):
 
     ax.set_ylabel('cNE #', labelpad=9)
     ax.set_xlabel('cNE #', labelpad=1)
-    ax.text(1-.1, 4+.25, 'i', color='w', weight='bold', fontsize=8)
-    ax.text(2-.2, 5+.25, 'ii', color='w', weight='bold', fontsize=8)
-    
+    ax.text(1 - .1, 4 + .25, 'i', color='w', weight='bold', fontsize=8)
+    ax.text(2 - .2, 5 + .25, 'ii', color='w', weight='bold', fontsize=8)
+
     # stem plot for matching patterns
     x_start = 0.283
     fig_y = 0.18
@@ -3393,12 +3218,12 @@ def figure4(datafolder='E:\Congcong\Documents\data\comparison\data-pkl'):
         axes.append(fig.add_axes([x_start + space_x + fig_x, y_start + (2 - i) * (space_y + fig_y), fig_x, fig_y]))
     plot_matching_ic_3_conditions(ne_split, axes, 2, marker_size=3, ymax=0.7, yticklabels=[False, True])
     axes[0].set_title('ii', pad=15, color='blue')
-    
+
     # summary plots comparing significant correlation values
     df = pd.read_json(os.path.join(re.sub('pkl', 'summary', datafolder), 'split_cNE.json'))
-    x_start = x_start + fig_x*2 + space_x + 0.095
+    x_start = x_start + fig_x * 2 + space_x + 0.095
     fig_x = 0.18
-    ax = fig.add_axes([x_start, y_start + fig_y * 3, fig_x, fig_y*1.8])
+    ax = fig.add_axes([x_start, y_start + fig_y * 3, fig_x, fig_y * 1.8])
     df['region_stim'] = df[['region', 'stim']].apply(tuple, axis=1)
     df['region_stim'] = df['region_stim'].apply(lambda x: '_'.join([str(y) for y in x]))
     my_order = df.groupby(by=['region', 'stim'])['corr'].mean().iloc[::-1].index
@@ -3444,15 +3269,15 @@ def figure4(datafolder='E:\Congcong\Documents\data\comparison\data-pkl'):
         _, p = stats.mannwhitneyu(x=df[df['region_stim'] == my_order[4]]['corr'],
                                   y=df[df['region_stim'] == my_order[2 - i * 2]]['corr'])
         p_all.append(p)
-        plot_significance_star(ax, p*9, [2 - i * 2, 4], 1.05 + i * 0.12, 1.04 + i * 0.12, linewidth=.8)
+        plot_significance_star(ax, p * 9, [2 - i * 2, 4], 1.05 + i * 0.12, 1.04 + i * 0.12, linewidth=.8)
         print(my_order[2 - 2 * i], ': p=', p)
     # significance test between dmr and cross
-    
+
     for i in range(2):
         _, p = stats.mannwhitneyu(x=df[df['region_stim'] == my_order[5]]['corr'],
-                                    y=df[df['region_stim'] == my_order[3 - i * 2]]['corr'])
+                                  y=df[df['region_stim'] == my_order[3 - i * 2]]['corr'])
         p_all.append(p)
-        plot_significance_star(ax, p*9, [3 - i * 2, 5], 1.3 + i * 0.12, 1.29 + i * 0.12, linewidth=.8)
+        plot_significance_star(ax, p * 9, [3 - i * 2, 5], 1.3 + i * 0.12, 1.29 + i * 0.12, linewidth=.8)
         print(my_order[3 - i * 2], ': p=', p)
     print(p_all)
     p_corrected = multipletests(p_all, alpha=.05, method='h')
@@ -3464,35 +3289,37 @@ def figure4(datafolder='E:\Congcong\Documents\data\comparison\data-pkl'):
     # add label for shuffle
     trans = ax.get_xaxis_transform()
     # add label for spon, dmr and cross
-    ax.plot([-.2, 1.2],[-.18,-.18], color="k", transform=trans, clip_on=False, linewidth=.8)
-    ax.plot([2-.2, 3.2],[-.18,-.18], color="k", transform=trans, clip_on=False, linewidth=.8)
-    ax.plot([4-.2, 5.2],[-.18,-.18], color="k", transform=trans, clip_on=False, linewidth=.8)
+    ax.plot([-.2, 1.2], [-.18, -.18], color="k", transform=trans, clip_on=False, linewidth=.8)
+    ax.plot([2 - .2, 3.2], [-.18, -.18], color="k", transform=trans, clip_on=False, linewidth=.8)
+    ax.plot([4 - .2, 5.2], [-.18, -.18], color="k", transform=trans, clip_on=False, linewidth=.8)
     ax.annotate('spon', xy=(.5, -.25), xycoords=trans, ha="center", va="center", fontsize=fontsize_figure_tick_label)
     ax.annotate('dmr', xy=(2.5, -.25), xycoords=trans, ha="center", va="center", fontsize=fontsize_figure_tick_label)
     ax.annotate('cross', xy=(4.5, -.25), xycoords=trans, ha="center", va="center", fontsize=fontsize_figure_tick_label)
 
     # example illiustration of significance definition
-    ax = fig.add_axes([x_start, y_start, fig_x, fig_y*1.5])
+    ax = fig.add_axes([x_start, y_start, fig_x, fig_y * 1.5])
     corr_null = ne_split['corr_null']['cross']
     corr_real = ne_split['corr']['cross']
     corr_real = corr_real[1:]
     thresh = ne_split['corr_thresh']['cross']
     handles = plot_ne_split_ic_weight_null_corr_panel(ax, thresh, corr_real, corr_null, color=['brown', 'blue'])
     ax.set_ylim([0, .06])
-    plt.legend(handles=handles, labels=['shuffled correlation', 'significance threshold (p=0.01)', 'cNE pair i', 'cNE pair ii'], loc='upper right', 
-               fontsize=5, fancybox=False, edgecolor='k', 
+    plt.legend(handles=handles,
+               labels=['shuffled correlation', 'significance threshold (p=0.01)', 'cNE pair i', 'cNE pair ii'],
+               loc='upper right',
+               fontsize=5, fancybox=False, edgecolor='k',
                handletextpad=1, labelspacing=.1, borderpad=.3, bbox_to_anchor=(1, 1.5))
-    
+
     # distribution of significant correlations
     x_start = x_start + fig_x + 0.058
     fig_y = 0.2
-    space_y=.08
+    space_y = .08
     fig_x = 0.12
     bins = np.linspace(0.5, 1, 21)
     text_x = .42
     axes_f = []
     for i, stim in enumerate(['dmr', 'spon', 'cross']):
-        ax = fig.add_axes([x_start, y_start + i * (fig_y + space_y) , fig_x, fig_y])
+        ax = fig.add_axes([x_start, y_start + i * (fig_y + space_y), fig_x, fig_y])
         axes_f.append(ax)
         sns.histplot(data=df[(df.stim == stim) & df.corr_sig], x='corr', bins=bins,
                      hue="region", palette=[MGB_color[0], A1_color[0]], hue_order=['MGB', 'A1'],
@@ -3514,7 +3341,7 @@ def figure4(datafolder='E:\Congcong\Documents\data\comparison\data-pkl'):
             ax.text(text_x, text_y - 0.03 * ii, '{:.1f}%'.format(ratio * 100),
                     color=eval('{}_color[0]'.format(region)), fontsize=6)
 
-        if i == 0:          
+        if i == 0:
             ax.set_xlabel('|Correlation|')
             ax.set_ylabel('')
         else:
@@ -3522,7 +3349,7 @@ def figure4(datafolder='E:\Congcong\Documents\data\comparison\data-pkl'):
             ax.set_ylabel('')
         if i == 2:
             ax.set_ylabel('Proportion')
-            plt.legend(loc='upper right', labels=['A1', 'MGB'], fontsize=6, fancybox=False, edgecolor='k', 
+            plt.legend(loc='upper right', labels=['A1', 'MGB'], fontsize=6, fancybox=False, edgecolor='k',
                        handletextpad=1, labelspacing=.1, borderpad=.3, bbox_to_anchor=(1, 1.7))
     print('F')
     count = []
@@ -3537,7 +3364,7 @@ def figure4(datafolder='E:\Congcong\Documents\data\comparison\data-pkl'):
             n_ne[ii] = len(corr_sig)
         count.extend(list(n_ne_sig))
         nobs.extend(list(n_ne))
-    
+
     count = np.array(count)
     nobs = np.array(nobs)
     res = proportion.proportions_chisquare(count, nobs)
@@ -3546,28 +3373,28 @@ def figure4(datafolder='E:\Congcong\Documents\data\comparison\data-pkl'):
     _, p_corrected, _, _ = multipletests(np.array([res.pvals_raw[x] for x in [2, 7, 11]]), method='h')
     print(p_corrected)
     for i in range(3):
-         ax = axes_f[i]
-         p = p_corrected[2-i]
-         ax.text(text_x, text_y - 0.03 * 2, 'p = {:.2f}'.format(p), color='k', fontsize=6)
-   
+        ax = axes_f[i]
+        p = p_corrected[2 - i]
+        ax.text(text_x, text_y - 0.03 * 2, 'p = {:.2f}'.format(p), color='k', fontsize=6)
+
     print(res)
-    
+
     fig.text(0, .955, 'A', fontsize=fontsize_panel_label, weight='bold')
     fig.text(0, .55, 'B', fontsize=fontsize_panel_label, weight='bold')
     fig.text(.228, .955, 'C', fontsize=fontsize_panel_label, weight='bold')
     fig.text(.582, .955, 'D', fontsize=fontsize_panel_label, weight='bold')
     fig.text(.582, .46, 'E', fontsize=fontsize_panel_label, weight='bold')
     fig.text(0.823, .955, 'F', fontsize=fontsize_panel_label, weight='bold')
-    
+
     plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig4.jpg', dpi=300)
     plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig4.pdf', dpi=1000)
     plt.close()
- 
-    
-def figure5():
-    figsize = [figure_size[2][0], 11*cm]
+
+
+def figure5(datafolder, figfolder=r'E:\Congcong\Documents\data\comparison\figure\summary'):
+    figsize = [figure_size[2][0], 11 * cm]
     fig, axes = plt.subplots(3, 1, figsize=figsize)
-    
+
     # panel A: number of cNEs identified on real data vs shuffled data
     fig.text(0, 0.96, 'A', fontsize=fontsize_panel_label, weight='bold')
     ax = axes[0]
@@ -3577,13 +3404,11 @@ def figure5():
     pos.x0 = pos.x0 + .02
     pos.x1 = pos.x1 + .079
     ax.set_position(pos)
-    ax.get_yaxis().set_label_coords(-0.1,0.5)
-    plot_num_cne_vs_shuffle(ax)
-    
+    ax.get_yaxis().set_label_coords(-0.1, 0.5)
+    plot_num_cne_vs_shuffle(ax, datafolder)
 
     # panel B: |corr.| distribution of real data and shuffled data
     fig.text(0, 0.6, 'B', fontsize=fontsize_panel_label, weight='bold')
-    datafolder = 'E:\Congcong\Documents\data\comparison\data-summary'
     ne_real = pd.read_json(os.path.join(datafolder, 'cNE_matched.json'))
     ne_shuffled = pd.read_json(os.path.join(datafolder, 'cNE_matched_shuffled.json'))
     bins = np.arange(0, 1.01, 0.05)
@@ -3591,17 +3416,17 @@ def figure5():
     ne_real['region'] = region
     region = ['MGB' if x == 'H31x64' else 'A1' for x in ne_shuffled['probe']]
     ne_shuffled['region'] = region
-    
+
     for i, region in enumerate(('MGB', 'A1')):
-        ax = axes[i+1]
+        ax = axes[i + 1]
         plot_ne_sig_corr_hist(ax, ne_real, ne_shuffled, region, bins)
-        
-        handles, labels = ax.legend_.legendHandles,  ax.legend_.texts
+
+        handles, labels = ax.legend_.legendHandles, ax.legend_.texts
         order = [0, 2, 1, 3]
-        ax.legend([handles[idx] for idx in order],[labels[idx].get_text() for idx in order],
-                  ncol=2, fontsize=6, columnspacing=0.8, 
-                  frameon=False, loc='upper center', bbox_to_anchor=(.1-i*.2,0,1,1.1)) 
-        
+        ax.legend([handles[idx] for idx in order], [labels[idx].get_text() for idx in order],
+                  ncol=2, fontsize=6, columnspacing=0.8,
+                  frameon=False, loc='upper center', bbox_to_anchor=(.1 - i * .2, 0, 1, 1.1))
+
         pos = ax.get_position()
         pos.y0 = pos.y0 - .01
         pos.y1 = pos.y1 - .01
@@ -3611,18 +3436,16 @@ def figure5():
         ax.set_xlabel('')
         if i == 0:
             ax.set_xticklabels([])
-        ax.get_yaxis().set_label_coords(-0.1,0.5)
+        ax.get_yaxis().set_label_coords(-0.1, 0.5)
 
     ax.set_xlabel('|Correlation|')
-    plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig5.jpg', dpi=300)
-    plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig5.tif', dpi=300)
-    plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig5.pdf', dpi=300)
+    plt.savefig(os.path.join(figfolder, 'fig5.jpg'), dpi=300)
+    plt.savefig(os.path.join(figfolder, 'fig5.pdf'), dpi=300)
     plt.close()
 
 
 def figure6():
-    
-    figsize = [figure_size[0][0], 10*cm]
+    figsize = [figure_size[0][0], 10 * cm]
     fig, axes = plt.subplots(3, 4, figsize=figsize)
     stim = 'spon'
     datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
@@ -3635,8 +3458,7 @@ def figure6():
     num_ne_participate(axes[0][2], datafolder, stim=stim, n_neuron_filter=(13, 22))
     # scatter plot of number of cNE vs number of neurons
     ne_freq_span_vs_all_freq_span(axes[0][3], datafolder, stim=stim)
-    
-    
+
     # spacial and frequency distribution
     probe_region = {'H31x64': 'MGB', 'H22x32': 'A1'}
     for i, probe in enumerate(('H31x64', 'H22x32')):
@@ -3649,37 +3471,37 @@ def figure6():
                             fontsize=10, color=eval(f'{region}_color[0]'))
         # cNE span
         print('F')
-        ne_member_span(axes[1][i+2], datafolder, stim=stim, probe=probe, linewidth=1)
+        ne_member_span(axes[1][i + 2], datafolder, stim=stim, probe=probe, linewidth=1)
         axes[1][i + 2].annotate(region, xy=(.5, 1.05), xycoords='axes fraction', ha="center", va="center",
-                            fontsize=10, color=eval(f'{region}_color[0]'))
+                                fontsize=10, color=eval(f'{region}_color[0]'))
         # pairwise frequency difference
         print('G')
         ne_member_freq_distance(axes[2][i], datafolder, stim=stim, probe=probe, linewidth=1)
         # cNE freq span
         print('H')
-        ne_member_freq_span(axes[2][i+2], datafolder, stim=stim, probe=probe, linewidth=1)
+        ne_member_freq_span(axes[2][i + 2], datafolder, stim=stim, probe=probe, linewidth=1)
         if i == 1:
             axes[1][i].set_xlabel('')
-            axes[1][i+2].set_xlabel('')
+            axes[1][i + 2].set_xlabel('')
             axes[2][i].set_xlabel('')
-            axes[2][i+2].set_xlabel('')
+            axes[2][i + 2].set_xlabel('')
         else:
             axes[1][i].xaxis.set_label_coords(1.25, -.22)
-            axes[1][i+2].xaxis.set_label_coords(1.25, -.22)
+            axes[1][i + 2].xaxis.set_label_coords(1.25, -.22)
             axes[2][i].xaxis.set_label_coords(1.25, -.22)
-            axes[2][i+2].xaxis.set_label_coords(1.25, -.22)
+            axes[2][i + 2].xaxis.set_label_coords(1.25, -.22)
 
     for row in axes:
         for ax in row:
             ax.patch.set_alpha(0)
-    
+
     # adjust layout
     y_adjust = [[.08, .0, -.035], [.08, -.02, -.06]]
     x_adjust = [[-.062, -.02, .03, .08], [-.062, -.02, .03, .08]]
     for i in range(4):
         for j in range(3):
             # panel label for the first row
-            
+
             ax = axes[j][i]
             pos = ax.get_position()
             pos.y0 = pos.y0 + y_adjust[0][j]
@@ -3687,12 +3509,12 @@ def figure6():
             pos.x0 = pos.x0 + x_adjust[0][i]
             pos.x1 = pos.x1 + x_adjust[1][i]
             ax.set_position(pos)
-                
+
             if i == 0:
-                ax.get_yaxis().set_label_coords(-0.24,0.5)
+                ax.get_yaxis().set_label_coords(-0.24, 0.5)
             elif j > 0:
                 ax.set_ylabel('')
-            
+
             if j == 0:
                 ax.get_xaxis().set_label_coords(0.5, -.2)
             elif j == 1 and i < 3:
@@ -3703,47 +3525,44 @@ def figure6():
     fig.text(0.24, y_coord, 'B', fontsize=fontsize_panel_label, weight='bold')
     fig.text(0.49, y_coord, 'C', fontsize=fontsize_panel_label, weight='bold')
     fig.text(0.75, y_coord, 'D', fontsize=fontsize_panel_label, weight='bold')
-    fig.text(0,    0.6, 'E', fontsize=fontsize_panel_label, weight='bold')
+    fig.text(0, 0.6, 'E', fontsize=fontsize_panel_label, weight='bold')
     fig.text(0.49, 0.6, 'F', fontsize=fontsize_panel_label, weight='bold')
-    fig.text(0,    0.29, 'G', fontsize=fontsize_panel_label, weight='bold')
+    fig.text(0, 0.29, 'G', fontsize=fontsize_panel_label, weight='bold')
     fig.text(0.49, 0.29, 'H', fontsize=fontsize_panel_label, weight='bold')
-    
+
     plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig6.jpg', dpi=300)
     plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig6.tif', dpi=300)
     plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig6.pdf', dpi=300)
     plt.close()
 
 
-def figure7(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-summary', 
-            figfolder:str=r'E:\Congcong\Documents\data\comparison\figure\summary'):
-    
-    
-    fig = plt.figure(figsize=[figure_size[0][0], 6*cm])
+def figure7(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-summary',
+            figfolder: str = r'E:\Congcong\Documents\data\comparison\figure\summary'):
+    fig = plt.figure(figsize=[figure_size[0][0], 6 * cm])
     y_start = .115
     x_start1 = .05
     x_start2 = .5
     x_fig = .12
-    x_space=.02
+    x_space = .02
     y_fig = .32
-    y_space=.12
-    
-    
+    y_space = .12
+
     # plot example strf
     axes = []
     for i in range(2):
         for j in range(2):
-            axes.append(fig.add_axes([x_start1 + j * (x_fig + x_space), 
-                               y_start + i * (y_fig + y_space),  
-                               x_fig, y_fig]))
+            axes.append(fig.add_axes([x_start1 + j * (x_fig + x_space),
+                                      y_start + i * (y_fig + y_space),
+                                      x_fig, y_fig]))
     axes = np.reshape(axes, [2, 2])
-    
+
     def get_example_data(data, example):
-        example_data = data[(data.exp==example[0]) & (data.region=='MGB') & 
-                            (data.cNE==example[1]) & (data.member==example[2])]
+        example_data = data[(data.exp == example[0]) & (data.region == 'MGB') &
+                            (data.cNE == example[1]) & (data.member == example[2])]
         return example_data
-    
+
     file = os.path.join(datafolder, 'subsample_ne_neuron_example.pkl')
-    try: 
+    try:
         with open(file, 'rb') as f:
             example = pickle.load(f)
     except:
@@ -3798,17 +3617,17 @@ def figure7(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-summary'
                     axes[i][j].set_yticklabels([])
             axes[i][j].spines[['top', 'right']].set_visible(True)
             trans = axes[i][j].get_xaxis_transform()
-            axes[i][j].annotate('PTD = {:.2f}'.format(ptd[j]), xy=(.1, 1.15), xycoords=trans, 
+            axes[i][j].annotate('PTD = {:.2f}'.format(ptd[j]), xy=(.1, 1.15), xycoords=trans,
                                 ha="left", va="center", fontsize=6)
-            axes[i][j].annotate('MI = {:.2f}'.format(mi[j]), xy=(.1, 1.05), xycoords=trans, 
+            axes[i][j].annotate('MI = {:.2f}'.format(mi[j]), xy=(.1, 1.05), xycoords=trans,
                                 ha="left", va="center", fontsize=6)
-            
+
     axes[1][0].set_title('all spikes', pad=15)
     axes[1][1].set_title('ne spikes', pad=15)
-    
+
     # plot population result
-    x_space=[0, .05, .12]
-    y_space=.17
+    x_space = [0, .05, .12]
+    y_space = .17
     data = pd.read_json(os.path.join(datafolder, 'subsample_ne_neuron_summary.json'))
     data = data[data.strf_sig > 0]
     data = data[(data.n_events > 100)]
@@ -3818,9 +3637,9 @@ def figure7(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-summary'
     axes = []
     for i in range(2):
         for j in range(3):
-            axes.append(fig.add_axes([x_start2 + j * x_fig + x_space[j], 
-                               y_start + i * (y_fig + y_space),  
-                               x_fig, y_fig]))
+            axes.append(fig.add_axes([x_start2 + j * x_fig + x_space[j],
+                                      y_start + i * (y_fig + y_space),
+                                      x_fig, y_fig]))
     axes = np.reshape(axes, [2, 3])
     for j, param in enumerate(('mi', 'ptd')):
         gain = {}
@@ -3857,15 +3676,16 @@ def figure7(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-summary'
                 axes[j][i].set_xlabel(xlabel)
                 axes[j][i].set_ylabel(ylabel)
             axes[j][i].xaxis.set_label_coords(1.25, -.22)
-            
+
             gain[region] = (data_tmp[f'{param}_ne_spike'] - data_tmp[f'{param}_neuron']) / data_tmp[f'{param}_neuron']
-            print('gain', region, param, gain[region].median(), gain[region].quantile(.025), gain[region].quantile(.975))
+            print('gain', region, param, gain[region].median(), gain[region].quantile(.025),
+                  gain[region].quantile(.975))
         _, p = stats.mannwhitneyu(gain['MGB'], gain['A1'])
         gain = pd.DataFrame(gain)
         gain.loc[np.isnan(gain.A1), 'A1'] = gain[np.isnan(gain.A1)]['MGB']
         gain.loc[gain.MGB.notnull(), 'MGB'] = 'MGB'
         gain.loc[gain.MGB != 'MGB', 'MGB'] = 'A1'
-        boxplot_scatter(axes[j][2], x='MGB', y='A1', data=gain, hue='MGB', 
+        boxplot_scatter(axes[j][2], x='MGB', y='A1', data=gain, hue='MGB',
                         palette=[MGB_color[0], A1_color[0]], order=['MGB', 'A1'], hue_order=['MGB', 'A1'], size=1)
         if j == 0:
             plot_significance_star(axes[j][2], p, [0, 1], 22, 23, linewidth=.8, fontsize=10)
@@ -3880,22 +3700,24 @@ def figure7(datafolder:str=r'E:\Congcong\Documents\data\comparison\data-summary'
     fig.text(0, y, 'A', fontsize=fontsize_panel_label, weight='bold')
     fig.text(0.4, y, 'B', fontsize=fontsize_panel_label, weight='bold')
     fig.text(0.4, .47, 'C', fontsize=fontsize_panel_label, weight='bold')
-    
+
     plt.savefig(os.path.join(figfolder, 'fig7.jpg'), dpi=1000)
     plt.savefig(os.path.join(figfolder, 'fig7.tif'), dpi=1000)
     plt.savefig(os.path.join(figfolder, 'fig7.pdf'), dpi=1000)
     plt.close()
+
 
 def add_p_val(ax, x, y, p, c='k'):
     if p < 1e-3:
         ax.text(x, y, 'p = {:.1e}'.format(p), color=c, fontsize=6)
     else:
         ax.text(x, y, 'p = {:.3f}'.format(p), color=c, fontsize=6)
-        
+
+
 def figure8():
     data_folder = r'E:\Congcong\Documents\data\comparison\data-pkl\up_down_spon'
     up_down_folder = r'E:\Congcong\Documents\data\comparison\data-pkl\up_down'
-    figsize = [figure_size[1][0], 10*cm]
+    figsize = [figure_size[1][0], 10 * cm]
     fig = plt.figure(figsize=figsize)
     x_start = .075
     y_start = .07
@@ -3903,7 +3725,7 @@ def figure8():
     x_space = .08
     y_fig = .24
     y_space = .1
-    
+
     sd_example = []
     cv_example = []
     # example raster
@@ -3913,12 +3735,12 @@ def figure8():
         up_down = pickle.load(f)
     plot_window = np.array([5e3, 10e3])
     axes = []
-    axes.append(fig.add_axes([x_start, y_start + 1.51 * y_fig + y_space, x_fig, y_fig/2]))
-    axes.append(fig.add_axes([x_start, y_start + y_fig + y_space, x_fig, y_fig/2]))
+    axes.append(fig.add_axes([x_start, y_start + 1.51 * y_fig + y_space, x_fig, y_fig / 2]))
+    axes.append(fig.add_axes([x_start, y_start + y_fig + y_space, x_fig, y_fig / 2]))
     plot_raster_fr_sd_cv(axes, up_down, plot_window)
     sd_example.append(up_down['silence_density_spon'].mean())
     cv_example.append(up_down['spkcount_cv_spon'].mean())
-    
+
     # weak up/down
     example_file = '210603_201616-site2-4800um-20db-dmr-32min-H31x64-fs20000-up_down.pkl'
     with open(os.path.join(up_down_folder, example_file), 'rb') as f:
@@ -3926,9 +3748,9 @@ def figure8():
     plot_window = np.array([3e3, 8e3])
     axes = []
     # raster [0]
-    axes.append(fig.add_axes([x_start + x_fig + .5 * x_space, y_start + 1.51 * y_fig + y_space, x_fig, y_fig/2]))
+    axes.append(fig.add_axes([x_start + x_fig + .5 * x_space, y_start + 1.51 * y_fig + y_space, x_fig, y_fig / 2]))
     # firing rate [1]
-    axes.append(fig.add_axes([x_start + x_fig + .5 * x_space, y_start + y_fig + y_space, x_fig, y_fig/2]))
+    axes.append(fig.add_axes([x_start + x_fig + .5 * x_space, y_start + y_fig + y_space, x_fig, y_fig / 2]))
     plot_raster_fr_sd_cv(axes, up_down, plot_window)
     axes[0].set_ylabel('')
     axes[1].set_ylabel('')
@@ -3936,28 +3758,25 @@ def figure8():
     sd_example.append(up_down['silence_density_spon'].mean())
     cv_example.append(up_down['spkcount_cv_spon'].mean())
 
-    
     # strong up/down
     example_file = '210119_222752-site2-4800um-20db-dmr-30min-H31x64-fs20000-up_down.pkl'
     with open(os.path.join(up_down_folder, example_file), 'rb') as f:
         up_down = pickle.load(f)
     plot_window = np.array([4.5e3, 9.5e3])
     axes = []
-    axes.append(fig.add_axes([x_start + x_fig + .5 * x_space, y_start + 2.51 * y_fig + 2 * y_space, x_fig, y_fig/2]))
-    axes.append(fig.add_axes([x_start + x_fig + .5 * x_space, y_start + 2 * y_fig + 2 * y_space, x_fig, y_fig/2]))
+    axes.append(fig.add_axes([x_start + x_fig + .5 * x_space, y_start + 2.51 * y_fig + 2 * y_space, x_fig, y_fig / 2]))
+    axes.append(fig.add_axes([x_start + x_fig + .5 * x_space, y_start + 2 * y_fig + 2 * y_space, x_fig, y_fig / 2]))
     plot_raster_fr_sd_cv(axes, up_down, plot_window)
     axes[0].set_ylabel('')
     axes[1].set_ylabel('')
     axes[1].set_yticklabels([])
     sd_example.append(up_down['silence_density_spon'].mean())
     cv_example.append(up_down['spkcount_cv_spon'].mean())
-    
-    
+
     # scatter plot of cv vs sd
     ax = fig.add_axes([x_start, y_start + 2 * y_fig + 2 * y_space, x_fig, y_fig])
     plot_cv_vs_sd(ax, example=[sd_example, cv_example])
-    
-    
+
     # example cNE spikes and shade
     example_file = '210610_163054-site1-5000um-20db-dmr-31min-H31x64-fs20000-up_down.pkl'
     with open(os.path.join(data_folder, example_file), 'rb') as f:
@@ -3970,20 +3789,20 @@ def figure8():
         session = pickle.load(f)
     cne_idx = 0
     axes = []
-    axes.append(fig.add_axes([x_start, y_start, x_fig * 2 + x_space, y_fig/2]))
-    axes.append(fig.add_axes([x_start, y_start + y_fig/2, x_fig * 2 + x_space, y_fig/2]))
+    axes.append(fig.add_axes([x_start, y_start, x_fig * 2 + x_space, y_fig / 2]))
+    axes.append(fig.add_axes([x_start, y_start + y_fig / 2, x_fig * 2 + x_space, y_fig / 2]))
     plot_up_ne_spikes(axes, session, ne, up_down, cne_idx, plot_window=[775000, 785000])
-    
+
     # box plot of event percentage in hiAct
-    ax = fig.add_axes([x_start + 2* x_fig + 2 * x_space, y_start + 2 * y_fig + 1.5 * y_space, x_fig, y_fig])
+    ax = fig.add_axes([x_start + 2 * x_fig + 2 * x_space, y_start + 2 * y_fig + 1.5 * y_space, x_fig, y_fig])
     plot_ne_event_up_percent(ax)
-    
+
     # scatter plot of 
-    ax = fig.add_axes([x_start + 2* x_fig + 2 * x_space, y_start + y_fig + y_space, x_fig, y_fig])
+    ax = fig.add_axes([x_start + 2 * x_fig + 2 * x_space, y_start + y_fig + y_space, x_fig, y_fig])
     plot_ne_spike_prob_up_vs_all(ax)
-    
+
     # histogram og correlation
-    ax = fig.add_axes([x_start + 2* x_fig + 2 * x_space, y_start , x_fig, y_fig])
+    ax = fig.add_axes([x_start + 2 * x_fig + 2 * x_space, y_start, x_fig, y_fig])
     datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl\up_down_spon'
     files = glob.glob(datafolder + r'\*ne-20dft-spon_up.pkl', recursive=False)
     corr = []
@@ -4000,18 +3819,18 @@ def figure8():
     corr = np.concatenate(corr)
     region = np.concatenate(region)
     bins = np.arange(0, 1.01, .025)
-    bar_A1, _ = np.histogram(corr[region==0], bins)
-    bar_MGB, _ = np.histogram(corr[region==1], bins)
+    bar_A1, _ = np.histogram(corr[region == 0], bins)
+    bar_MGB, _ = np.histogram(corr[region == 1], bins)
     centers = (bins[1:] + bins[:-1]) / 2
     ax.bar(centers, bar_MGB, color=MGB_color[0], width=.025, edgecolor='k', linewidth=.5)
     ax.bar(centers, bar_A1, bottom=bar_MGB, color=A1_color[0], width=.025, edgecolor='k', linewidth=.5)
-    ax.legend(['MGB (n={})'.format(np.sum(bar_MGB)), 'A1 (n={})'.format(np.sum(bar_A1))], 
+    ax.legend(['MGB (n={})'.format(np.sum(bar_MGB)), 'A1 (n={})'.format(np.sum(bar_A1))],
               fontsize=6, handletextpad=1, labelspacing=.1, borderpad=.3,
               fancybox=False, edgecolor='black', loc='upper left')
     ax.set_xlabel('|Correlation|')
     ax.set_ylabel('# of cNEs')
-    print('MGB: ', np.mean(corr[region==1]), np.std(corr[region==1]))
-    print('A1: ', np.mean(corr[region==0]), np.std(corr[region==0]))
+    print('MGB: ', np.mean(corr[region == 1]), np.std(corr[region == 1]))
+    print('A1: ', np.mean(corr[region == 0]), np.std(corr[region == 0]))
     ax.set_xlim([.5, 1])
 
     fig.text(0, .965, 'A', fontsize=fontsize_panel_label, weight='bold')
@@ -4027,12 +3846,12 @@ def figure8():
     plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig8.tif', dpi=300)
     plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig8.pdf', dpi=300)
     plt.close()
-    
+
 
 def get_taxis_faxis():
     file = (r'E:\Congcong\Documents\data\comparison\data-pkl' +
-        r'\191126_211411-site5-5214um-20db-dmr-16min-H31x64-fs20000.pkl')
+            r'\191126_211411-site5-5214um-20db-dmr-16min-H31x64-fs20000.pkl')
     with open(file, 'rb') as f:
         session = pickle.load(f)
     unit = session.units[0]
-    return unit.strf_taxis, unit.strf_faxis      
+    return unit.strf_taxis, unit.strf_faxis
