@@ -398,7 +398,7 @@ class Session:
             return np.array([]), np.array([])
         
         
-        if type(spktrain) == np.array and spktrain.ndim == 2:
+        if type(spktrain) == np.ndarray and spktrain.ndim == 2:
             spktrain = np.array([spktrain])
             edges = np.array([edges])
         # down sample spktrain
@@ -1227,5 +1227,3 @@ def ne_neuron_subsample_combine(datafolder='E:\Congcong\Documents\data\compariso
             # get ri mean
             subsample_ri[rf+ri+'_mean'] =  subsample_ri[rf+ri].apply(np.nanmean)
 
-
-        

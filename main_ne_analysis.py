@@ -169,6 +169,10 @@ netools.get_split_ne_df(files, savefolder)
 files = glob.glob(datafolder + r'\*sub10.pkl', recursive=False)
 netools.get_split_ne_null_df(files, savefolder)
 
+# -------------------------------get frequency span of cNEs on each block ----------------------------------------
+datafolder = r'/Users/hucongcong/Documents/UCSF/data/summary'
+savefolder = r'/Users/hucongcong/Documents/UCSF/data/summary'
+netools.get_split_ne_freq_span(datafolder, savefolder)
 
 # ++++++++++++++++++++++++++++++++++++ cNE significanc: data shuffling  +++++++++++++++++++++++++++++++++++++++++++++++
 # ------------------------------------ get cNEs and number of cNEs from shuffled data ---------------------------------
@@ -265,6 +269,17 @@ for idx, file in enumerate(files):
         pickle.dump(ne_dmr, output)
 
 
+# --------------------- save significance of pattern correlation for shuffled data -------------------------------------
+datafolder = r'/Users/hucongcong/Documents/UCSF/data/summary'
+ne_real = pd.read_json(os.path.join(datafolder, 'cNE_matched.json'))
+ne_shuffled = pd.read_json(os.path.join(datafolder, 'cNE_matched_shuffled.json'))
+corr_thresh = ne_real[['exp', 'probe', 'depth', 'corr_thresh']]
+corr_thresh = corr_thresh.drop_duplicates()
+ne_shuffled = pd.merge(ne_shuffled, corr_thresh,  how='left', on=['exp', 'probe', 'depth'])
+ne_shuffled['corr_sig'] = ne_shuffled['pattern_corr'] > ne_shuffled['corr_thresh']
+ne_shuffled.to_json(os.path.join(datafolder, 'cNE_matched_shuffled.json'))
+
+
 # ++++++++++++++++++++++++++++++++++++++++++++++ cNE stim response ++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ----------------------------------------- get cNE stimulus responses ---------------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
@@ -342,15 +357,29 @@ for idx, file in enumerate(files):
                 ne.save_pkl_file(savefile_path)
 
 # ------------------------------------------- match cNE patterns in each recording -------------------------------------
-datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
-files = glob.glob(datafolder + r'\*320dft-dmr.pkl', recursive=False)
-dfs = np.array([160, 80, 40, 20, 10, 5, 2])*2
+# match cNE patterns to 10ms bin
+stim = 'spon'
+datafolder = r'/Users/hucongcong/Documents/UCSF/data/data-pkl-binsize/{}'.format(stim)
+files = glob.glob(datafolder + r'/*-20dft-{}.pkl'.format(stim), recursive=False)
+dfs = np.array([2, 5, 10, 20, 40, 80, 160])*2
 for idx, file in enumerate(files):
+    print(r'{}/{} Matching time bins for {}'.format(idx+1, len(files), file))
     ic_matched = netools.ICweight_match_binsize(datafolder, file, dfs)
-    savefile = re.sub('dmr.pkl', 'dmr-ic_match_tbins.pkl', file)
+    savefile = re.sub(f'{stim}.pkl', f'{stim}-ic_match_tbins.pkl', file)
     with open(savefile, 'wb') as f:
         pickle.dump(ic_matched, f)
 
+# -------------------------------------------- data summary saved to dataframe -----------------------------------------
+datafolder = r'/Users/hucongcong/Documents/UCSF/data/data-pkl-binsize'
+savefolder = r'/Users/hucongcong/Documents/UCSF/data/summary'
+dfs = np.array([2, 5, 20, 40, 80, 160])*2
+netools.batch_save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, dfs)
+
+# ------------------------------------get ccg of members identified under diffrent bin sizes ---------------------------
+datafolder = r'/Users/hucongcong/Documents/UCSF/data/data-pkl-binsize'
+jsonfile = r'/Users/hucongcong/Documents/UCSF/data/summary/icweight_corr_binsize.json'
+df_ref = 20
+netools.batch_save_icweight_ccg_binsize(datafolder, jsonfile, savefolder, df_ref)
 
 # ++++++++++++++++++++++++++++++++++++++++++++++ cNE and UP/DOWN states ++++++++++++++++++++++++++++++++++++++++++
 # ---------------------------------------------get up.down spikes ------------------------------------------------

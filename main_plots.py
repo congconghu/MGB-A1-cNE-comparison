@@ -62,7 +62,7 @@ figpath = r'E:\Congcong\Documents\data\comparison\figure\cNE-construction'
 files = glob.glob(datafolder + r'\*20dft-dmr.pkl', recursive=False)
 
 for idx, file in enumerate(files):
-    print('({}/{}) plot 5ms STRFs for {}'.format(idx+1, len(files), file))
+    print('({}/{}) plot 5ms STRFs for {}'.format(idx + 1, len(files), file))
     with open(file, 'rb') as f:
         ne = pickle.load(f)
     plots.plot_ne_construction(ne, figpath)
@@ -135,7 +135,6 @@ xcorr = pd.read_json(os.path.join(datafolder, 'member_nonmember_pair_xcorr.json'
 xcorr['xcorr'] = xcorr['xcorr'].apply(lambda x: np.array(x))
 plots.plot_xcorr(xcorr)
 
-
 # +++++++++++++++++++++++++++++++++++++++ split cNE: spon/dmr stability +++++++++++++++++++++++++++++++++++++++++++++++
 # -------------------------------plot ICweight correlation and matching ICs for split cNEs-----------------------------
 datafolder = r'/Users/hucongcong/Documents/UCSF/data/data-pkl'
@@ -162,6 +161,26 @@ for idx, file in enumerate(files):
     figure_path = os.path.join(figure_folder, re.sub('pkl', 'jpg', filename))
     plots.plot_ne_split_ic_weight_null_corr(ne_split, figure_path)
 
+# ---------------------------------- number of members / freq span  on adjacent blocks --------------------------------
+jsonfile = r'/Users/hucongcong/Documents/UCSF/data/summary/split_cNE.json'
+figfolder = r'/Users/hucongcong/Documents/UCSF/data/figure/split'
+fig = plt.figure()
+ax = fig.add_axes([.1, .1, .8, .8])
+for property in ('freq_span', 'nmember'):
+    for probe in ('H31x64', 'H22x32'):
+        plots.plot_box_split_cNE_properties(ax, jsonfile, probe, property=property)
+        fig.savefig(os.path.join(figfolder, f'cNE_split_{property}_{probe}.jpg'))
+        ax.clear()
+
+# -------------------------------------------- proportion of strf+ members  ------------------------------------
+datafolder = r'/Users/hucongcong/Documents/UCSF/data/summary'
+figfolder = r'/Users/hucongcong/Documents/UCSF/data/figure/split'
+fig = plt.figure()
+ax = fig.add_axes([.1, .1, .8, .8])
+for probe in ('H31x64', 'H22x32'):
+    plots.plot_extra_member_strf_sig(ax, datafolder, probe)
+    fig.savefig(os.path.join(figfolder, f'cNE_split_strtf_sig_proportion_{probe}.jpg'))
+    ax.clear()
 
 # ++++++++++++++++++++++++++++++++++++++++++++++cNE significance ++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ----------------------------------------plot umber of cNEs in real and shuffled data ------------------
@@ -169,7 +188,6 @@ fig = plt.figure()
 ax = fig.add_axes([.1, .1, .8, .8])
 plots.plot_num_cne_vs_shuffle(ax)
 fig.savefig(r'E:\Congcong\Documents\data\comparison\figure\num_cNE_real_vs_shuffle.jpg', dpi=300)
-
 
 # +++++++++++++++++++++++++++++++++++++++ cNE stimulus encoding +++++++++++++++++++++++++++++++++++++++++++++++
 # ------------------------------percentage of stimulus encoding units------------------------------
@@ -188,7 +206,7 @@ for idx, file in enumerate(files):
     with open(file, 'rb') as f:
         ne = pickle.load(f)
     plots.plot_ne_member_strf_crh_nonlinearity(ne, figpath)
-    
+
 # ------------------------------ plot strf, crh and nonlinearity of subsampled spikes------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-summary\subsample'
 figpath = r'E:\Congcong\Documents\data\comparison\figure\cNE-strf-crh-nonlinearity-subsampled'
@@ -199,12 +217,12 @@ for idx, file in enumerate(files):
     with open(file, 'rb') as f:
         ne = pickle.load(f)
     plots.plot_ne_member_strf_crh_nonlinearity_subsample(ne, figpath)
-    
+
 # ++++++++++++++++++++++++++++++++++++++++++++++ cNE stability across binsize ++++++++++++++++++++++++++++++++++++++++++
-# -------------------------------------------- plot cNE under different binsizes ----------------------------------------
-datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
-figpath = r'E:\Congcong\Documents\data\comparison\figure\cNE-binsize-stability'
-files = glob.glob(datafolder + r'\*dmr-ic_match_tbins.pkl', recursive=False)
+# -------------------------------------------- plot cNE under different binsizes ---------------------------------------
+datafolder = r'/Users/hucongcong/Documents/UCSF/data/data-pkl-binsize/spon'
+figpath = r'/Users/hucongcong/Documents/UCSF/data/figure/icweight_binsize'
+files = glob.glob(datafolder + r'/*H31x64*spon-ic_match_tbins.pkl', recursive=False)
 
 for idx, file in enumerate(files):
     print('({}/{}) plot matched ICweight for {}'.format(idx, len(files), file))
@@ -213,44 +231,59 @@ for idx, file in enumerate(files):
     namebase = file[:-4]
     namebase = os.path.join(figpath, re.findall('\d{6}_\d{6}.*', namebase)[0])
     plots.plot_icweight_match_binsize(ic_matched, namebase)
-    
+
 # -------------------------------------------- plot number of matched cNE ----------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 figfolder = r'E:\Congcong\Documents\data\comparison\figure\cNE-binsize-stability'
 plots.plot_icweight_match_binsize_summary(datafolder, figfolder)
-    
-    
-# ++++++++++++++++++++++++++++++++++++++++++++++ UP/DOWN state ++++++++++++++++++++++++++++++++++++++++++
-# -------------------------------------------- plot cNE under different binsizes ----------------------------------------
+
+# ------------------------------violin plot of ccorrelation / ovelapping prc vs binszie ---------------------
+jsonfile = r'/Users/hucongcong/Documents/UCSF/data/summary/icweight_corr_binsize.json'
+figfolder = r'/Users/hucongcong/Documents/UCSF/data/figure/icweight_binsize'
+fig = plt.figure()
+ax = fig.add_axes([.1, .1, .8, .8])
+for property in ('corr', 'member_overlap_prc', 'member_overlap_prc_ref', 'member_overlap_prc_all'):
+    for stim in ('spon', 'dmr'):
+        plots.plot_icweight_corr_vs_binsize_summary(ax, stim, jsonfile, property)
+        fig.savefig(os.path.join(figfolder, f'{property}_vs_binszie-{stim}.jpg'))
+        ax.clear()
+
+# -------------------------------------------- ccg of members in different binsize ------------------------------------
+jsonfile = r'/Users/hucongcong/Documents/UCSF/data/summary/member_pair_ccg_binsize.json'
+figfolder = r'/Users/hucongcong/Documents/UCSF/data/figure/icweight_binsize'
+dfs = [4, 10, 40, 80, 160, 320]
+for df in dfs:
+    for stim in ('spon', 'dmr'):
+        for probe in ('H31x64', 'H22x32'):
+            fig, axes = plt.subplots(1, 3, sharey=True, figsize=[6, 2])
+            plots.plot_member_ccg_binsize(axes, jsonfile, figfolder, df, stim, probe)
+            fig.savefig(os.path.join(figfolder, f'{stim}-{probe}-{df}-member_ccg.jpg'), dpi=300)
+            plt.close()
+
+# ++++++++++++++++++++++++++++++++++++++++++++++ UP/DOWN state ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# -------------------------------------------- plot cNE under different binsizes ---------------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
 figfolder = r'E:\Congcong\Documents\data\comparison\figure\up_down\ne_spikes'
 files = glob.glob(datafolder + r'\*-20dft-dmr.pkl', recursive=False)
 for idx, file in enumerate(files):
-    
     with open(file, 'rb') as f:
         ne = pickle.load(f)
-    
+
     session = ne.get_session_data()
     up_down = ne.get_up_down_data(datafolder)
-    
+
     plots.plot_raster_fr_prob(session, ne, up_down, figfolder)
 
 # percent of events in up-state
 fig = plt.figure()
 ax = fig.add_axes([.1, .1, .8, .8])
 plots.plot_ne_event_up_percent(ax)
-plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\up_down\ne_event_up_percent.jpg', dpi=300, bbox_inches = 'tight')
+plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\up_down\ne_event_up_percent.jpg', dpi=300,
+            bbox_inches='tight')
 
 # percent of spikes in up_state
 fig = plt.figure()
 ax = fig.add_axes([.1, .1, .8, .8])
 plots.plot_ne_spike_prob_up_vs_all(ax)
-plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\up_down\up_percent_ne_vs_all.jpg', dpi=300, bbox_inches = 'tight')
-
-    
-    
-    
-    
-    
-    
-    
+plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\up_down\up_percent_ne_vs_all.jpg', dpi=300,
+            bbox_inches='tight')

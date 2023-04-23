@@ -1,3 +1,4 @@
+import itertools
 import re
 import glob
 import os
@@ -99,8 +100,8 @@ def get_binned_spiketimes(spiketimes, edges):
         edges = [edges]
     for edge in edges:
         edge = edge.flatten()
-        for i in range(len(edge)-1):
-            spiketimes_binned.append(spiketimes[(spiketimes >= edge[i]) & (spiketimes < edge[i+1])])
+        for i in range(len(edge) - 1):
+            spiketimes_binned.append(spiketimes[(spiketimes >= edge[i]) & (spiketimes < edge[i + 1])])
     return spiketimes_binned
 
 
@@ -168,11 +169,13 @@ def get_member_nonmember_xcorr(files, df=2, maxlag=200):
     xcorr = pd.DataFrame(xcorr)
     return xcorr
 
+
 def get_member_pairs(ne):
     member_pairs = set()
     for members in ne.ne_members.values():
         member_pairs.update(set(combinations(members, 2)))
     return member_pairs
+
 
 # ------------ get cNE on split activities and related analysis of dmr/spon stability ------------------------
 def get_split_ne_ic_weight_match(ne_split):
@@ -322,11 +325,12 @@ def get_split_ne_df(files, savefolder):
         region = 'A1' if probe == 'H22x32' else 'MGB'
         with open(file, 'rb') as f:
             ne_split = pickle.load(f)
-        
+
         new_rows = get_matching_patterns_for_df(ne_split, exp, probe, region)
         ne = pd.concat([ne, new_rows], ignore_index=True)
-        
+
     ne.to_json(os.path.join(savefolder, 'split_cNE.json'))
+
 
 def get_matching_patterns_for_df(ne_split, exp, probe, region):
     ne = pd.DataFrame(columns=['exp', 'probe', 'region', 'stim', 'dmr_first', 'idx1', 'idx2',
@@ -344,39 +348,62 @@ def get_matching_patterns_for_df(ne_split, exp, probe, region):
                 corr = ne_split['corr_mat'][i + n_ne_dmr, i + n_ne_dmr]
             new_row = pd.DataFrame({'exp': exp, 'probe': probe, 'region': region, 'stim': stim,
                                     'dmr_first': ne_split['dmr_first'], 'idx1': idx1, 'idx2': idx2,
-                                    'pattern1': [ne_split[stim+'0'].patterns[idx1]],
-                                    'pattern2': [ne_split[stim+'1'].patterns[idx2]],
+                                    'pattern1': [ne_split[stim + '0'].patterns[idx1]],
+                                    'pattern2': [ne_split[stim + '1'].patterns[idx2]],
                                     'corr': corr, 'corr_thresh': ne_split['corr_thresh'][stim]})
             ne = pd.concat([ne, new_row], ignore_index=True)
-    
+
     # get matching cNE patterns cross stimulus conditions
     n_ne = min([n_ne_dmr, len(ne_split['order']['spon'][0])])
     for i in range(n_ne):
         if ne_split['dmr_first']:
-             # dmr1
-             idx1 = ne_split['order']['dmr'][1][i]
-             pattern1 = [ne_split['dmr1'].patterns[idx1]]
-             # spon0
-             idx2 = ne_split['order']['spon'][0][i]
-             pattern2 = [ne_split['spon0'].patterns[idx2]]
-             corr = ne_split['corr_mat'][n_ne_dmr + i, i]
+            # dmr1
+            idx1 = ne_split['order']['dmr'][1][i]
+            pattern1 = [ne_split['dmr1'].patterns[idx1]]
+            # spon0
+            idx2 = ne_split['order']['spon'][0][i]
+            pattern2 = [ne_split['spon0'].patterns[idx2]]
+            corr = ne_split['corr_mat'][n_ne_dmr + i, i]
         else:
-             # spon1
-             idx1 = ne_split['order']['spon'][1][i]
-             pattern1 = [ne_split['spon1'].patterns[idx1]]
-             # dmr0
-             idx2 = ne_split['order']['dmr'][0][i]
-             pattern2 = [ne_split['dmr0'].patterns[idx2]]
-             corr = ne_split['corr_mat'][i, n_ne_dmr + i]
+            # spon1
+            idx1 = ne_split['order']['spon'][1][i]
+            pattern1 = [ne_split['spon1'].patterns[idx1]]
+            # dmr0
+            idx2 = ne_split['order']['dmr'][0][i]
+            pattern2 = [ne_split['dmr0'].patterns[idx2]]
+            corr = ne_split['corr_mat'][i, n_ne_dmr + i]
 
         new_row = pd.DataFrame({'exp': exp, 'probe': probe, 'region': region, 'stim': 'cross',
-                                 'dmr_first': ne_split['dmr_first'], 'idx1': idx1, 'idx2': idx2,
-                                 'pattern1': pattern1, 'pattern2': pattern2,
-                                 'corr': corr,
-                                 'corr_thresh': ne_split['corr_thresh']['cross']})
+                                'dmr_first': ne_split['dmr_first'], 'idx1': idx1, 'idx2': idx2,
+                                'pattern1': pattern1, 'pattern2': pattern2,
+                                'corr': corr,
+                                'corr_thresh': ne_split['corr_thresh']['cross']})
         ne = pd.concat([ne, new_row], ignore_index=True)
     return ne
-    
+
+
+def get_split_ne_freq_span(datafolder, savefolder):
+    ne_split = pd.read_json(os.path.join(datafolder, 'split_cNE.json'))
+    su = pd.read_json(os.path.join(datafolder, 'single_units.json'))
+    su = su[su.strf_sig]
+    for i in range(1, 3):
+        freq_span = []
+        for j in range(len(ne_split)):
+            ne = ne_split.iloc[j]
+            su_tmp = su[(su.exp == ne.exp) & (su.probe == ne.probe)]
+            members = eval(f'ne.member{i}')
+            freqs = []
+            for member in members:
+                try:
+                    freqs.append(su_tmp[su_tmp['index'] == member].bf.item())
+                except:
+                    continue
+            try:
+                freq_span.append(np.log2(np.max(freqs) / np.min(freqs)))
+            except:
+                freq_span.append(None)
+        ne_split['freq_span' + str(i)] = freq_span
+    ne_split.to_json(os.path.join(savefolder, 'split_cNE.json'))
 def sub_sample_split_ne(files, savefolder, n_neuron=10, n_sample=10):
     rand.seed(0)
     for i, file in enumerate(files):
@@ -388,13 +415,13 @@ def sub_sample_split_ne(files, savefolder, n_neuron=10, n_sample=10):
         elif not hasattr(session, 'spktrain_spon'):
             continue
 
-        print('({}/{}) get split cNEs {}'.format(i+1, len(files), file))
+        print('({}/{}) get split cNEs {}'.format(i + 1, len(files), file))
         spktrain_dmr = deepcopy(session.spktrain_dmr)
         spktrain_spon = deepcopy(session.spktrain_spon)
 
         ne_split_subsample = []
         for sample in range(n_sample):
-            print('{}/{}'.format(sample+1, n_sample))
+            print('{}/{}'.format(sample + 1, n_sample))
             new_idx = rand.sample(range(len(session.units)), n_neuron)
             session.spktrain_dmr = spktrain_dmr[new_idx]
             session.spktrain_spon = spktrain_spon[new_idx]
@@ -413,9 +440,10 @@ def sub_sample_split_ne(files, savefolder, n_neuron=10, n_sample=10):
         with open(savename, 'wb') as output:
             pickle.dump(ne_split_subsample, output, pickle.HIGHEST_PROTOCOL)
 
+
 def get_split_ne_null_df(files, savefolder):
     ne_null = pd.DataFrame(columns=['exp', 'probe', 'region', 'stim', 'dmr_first', 'idx1', 'idx2',
-                               'pattern1', 'pattern2', 'corr', 'corr_thresh'])
+                                    'pattern1', 'pattern2', 'corr', 'corr_thresh'])
     for idx, file in enumerate(files):
         print('({}/{}) get null split cNE patterns for {}'.format(idx + 1, len(files), file))
         exp = re.findall('\d{6}_\d{6}', file)[0]
@@ -423,13 +451,14 @@ def get_split_ne_null_df(files, savefolder):
         region = 'A1' if probe == 'H22x32' else 'MGB'
         with open(file, 'rb') as f:
             ne_split_null = pickle.load(f)
-        
+
         for ne_split in ne_split_null:
             new_rows = get_matching_patterns_for_df(ne_split, exp, probe, region)
             ne_null = pd.concat([ne_null, new_rows], ignore_index=True)
-        
+
     ne_null.to_json(os.path.join(savefolder, 'split_cNE_null.json'))
-            
+
+
 # ---------------------------------------- single unit properties -----------------------------------------------------
 
 
@@ -453,8 +482,8 @@ def calc_crh(spktrain, stim):
     df = smfaxis[1] - smfaxis[0]
     edges_smf = np.append(smfaxis - df / 2, smfaxis[-1] + df / 2)
     crh, _, _ = np.histogram2d(smf, tmf, [edges_smf, edges_tmf])
-    crh[0][:len(tmfaxis)//2] = crh[0][::-1][:len(tmfaxis)//2]/2
-    crh[0][len(tmfaxis) // 2 + 1:] =  crh[0][len(tmfaxis) // 2 + 1:] / 2
+    crh[0][:len(tmfaxis) // 2] = crh[0][::-1][:len(tmfaxis) // 2] / 2
+    crh[0][len(tmfaxis) // 2 + 1:] = crh[0][len(tmfaxis) // 2 + 1:] / 2
 
     return crh, tmfaxis, smfaxis
 
@@ -507,7 +536,7 @@ def calc_crh_ri(spktrain, stim, method='block', n_block=10, n_sample=1000):
         nt_block = nt // n_block
         for i in range(n_block):
             spktrain_tmp = np.empty(spktrain.shape)
-            spktrain_tmp[i * nt_block: (i + 1) * nt_block] =  spktrain[i * nt_block : (i + 1) * nt_block]
+            spktrain_tmp[i * nt_block: (i + 1) * nt_block] = spktrain[i * nt_block: (i + 1) * nt_block]
             crh_tmp, _, _ = calc_crh(spktrain_tmp, stim)
             crh.append(crh_tmp)
         crh = np.array(crh)
@@ -550,7 +579,7 @@ def calc_strf_properties(strf, taxis, faxis, sigma_y=2, sigma_x=1):
 def calc_crh_properties(crh, tmfaxis, smfaxis):
     tmf = np.sum(crh, axis=0)
     smf = np.sum(crh, axis=1)
-    
+
     # upsample tmf and smf
     tmf_u = scipy.interpolate.interp1d(tmfaxis, tmf, kind='cubic')
     smf_u = scipy.interpolate.interp1d(smfaxis, smf, kind='cubic')
@@ -560,7 +589,7 @@ def calc_crh_properties(crh, tmfaxis, smfaxis):
     x = np.linspace(smfaxis[0], smfaxis[-1], 1000)
     smf_u = smf_u(x)
     bsmf = x[smf_u.argmax()]
-    
+
     return btmf, bsmf
 
 
@@ -569,87 +598,84 @@ def calc_strf_ptd(strf, nspk):
 
 
 def moran_i(mat, diagopt=True):
-    
     weightmat = create_spatial_autocorr_weight_mat(*mat.shape, diagopt=diagopt)
     N = mat.size
     W = weightmat.sum()
-    
+
     # Calculate denominator
     xbar = mat.mean()
     dvec = mat - xbar
     dvec = dvec.flatten()
     deno = np.multiply(dvec, dvec).sum()
-    
+
     # Calculate numerator
     numer = 0
     i, j = np.where(weightmat)
-    
+
     for m, n in zip(i, j):
         numer += dvec[m] * dvec[n]
     return (N / W) * (numer / deno)
 
 
 def create_spatial_autocorr_weight_mat(nrows, ncols, diagopt=True):
-    eq = [lambda i,j: np.array([i-1, j]), 
-          lambda i,j: np.array([i+1, j]),
-          lambda i,j: np.array([i, j-1]), 
-          lambda i,j: np.array([i, j+1])]
+    eq = [lambda i, j: np.array([i - 1, j]),
+          lambda i, j: np.array([i + 1, j]),
+          lambda i, j: np.array([i, j - 1]),
+          lambda i, j: np.array([i, j + 1])]
     if diagopt:
-        eq.extend([lambda i,j: np.array([i-1, j-1]), 
-                   lambda i,j: np.array([i+1, j-1]),
-                   lambda i,j: np.array([i-1, j+1]), 
-                   lambda i,j: np.array([i+1, j+1])])
-    
+        eq.extend([lambda i, j: np.array([i - 1, j - 1]),
+                   lambda i, j: np.array([i + 1, j - 1]),
+                   lambda i, j: np.array([i - 1, j + 1]),
+                   lambda i, j: np.array([i + 1, j + 1])])
+
     nele = nrows * ncols;
     weightmat = np.zeros((nele, nele))
     # single index
-    
+
     for j in range(ncols):
         for i in range(nrows):
-            
             # apply all equations to find 2d-indices of contiguous pixels
             rcidx = [func(i, j) for func in eq]
             # keep only indices within range
             rcidx = [[x, y] for [x, y] in rcidx if x >= 0 and x < nrows and y >= 0 and y < ncols]
             # get 1d-indices from 2d
             idx = [np.ravel_multi_index(x, [nrows, ncols]) for x in rcidx]
-            
+
             weightmat[i * nrows + j, idx] = 1
     return weightmat
-            
+
 
 def calc_strf_nonlinearity(strf, spktrain, stim):
-    
     if strf.ndim == 3:
         strf = np.sum(strf, axis=0)
     ntbins = strf.shape[-1]
     similarity_null = get_strf_proj_xprior(strf, stim)
-    
+
     sd = similarity_null.std()
     m = similarity_null.mean()
     similarity_null = (similarity_null - m) / sd
-    
+
     edge_min = np.round(similarity_null.min()) - .5
     edge_max = np.round(similarity_null.max()) + .5
-    edges = np.arange(edge_min, edge_max+0.5)
-    centers = (edges[:-1] + edges[1:])/2
-    t, _ = np.histogram(similarity_null, edges) 
-    t = t * 5e-3 # time of each sd bin in s
-    
-    similarity_spk = similarity_null[spktrain[ntbins-1:] > 0]
+    edges = np.arange(edge_min, edge_max + 0.5)
+    centers = (edges[:-1] + edges[1:]) / 2
+    t, _ = np.histogram(similarity_null, edges)
+    t = t * 5e-3  # time of each sd bin in s
+
+    similarity_spk = similarity_null[spktrain[ntbins - 1:] > 0]
     nspk, _ = np.histogram(similarity_spk, edges)
-    
+
     fr = np.divide(nspk, t)
     fr_mean = nspk.sum() / t.sum()
-    
+
     idx0 = np.where(centers == 0)[0][0]
-    fr_l = fr[:idx0].sum() 
-    fr_r = fr[idx0+1:].sum() 
+    fr_l = fr[:idx0].sum()
+    fr_r = fr[idx0 + 1:].sum()
     asi = (fr_r - fr_l) / (fr_r + fr_l)
-    nonlinearity = {'si_null': similarity_null, 'si_spk': similarity_spk, 
-                    'centers': centers, 't_bins': t, 'nspk_bins': nspk, 
-                    'fr':fr, 'fr_mean': fr_mean, 'asi': asi}
-    
+    nonlinearity = {'si_null': similarity_null, 'si_spk': similarity_spk,
+                    'centers': centers, 't_bins': t, 'nspk_bins': nspk,
+                    'fr': fr, 'fr_mean': fr_mean, 'asi': asi}
+
     return nonlinearity
 
 
@@ -657,67 +683,67 @@ def calc_strf_mi(spiketimes, edges, stim, frac=[90, 92.5, 95, 97.5, 100], nreps=
     spktrain, _ = np.histogram(spiketimes, edges)
     spiketimes = spiketimes[(spiketimes >= edges[0]) & (spiketimes <= edges[-1])]
     np.random.shuffle(spiketimes)
-    nspk_block = int(spktrain.sum()/nblocks)
+    nspk_block = int(spktrain.sum() / nblocks)
     info = np.zeros(nblocks)
     ifrac = np.zeros([nblocks, nreps, len(frac)])
     xbins_centers = np.zeros([nblocks, 14])
-    
+
     for i in range(nblocks):
-        spiketimes_tmp = spiketimes[i*nspk_block: (i+1)*nspk_block]
+        spiketimes_tmp = spiketimes[i * nspk_block: (i + 1) * nspk_block]
         spktrain_train, _ = np.histogram(spiketimes_tmp, edges)
         spktrain_test = spktrain - spktrain_train
         info[i], ifrac[i], xbins_centers[i] = cal_mi(spktrain_train, spktrain_test, stim)
-    
+
     return info, ifrac, xbins_centers
 
+
 def cal_mi(spktrain_train, spktrain_test, stim, frac=[90, 92.5, 95, 97.5, 100], nreps=10, nlag=0, nlead=20):
-    
     strf = calc_strf(stim, spktrain_train, nlag=nlag, nlead=nlead)
     xprior = get_strf_proj_xprior(strf, stim)
-    xpost = xprior[spktrain_test[(nlead-1):] > 0]
-    
+    xpost = xprior[spktrain_test[(nlead - 1):] > 0]
+
     ifrac, xbins_centers = info_from_fraction(xprior, xpost, frac=frac, nreps=nreps)
-    
+
     info_mn = np.mean(ifrac, axis=0)
     x = 100 / np.array(frac)
-    
+
     _, info = np.polyfit(x, info_mn, 1)
-    
+
     return info, ifrac, xbins_centers
 
 
 def info_from_fraction(xprior, xpost, frac=[90, 92.5, 95, 97.5, 100], nreps=10):
     ifrac = np.empty([nreps, len(frac)])
     n_event = len(xpost)
-    
+
     # prior distribution of projection values
     xmn = xprior.mean()
     xstd = xprior.std()
     xprior = (xprior - xmn) / xstd
     xpost = (xpost - xmn) / xstd
     xbins_edges = np.linspace(xprior.min(), xprior.max(), 15)
-    xbins_centers = (xbins_edges[:-1] +  xbins_edges[1:]) / 2
+    xbins_centers = (xbins_edges[:-1] + xbins_edges[1:]) / 2
     nx_prior, _ = np.histogram(xprior, xbins_edges)
     px_prior = nx_prior / len(xprior)
-    
+
     # posterior distribution of projection values of subset of spikes
     for m, curr_frac in enumerate(frac):
         n_event_subset = int(np.round(curr_frac / 100 * n_event))
-        
+
         if curr_frac == 100:
             nreps = 1
-        
+
         for n in range(nreps):
             xspk = rand.sample(list(xpost), n_event_subset)
             nx_post, _ = np.histogram(xspk, xbins_edges)
             px_post = nx_post / n_event_subset
             ifrac[n, m] = info_prior_post(px_prior, px_post)
-        
+
         if curr_frac == 100:
             ifrac[:, m] = ifrac[n, m]
 
     return ifrac, xbins_centers
-    
+
 
 def get_strf_proj_xprior(strf, stim):
     """
@@ -740,62 +766,194 @@ def get_strf_proj_xprior(strf, stim):
     similarity_tbins = np.transpose(strf) @ stim
     similarity_null = np.zeros(stim.shape[1] - ntbins + 1)
     for i in range(ntbins):
-        if i == ntbins-1:
+        if i == ntbins - 1:
             similarity_null = similarity_null + similarity_tbins[i, i:]
         else:
-            similarity_null = similarity_null + similarity_tbins[i, i:-ntbins+i+1]
-    
+            similarity_null = similarity_null + similarity_tbins[i, i:-ntbins + i + 1]
+
     return similarity_null
-    
-    
+
+
 def info_prior_post(px_prior, px_post):
     idx = np.where((px_prior > 0) & (px_post > 0))[0]
     px_prior = px_prior[idx]
     px_post = px_post[idx]
     return np.sum(px_post * np.log2(px_post / px_prior))
 
-def ICweight_match_binsize(datafolder, file, dfs):
+
+def ICweight_match_binsize_adjacent(datafolder, file, dfs):
     base = re.findall('.*db', file)[0]
     suffix = re.findall('dft-.*', file)[0]
-    
+
     patterns = []
     for i, df in enumerate(dfs):
         file = glob.glob('{}-*{}{}'.format(base, df, suffix))[0]
         with open(file, 'rb') as f:
             ne = pickle.load(f)
         patterns.append(ne.patterns)
-    
+
     n_ne = [len(x) for x in patterns]
-    p = np.ones([n_ne[0], len(dfs)-1])
-    corr = np.zeros([n_ne[0], len(dfs)-1])
-    for i in range(len(n_ne)-1):
+    p = np.ones([n_ne[0], len(dfs) - 1])
+    corr = np.zeros([n_ne[0], len(dfs) - 1])
+    for i in range(len(n_ne) - 1):
         pattern1 = np.array(patterns[i])
-        row_idx = np.where(abs(pattern1).sum(axis=1) > 0)[0] # get index of existing patterns
-        pattern2 = np.array(patterns[i+1])
-        patterns[i+1] = np.zeros([n_ne[0], pattern1.shape[1]])
+        row_idx = np.where(abs(pattern1).sum(axis=1) > 0)[0]  # get index of existing patterns
+        pattern2 = np.array(patterns[i + 1])
+        patterns[i + 1] = np.zeros([n_ne[0], pattern1.shape[1]])
         if not any(row_idx):
             continue
-        pattern1 = pattern1[row_idx,:]
-        
+        pattern1 = pattern1[row_idx, :]
+
         corrmat = np.corrcoef(pattern1, pattern2)[:len(row_idx), len(row_idx):]
         for _ in range(corrmat.shape[0]):
             row, col = np.unravel_index(abs(corrmat).argmax(), corrmat.shape)
-            corrmat[row,:] = 0
+            corrmat[row, :] = 0
             corrmat[:, col] = 0
             corr[row_idx[row], i], p[row_idx[row], i] = pearsonr(pattern1[row], pattern2[col])
-            patterns[i+1][row_idx[row]] = pattern2[col]
-            
+            patterns[i + 1][row_idx[row]] = pattern2[col]
+
     return {'df': dfs, 'n_ne': n_ne, 'patterns': patterns, 'pearsonr': corr, 'p': p}
-   
-    
+
+
+def ICweight_match_binsize(datafolder, file, dfs):
+    base = re.findall('.*fs20000', file)[0]
+    suffix = re.findall('dft-.*', file)[0]
+
+    with open(file, 'rb') as f:
+        ne = pickle.load(f)
+    patterns_ref = ne.patterns
+    patterns_match = np.zeros([patterns_ref.shape[0], len(dfs), patterns_ref.shape[1]])
+    corr_match = np.zeros([patterns_ref.shape[0], len(dfs)])
+    for i, df in enumerate(dfs):
+        file = glob.glob('{}-*-{}{}'.format(base, df, suffix))[0]
+        with open(file, 'rb') as f:
+            ne = pickle.load(f)
+        patterns = ne.patterns
+        for j, pattern_ref in enumerate(patterns_ref):
+            corr = np.corrcoef(pattern_ref, patterns)[0][1:]
+            match_idx = np.argmax(abs(corr))
+            pattern = patterns[match_idx]
+            patterns_match[j, i, :] = pattern
+            corr_match[j, i] = abs(corr[match_idx])
+
+    return {'df': dfs, 'patterns': patterns_match, 'pearsonr': corr_match}
+
+
+def batch_save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, dfs):
+    dataframe = pd.DataFrame()
+    for stim in ('spon', 'dmr'):
+        files = glob.glob(datafolder + r'/{}/*-20dft-{}.pkl'.format(stim, stim), recursive=False)
+        for idx, file in enumerate(files):
+            print('({}/{}) save icweight binsize match summary data for {}'.format(idx, len(files), file))
+            dataframe_tmp = save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, file, dfs)
+            dataframe_tmp['stim'] = stim
+            dataframe = pd.concat([dataframe, dataframe_tmp])
+    dataframe.reset_index(inplace=True, drop=True)
+    dataframe.to_json(os.path.join(savefolder, 'icweight_corr_binsize.json'))
+
+
+def save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, file, dfs):
+    dataframe = pd.DataFrame()
+    base = re.findall('.*fs20000', file)[0]
+    suffix = re.findall('dft-.*', file)[0]
+    exp = re.search('\d{6}_\d{6}', file).group(0)
+    probe = re.search('H\d{2}x\d{2}', file).group(0)
+    with open(file, 'rb') as f:
+        ne = pickle.load(f)
+    patterns_ref = ne.patterns
+    thresh = 1 / np.sqrt(patterns_ref.shape[1])
+
+    for i, df in enumerate(dfs):
+        file = glob.glob('{}-*-{}{}'.format(base, df, suffix))[0]
+        with open(file, 'rb') as f:
+            ne = pickle.load(f)
+        patterns = ne.patterns
+        for j, pattern in enumerate(patterns):
+            corr = np.corrcoef(pattern, patterns_ref)[0][1:]
+            match_idx = np.argmax(abs(corr))
+            pattern_ref = patterns_ref[match_idx]
+
+            members_ref = set(np.where(pattern_ref > thresh)[0])
+            n_member_ref = len(members_ref)
+            members = set(np.where(pattern > thresh)[0])
+            n_member = len(members)
+            member_overlap = members.intersection(members_ref)
+            n_member_overlap = len(member_overlap)
+            member_ref_only = members_ref.difference(members)
+            member_extra = members.difference(members_ref)
+            n_member_all = len(members.union(members_ref))
+            row = pd.DataFrame({'exp': exp, 'probe': probe, 'df': df, 'corr': abs(corr[match_idx]),
+                          'member_overlap': [member_overlap], 'member_extra': [member_extra],
+                          'member_ref_only': [member_ref_only], 'n_member': n_member, 'n_member_ref': n_member_ref,
+                          'n_member_all': n_member_all, 'n_member_overlap': n_member_overlap})
+            dataframe = pd.concat([dataframe, row])
+    return dataframe
+
+    return {'df': dfs, 'patterns': patterns_match, 'pearsonr': corr_match}
+
+
+def batch_save_icweight_ccg_binsize(datafolder, jsonfile, savefolder):
+    data = pd.read_json(jsonfile)
+    data['overlap_prc'] = data['n_member_overlap'] / data['n_member_ref']
+    data = data[data.overlap_prc > .5]
+    ccg = pd.DataFrame()
+    for stim in ('spon', 'dmr'):
+        for probe in ('H31x64', 'H22x32'):
+            data_subset = data[(data.stim == stim) & (data.probe == probe)]
+            exps = set(data_subset.exp)
+            dfs = set(data_subset.df)
+            for idx, exp in enumerate(exps):
+                print('{}/{}'.format(idx+1, len(exps)), stim, probe, exp)
+                exp_str = str(exp)
+                exp_str = exp_str[:6] + '_' + exp_str[6:]
+                session_file = glob.glob(os.path.join(datafolder, f'{exp_str}-*-{probe}-fs20000.pkl'))
+                assert(len(session_file) == 1)
+                with open(session_file[0], 'rb') as f:
+                    session = pickle.load(f)
+                spktrain, edges = session.downsample_spktrain(df=2, stim=stim)
+                for df in dfs:
+                    cnes = data_subset[(data_subset.df == df) & (data_subset.exp == exp)]
+                    member_pairs_overlap = set()
+                    member_pairs_ref = set()
+                    member_pairs_extra = set()
+                    for i in range(len(cnes)):
+                        cne = cnes.iloc[i]
+                        members_overlap = cne.member_overlap
+                        members_ref_only = cne.member_ref_only
+                        members_extra = cne.member_extra
+                        member_pairs_overlap.update(list(itertools.combinations(members_overlap, 2)))
+                        member_pairs_ref.update([(x, y) for x in members_ref_only for y in members_overlap])
+                        member_pairs_extra.update([(x, y) for x in members_extra for y in members_overlap])
+                    member_pairs_overlap = set([(x, y) if x < y else (y, x) for x, y in member_pairs_overlap])
+                    member_pairs_ref = set([(x, y) if x < y else (y, x) for x, y in member_pairs_ref])
+                    member_pairs_extra = set([(x, y) if x < y else (y, x) for x, y in member_pairs_extra])
+                    member_pairs_ref = member_pairs_ref.difference(member_pairs_overlap)
+                    member_pairs_extra = member_pairs_extra.difference(members_overlap)
+                    ccg_overlap = get_ccg(spktrain,  member_pairs_overlap)
+                    ccg_ref = get_ccg(spktrain, member_pairs_ref)
+                    ccg_extra = get_ccg(spktrain,  member_pairs_extra)
+                    ccg = pd.concat([ccg, pd.DataFrame({'exp': exp, 'stim': stim, 'probe': probe, 'df': df,
+                                                        'ccg_overlap': [ccg_overlap],
+                                                        'ccg_ref': [ccg_ref], 'ccg_extra': [ccg_extra]})])
+            ccg.reset_index(inplace=True, drop=True)
+            ccg.to_json(os.path.join(savefolder, 'member_pair_ccg_binsize.json'))
+
+
+def get_ccg(spktrain, pairs, hw=200):
+    ccg = []
+    for i, pair in enumerate(pairs):
+        ccg.append(np.correlate(spktrain[pair[0]], spktrain[pair[1]][hw:-hw]))
+    return np.array(ccg)
+
+
 def shuffle_spktrain(spktrain):
     for i in range(spktrain.shape[0]):
         shift = rand.randint(1, spktrain.shape[1])
         spktrain[i] = np.roll(spktrain[i], shift)
     return spktrain
-    
 
-def get_num_cne_vs_shuffle(datafolder='E:\Congcong\Documents\data\comparison\data-pkl', 
+
+def get_num_cne_vs_shuffle(datafolder='E:\Congcong\Documents\data\comparison\data-pkl',
                            summary_folder='E:\Congcong\Documents\data\comparison\data-summary'):
     stims = ('dmr', 'spon')
     n_ne = {'n_ne': [], 'shuffled': [], 'stim': [], 'region': []}
@@ -804,9 +962,9 @@ def get_num_cne_vs_shuffle(datafolder='E:\Congcong\Documents\data\comparison\dat
         for file_idx, file in enumerate(nefiles):
             print('{}/{} get ne numbers for {}'.format(file_idx + 1, len(nefiles), file))
             if 'H31x64' in file:
-                n_ne['region'].extend(2*['MGB'])
+                n_ne['region'].extend(2 * ['MGB'])
             else:
-                n_ne['region'].extend(2*['A1'])
+                n_ne['region'].extend(2 * ['A1'])
             # get number of cNEs from real data
             with open(file, 'rb') as f:
                 ne = pickle.load(f)
@@ -820,8 +978,6 @@ def get_num_cne_vs_shuffle(datafolder='E:\Congcong\Documents\data\comparison\dat
             n_ne['n_ne'].append(np.median(data['n_ne']))
             n_ne['shuffled'].append(1)
             n_ne['stim'].append(stim)
-                
+
     n_ne = pd.DataFrame(n_ne)
     n_ne.to_json(os.path.join(summary_folder, 'num_ne_data_vs_shuffle.json'))
-
-    
