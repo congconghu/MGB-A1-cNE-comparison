@@ -882,7 +882,6 @@ def num_ne_vs_num_neuron(ax, datafolder, stim):
             n_neuron[region].append(ne.patterns.shape[1])
             n_ne[region].append(len(ne.ne_members))
     sc = []
-    print('A:')
     for i, region in enumerate(('MGB', 'A1')):
         a, b, r, _, _ = stats.linregress(n_neuron[region], n_ne[region])
         print(region, a, b)
@@ -890,7 +889,7 @@ def num_ne_vs_num_neuron(ax, datafolder, stim):
         x = np.linspace(5, 45, num=10)
         ax.plot(x, a * x + b, color=eval(region + '_color[0]'), linewidth=.8)
         sc.append(ax.scatter(n_neuron[region], n_ne[region], color=eval(region + '_color[0]'),
-                             edgecolors='black', linewidth=.2, alpha=.8, s=marker_size))
+                             edgecolors='black', linewidth=.2, alpha=.5, s=marker_size))
     ax.legend(sc, ['MGB (n=34)', 'A1 (n=17)'], fontsize=6, handletextpad=0, labelspacing=.1, borderpad=.3,
               fancybox=False, edgecolor='black', loc='upper left')
     n_min = np.min(n_neuron['A1'])
@@ -929,7 +928,6 @@ def ne_size_vs_num_neuron(ax, datafolder, stim, plot_type='mean', relative=False
     # get the number of neurons and the number of cNEs in each recording
     n_neuron = {'A1': [], 'MGB': []}
     ne_size = {'A1': [], 'MGB': []}
-    print('B:')
     for region, filepaths in files.items():
         for file in filepaths:
             with open(file, 'rb') as f:
@@ -973,13 +971,17 @@ def ne_size_vs_num_neuron(ax, datafolder, stim, plot_type='mean', relative=False
         ax.text(-.4, 0.55, 'recordings with {}-{} neurons'.format(n_neuron_filter[0], n_neuron_filter[1]), fontsize=6)
     else:
         sc = []
-        for region in files.keys():
+        for i, region in enumerate(('MGB', 'A1')):
             sc.append(ax.scatter(n_neuron[region], ne_size[region], color=eval(region + '_color[0]'),
-                                 s=marker_size, alpha=.5))
-            a, b = np.polyfit(n_neuron[region], ne_size[region], deg=1)
+                                 edgecolors='black', linewidth=.2, alpha=.5, s=marker_size))
+            a, b, r, _, _ = stats.linregress(n_neuron[region], ne_size[region])
+            print(region, a, b)
+            ax.text(30, 15 - i, 'R\u00b2 = {:.2}'.format(r), color=eval(region + '_color[0]'), fontsize=6)
             x = np.linspace(5, 45, num=10)
             ax.plot(x, a * x + b, color=eval(region + '_color[0]'))
-        ax.legend(sc, ['A1', 'MGB'], frameon=False, fontsize=8, labelspacing=2)
+        ax.legend(sc, ['MGB (n={})'.format(len(n_neuron['MGB'])), 'A1 (n={})'.format(len(n_neuron['A1']))],
+                  fontsize=6, handletextpad=0, labelspacing=.1, borderpad=.3,
+                  fancybox=False, edgecolor='black', loc='upper left')
         ax.set_xlabel('# of neurons')
         ax.set_ylabel('{} cNE size'.format(plot_type))
 
@@ -3502,20 +3504,24 @@ def figure5(datafolder, figfolder=r'E:\Congcong\Documents\data\comparison\figure
     plt.close()
 
 
-def figure6():
+def figure6(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
+            figfolder=r'E:\Congcong\Documents\data\comparison\figure\summary'):
     figsize = [figure_size[0][0], 10 * cm]
     fig, axes = plt.subplots(3, 4, figsize=figsize)
     stim = 'spon'
-    datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
     # scatter plot of number of cNE vs number of neurons
+    print('A')
     num_ne_vs_num_neuron(axes[0][0], datafolder, stim=stim)
     axes[0][0].set_ylim([0, 10])
+    # scatter plot of cNE size vs number of neurons
+    print('B')
+    ne_size_vs_num_neuron(axes[0][1], datafolder, stim=stim, plot_type='raw')
     # box plot of cNE size vs number of neurons with recordings of certain sizes
-    ne_size_vs_num_neuron(axes[0][1], datafolder, stim=stim, plot_type='raw', relative=True, n_neuron_filter=(13, 22))
+    print('C')
+    ne_size_vs_num_neuron(axes[0][2], datafolder, stim=stim, plot_type='raw', relative=True, n_neuron_filter=(13, 22))
     # bar plot of number of cNEs each neuron participated in
-    num_ne_participate(axes[0][2], datafolder, stim=stim, n_neuron_filter=(13, 22))
-    # scatter plot of number of cNE vs number of neurons
-    ne_freq_span_vs_all_freq_span(axes[0][3], datafolder, stim=stim)
+    print('D')
+    num_ne_participate(axes[0][3], datafolder, stim=stim, n_neuron_filter=(13, 22))
 
     # spacial and frequency distribution
     probe_region = {'H31x64': 'MGB', 'H22x32': 'A1'}
@@ -3523,20 +3529,22 @@ def figure6():
         region = probe_region[probe]
         print(region)
         # pairwise distance
-        print('E')
+        print('Ei')
         ne_member_distance(axes[1][i], datafolder, stim=stim, probe=probe, direction='vertical', linewidth=1)
         axes[1][i].annotate(region, xy=(.5, 1), xycoords='axes fraction', ha="center", va="center",
                             fontsize=10, color=eval(f'{region}_color[0]'))
         # cNE span
-        print('F')
+        print('Eii')
         ne_member_span(axes[1][i + 2], datafolder, stim=stim, probe=probe, linewidth=1)
         axes[1][i + 2].annotate(region, xy=(.5, 1.05), xycoords='axes fraction', ha="center", va="center",
                                 fontsize=10, color=eval(f'{region}_color[0]'))
+        axes[1][i + 2].set_ylim([0, .2])
+        axes[1][i + 2].set_yticks(np.arange(0, .21, .05))
         # pairwise frequency difference
-        print('G')
+        print('Fi')
         ne_member_freq_distance(axes[2][i], datafolder, stim=stim, probe=probe, linewidth=1)
         # cNE freq span
-        print('H')
+        print('Fii')
         ne_member_freq_span(axes[2][i + 2], datafolder, stim=stim, probe=probe, linewidth=1)
         if i == 1:
             axes[1][i].set_xlabel('')
@@ -3575,7 +3583,7 @@ def figure6():
 
             if j == 0:
                 ax.get_xaxis().set_label_coords(0.5, -.2)
-            elif j == 1 and i < 3:
+            elif j == 1 and i < 2:
                 ax.set_ylim([0, 0.15])
     # panel label
     y_coord = 0.962
@@ -3588,9 +3596,8 @@ def figure6():
     fig.text(0, 0.29, 'G', fontsize=fontsize_panel_label, weight='bold')
     fig.text(0.49, 0.29, 'H', fontsize=fontsize_panel_label, weight='bold')
 
-    plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig6.jpg', dpi=300)
-    plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig6.tif', dpi=300)
-    plt.savefig(r'E:\Congcong\Documents\data\comparison\figure\summary\fig6.pdf', dpi=300)
+    plt.savefig(os.path.join(figfolder, 'fig6.jpg'), dpi=300)
+    plt.savefig(os.path.join(figfolder, 'fig6.pdf'), dpi=300)
     plt.close()
 
 
@@ -3760,8 +3767,6 @@ def figure7(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-summa
     fig.text(0.4, .47, 'C', fontsize=fontsize_panel_label, weight='bold')
 
     plt.savefig(os.path.join(figfolder, 'fig7.jpg'), dpi=1000)
-    plt.savefig(os.path.join(figfolder, 'fig7.tif'), dpi=1000)
-    plt.savefig(os.path.join(figfolder, 'fig7.pdf'), dpi=1000)
     plt.close()
 
 
