@@ -697,10 +697,14 @@ def calc_strf_mi(spiketimes, edges, stim, frac=[90, 92.5, 95, 97.5, 100], nreps=
     return info, ifrac, xbins_centers
 
 
-def cal_mi(spktrain_train, spktrain_test, stim, frac=[90, 92.5, 95, 97.5, 100], nreps=10, nlag=0, nlead=20):
+def cal_mi(spktrain_train, spktrain_test, stim, frac=[90, 92.5, 95, 97.5, 100], 
+           nreps=10, nlag=0, nlead=20):
     strf = calc_strf(stim, spktrain_train, nlag=nlag, nlead=nlead)
     xprior = get_strf_proj_xprior(strf, stim)
-    xpost = xprior[spktrain_test[(nlead - 1):] > 0]
+    if np.sum(spktrain_test) == 0: # only one block
+        xpost = xprior[spktrain_train[(nlead - 1):] > 0]
+    else:
+        xpost = xprior[spktrain_test[(nlead - 1):] > 0]
 
     ifrac, xbins_centers = info_from_fraction(xprior, xpost, frac=frac, nreps=nreps)
 

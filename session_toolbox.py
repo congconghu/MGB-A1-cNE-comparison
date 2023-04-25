@@ -205,9 +205,10 @@ class SingleUnit:
         self.nonlin_fr_mean =  strf_nonlinearity['fr_mean']
         self.nonlin_asi =  strf_nonlinearity['asi']
         
-    def get_strf_mi(self, edges, stim):
+    def get_strf_mi(self, edges, stim, nblocks=1):
             spiketimes = self.spiketimes
-            self.strf_info, self.strf_ifrac, self.strf_info_xcenters = netools.calc_strf_mi(spiketimes, edges, stim)
+            self.strf_info, self.strf_ifrac, self.strf_info_xcenters = \
+                netools.calc_strf_mi(spiketimes, edges, stim, nblocks=nblocks)
             
     def get_crh_properties(self):
         btmf, bsmf = netools.calc_crh_properties(self.crh, self.tmfaxis, self.smfaxis)
@@ -511,7 +512,7 @@ class Session:
             df = stim.df
             edges = edges[::df]
         for unit in self.units:
-            unit.get_strf_mi(edges, stim.stim_mat)
+            unit.get_strf_mi(edges, stim.stim_mat, nblocks=1)
 
     def get_strf_ri(self, stim, nlead=20, nlag=0, method='block', n_block=10, n_sample=1000):
         edges = self.edges_dmr

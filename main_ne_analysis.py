@@ -6,6 +6,7 @@ import ne_toolbox as netools
 import session_toolbox as st
 from session_toolbox import save_su_df, save_session_df
 import numpy as np
+import pandas as pd
 
 # ++++++++++++++++++++++++++++++++++++++++++++ single unit properties ++++++++++++++++++++++++++++++++++++++++++++++++
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
