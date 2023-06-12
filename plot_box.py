@@ -292,7 +292,8 @@ def plot_strf_nonlinearity_df(units, figfolder):
             fig.savefig(os.path.join(figfolder, 'nonlinearity-{}.jpg'.format(nfig)), dpi=300)
 
 
-def plot_strf(ax, strf, taxis, faxis, latency=None, bf=None, smooth=False, vmax=None):
+def plot_strf(ax, strf, taxis, faxis, latency=None, bf=None, smooth=False, vmax=None, tlim=None, flim=None,
+              tlabels=np.array([75, 50, 25, 0]), flabels_arr = np.array([0.5, 2, 8, 32])):
     """
     plot strf and format axis labels for strf
 
@@ -307,6 +308,18 @@ def plot_strf(ax, strf, taxis, faxis, latency=None, bf=None, smooth=False, vmax=
     faxis = np.array(faxis)
     if strf.ndim == 3:
         strf = np.sum(strf, axis=0)
+        
+    if tlim:
+        idx_start = np.where(taxis == tlim[0])[0][0] + 1
+        idx_end = np.where(taxis == tlim[1])[0][0] + 1
+        taxis = taxis[idx_start: idx_end]
+        strf = strf[:, idx_start:idx_end]
+    if flim:
+        idx_start = np.where(faxis >= flim[0]*1e3)[0][0] + 1
+        idx_end = np.where(faxis >= flim[1]*1e3)[0][-1] + 1
+        faxis = faxis[idx_start: idx_end]
+        strf = strf[idx_start:idx_end, :]
+     
     max_val = abs(strf).max() * 1.01
     if smooth:
         weights = np.array([[1],
@@ -320,23 +333,25 @@ def plot_strf(ax, strf, taxis, faxis, latency=None, bf=None, smooth=False, vmax=
     im = ax.imshow(strf, aspect='auto', origin='lower', cmap='RdBu_r',
                    vmin=-vmax, vmax=vmax)
 
-    tlabels = np.array([75, 50, 25, 0])
+    
     xticks = np.searchsorted(-taxis, -tlabels)
     ax.set_xticks(xticks)
     ax.set_xticklabels(tlabels)
     ax.set_xlabel('time before spike (ms)')
 
     faxis = faxis / 1000
-    flabels = ['0.5', '2', '8', '32']
-    flabels_arr = np.array([0.5, 2, 8, 32])
+    flabels = [str(x).replace('.0', '') for x in flabels_arr]
     yticks = np.searchsorted(faxis, flabels_arr)
     ax.set_yticks(yticks)
     ax.set_yticklabels(flabels)
     ax.set_ylabel('frequency (kHz)', labelpad=-2)
 
     if bf and latency is not None:
-        idx_t = np.where(taxis <= latency)[0][0]
-        idx_f = np.where(faxis >= bf / 1000)[0][0]
+        try:
+            idx_t = np.where(taxis <= latency)[0][0]
+            idx_f = np.where(faxis >= bf / 1000)[0][0]
+        except IndexError:
+            return im
         ax.plot([0, idx_t], [idx_f, idx_f], 'k--')
         ax.plot([idx_t, idx_t], [0, idx_f], 'k--')
     return im

@@ -14,8 +14,11 @@ from scipy.io import loadmat
 import ne_toolbox as netools
 from itertools import combinations
 from copy import deepcopy
+import matplotlib.pyplot as plt
+import plot_box as plots
 
 from helper import strf2rtf
+
 
 
 class Stimulus:
@@ -149,17 +152,23 @@ class SingleUnit:
 
     def get_strf_ri(self, stim, edges, nlead=20, nlag=0, method='block', n_block=10, n_sample=1000, return_null=True):
         spiketimes = self.spiketimes
-        spktrain, _ = np.histogram(spiketimes, edges)
         stim_mat = stim.stim_mat
-
+        spktrain = []
+        stim_mat_all = []
+        for i in range(edges.shape[0]):
+            spktrain_tmp, _ = np.histogram(spiketimes, edges[i])
+            spktrain.append(spktrain_tmp)
+            stim_mat_all.append(stim_mat)
+        spktrain = np.concatenate(spktrain)
+        stim_mat = np.concatenate(stim_mat_all, axis=1)
         ri = netools.calc_strf_ri(spktrain, stim_mat, nlead=nlead, nlag=nlag, method=method,
-                                      n_block=n_block, n_sample=n_sample, bigmat_file=stim.bigmat_file)
+                                      n_block=n_block, n_sample=n_sample)
         self.strf_ri = ri
         
         if return_null:
             spktrain_null = spktrain[::-1]
             ri_null = netools.calc_strf_ri(spktrain_null, stim_mat, nlead=nlead, nlag=nlag, method=method,
-                                           n_block=n_block, n_sample=n_sample, bigmat_file=stim.bigmat_file)
+                                           n_block=n_block, n_sample=n_sample)
             self.strf_ri_null = ri_null
             self.strf_ri_z = (ri.mean() - ri_null.mean()) / np.sqrt((ri.std() ** 2 + ri_null.std() ** 2) / 2)
             self.strf_ri_p = sum(ri_null > ri.mean()) / n_sample
@@ -255,6 +264,10 @@ class SingleUnit:
         idx_trough = np.argmin(waveform)
         idx_peak = np.argmax(waveform[idx_trough:])
         self.waveform_tpd = idx_peak * .05
+        
+    def plot_strf(self, ax):
+        strf = self.strf
+        plots.plot_strf(ax, self.strf, self.strf_taxis, self.strf_faxis)
     
 class Session:
 
@@ -487,7 +500,9 @@ class Session:
             for edge in edges:
                 edges_df.append(edge[::df])
             edges = np.array(edges_df)
-        for unit in self.units:
+        n_units = len(self.units)
+        for i, unit in enumerate(self.units):
+            print(f'{i+1}/{n_units}')
             unit.get_strf(stim, edges, nlag=nlag, nlead=nlead)
     
     def get_strf_properties(self):
@@ -518,7 +533,10 @@ class Session:
         edges = self.edges_dmr
         if hasattr(stim, 'df'):
             df = stim.df
-            edges = edges[::df]
+            try:
+                edges = edges[:, ::df]
+            except IndexError:
+                edges = edges[::df]
         for unit in self.units:
             unit.get_strf_ri(stim, edges, nlead=20, nlag=0, method=method,  n_block=n_block, n_sample=n_sample)
     
@@ -613,6 +631,16 @@ class Session:
             self.spktrain_dmr_up = spktrain_up
             self.edges_dmr_up = edges_up
         self.save_pkl_file()
+    
+    def plot_strf(self, figfolder=None):
+        filename = re.search('\d{6}_\d{6}.*(?=.pkl)', self.file_path).group(0)
+        for i, unit in enumerate(self.units):
+            fig = plt.figure()
+            ax = fig.add_axes([.1, .1, .8, .8])
+            unit.plot_strf(ax)
+            if figfolder:
+                fig.savefig(os.path.join(figfolder, f'{filename}-unit{i}.jpg'))
+            plt.close()
 
 
 class NE(Session):

@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 #plots.figure1_2()
 
-plots.figure2()
+#plots.figure2()
 
 #plots.figure3()
 
@@ -23,6 +23,6 @@ plots.figure2()
 
 #plots.figure6()
 
-#plots.figure7()
+plots.figure7()
 
 #plots.figure8()
