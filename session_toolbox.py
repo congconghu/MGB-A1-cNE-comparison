@@ -641,7 +641,16 @@ class Session:
             if figfolder:
                 fig.savefig(os.path.join(figfolder, f'{filename}-unit{i}.jpg'))
             plt.close()
-
+    def get_position_idx(self):
+        units = self.units
+        positions = []
+        for unit in units:
+            positions.append(unit.position)
+        positions = np.array(positions)
+        order = np.lexsort((positions[:,1], positions[:, 0])) # order of each position
+        position_idx = np.argsort(order)
+        for i, unit in enumerate(units):
+            unit.position_idx = position_idx[i]
 
 class NE(Session):
     def __init__(self, exp, depth, probe, df, stim=None, spktrain=None, patterns=None, edges=None):
