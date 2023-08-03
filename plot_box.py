@@ -2951,24 +2951,14 @@ def figure1_2(datafolder=r'E:\Congcong\Documents\data\comparison', figfolder: st
         xcorr = np.correlate(spktrain1, spktrain2, mode='valid')
         # xcorr = xcorr / (spktrain1.sum() * spktrain2.sum() / 4) * 1e5
         ax.bar(np.arange(-25, 25.1, .5), xcorr, color='k')
-<<<<<<< Updated upstream
-
-
-    def plot_ccg_spon(u1, u2, ax):
-=======
         
->>>>>>> Stashed changes
         spktrain1 = session.spktrain_spon[u1, :]
         spktrain2 = np.roll(session.spktrain_spon[u2, :], -maxlag)
         spktrain2 = spktrain2[:-2 * maxlag]
         xcorr = np.correlate(spktrain1, spktrain2, mode='valid')
         # xcorr = xcorr / (spktrain1.sum() * spktrain2.sum() / 4) * 1e5
-<<<<<<< Updated upstream
-        ax.plot(np.arange(-25, 25.1, .5), xcorr, color='b', linewidth=.6)
-=======
         ax.plot(np.arange(-25, 25.1, .5), xcorr, color='grey')
         
->>>>>>> Stashed changes
         ax.plot([-maxlag / 2, maxlag / 2],
                 np.ones(2) * np.mean((xcorr[0:10] + xcorr[-10:]) / 2),
                 ls='--', color='r', linewidth=.6)
@@ -3449,30 +3439,6 @@ def figure4(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
         n_ne_sig = np.empty(2)
         n_ne = np.empty(2)
         text_y = 0.25
-<<<<<<< Updated upstream
-        corr_sig_all = []
-        for ii, region in enumerate(['MGB', 'A1']):
-            data = df[(df.stim == stim) & (df.region == region)]
-            sns.histplot(data=data, x="corr", bins=bins, color=eval('{}_color[0]'.format(region)),
-                         element="step", fill=False, stat='probability', ax=ax, linewidth=.8)
-            n_unit = len(data)
-            sns.histplot(data=data[data.corr_sig > 0], x="corr", bins=bins, color=eval('{}_color[0]'.format(region)),
-                         ec=eval('{}_color[0]'.format(region)), fill=True, weights=1 / n_unit, ax=ax, linewidth=.8)
-            ax.scatter(np.median(data[data.corr_sig]["corr"]), 0.25,
-                       marker='v', color=eval(region + '_color[0]'), alpha=.5, s=marker_size)
-            corr_sig = df[(df.stim == stim) & (df.region == region)]['corr_sig']
-            ratio = corr_sig.mean()
-            corr_sig_all.append(np.array(corr_sig))
-            n_ne_sig = corr_sig.sum()
-            n_ne = len(corr_sig)
-            ax.text(text_x, text_y - 0.03 * ii, '{:.1f}%'.format(ratio * 100),
-                    color=eval('{}_color[0]'.format(region)), fontsize=6)
-            print(stim, region, n_ne_sig, n_ne)
-
-        p = permutation_test(corr_sig_all[0], corr_sig_all[1])
-        ax.text(text_x, text_y - 0.03 * 2, 'p = {:.2f}'.format(p), color='k', fontsize=6)
-        print(p)
-=======
         ii = 0
         region = 'MGB'
         data = df[(df.stim == stim) & (df.region == region)]
@@ -3495,14 +3461,12 @@ def figure4(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
         ax.text(text_x, text_y - 0.03 * ii, '{:.1f}%'.format(ratio * 100),
                 color=eval('{}_color[0]'.format(region)), fontsize=6)
         
->>>>>>> Stashed changes
         if i == 0:
             ax.set_xlabel('|Correlation|')
             ax.set_ylabel('')
         else:
             ax.set_xlabel('')
             ax.set_ylabel('')
-<<<<<<< Updated upstream
 
         if i == 1:
             ax.set_ylabel('Proportion')
@@ -3510,53 +3474,12 @@ def figure4(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
             plt.legend(loc='upper right', labels=['A1', 'MGB'], fontsize=6, fancybox=False, edgecolor='k',
                        handletextpad=1, labelspacing=.1, borderpad=.3, bbox_to_anchor=(1, 1.1))
 
-    print('E')
-    for region in ('MGB', 'A1'):
-        sig1 = df[(df.stim == 'cross') & (df.region == region)]['corr_sig']
-        for stim in ('dmr', 'spon'):
-            sig2 = df[(df.stim == stim) & (df.region == region)]['corr_sig']
-            p = permutation_test(sig1, sig2)
-            print(region, stim, p)
-
-    # test for difference in IC weights correlation values
-    def corr_comparison(df):
-        model = ols('corr ~ C(region) + C(stim) + C(region):C(stim)', data=df).fit()
-        anova_df = sm.stats.anova_lm(model)
-        print(anova_df)
-        print('MGB vs A1')
-        for stim in ('spon', 'dmr', 'cross'):
-            _, p = stats.mannwhitneyu(df[(df.stim == stim) & (df.region == 'MGB')]['corr'],
-                                      df[(df.stim == stim) & (df.region == 'A1')]['corr'])
-            print(stim, p * 7)
-        for region in ('MGB', 'A1'):
-            for stim in ('dmr', 'spon'):
-                new_df = []
-                for dmr_first in (True, False):
-                    data_cross = df[(df.region == region) & (df.stim == 'cross') & (df.dmr_first == dmr_first)]
-                    data_stim = df[(df.region == region) & (df.stim == stim) & (df.dmr_first == dmr_first)]
-                    if (dmr_first and stim == 'dmr') or (not dmr_first and stim == 'spon'):
-                        new_df.append(pd.merge(data_cross, data_stim[['exp', 'idx1', 'idx2', 'corr']],  how='left',
-                                        left_on=['exp', 'idx1'], right_on=['exp', 'idx2']))
-                    elif (dmr_first and stim == 'spon') or (not dmr_first and stim == 'dmr'):
-                        new_df.append(pd.merge(data_cross, data_stim[['exp', 'idx1', 'idx2', 'corr']], how='left',
-                                       left_on=['exp', 'idx2'], right_on=['exp', 'idx1']))
-                new_df = pd.concat(new_df)
-                _, p = stats.wilcoxon(new_df['corr_x'], new_df['corr_y'], nan_policy='omit')
-                print(region, stim, 'vs cross', p*7)
-
-    print('All')
-    corr_comparison(df)
-    print('Sig')
-    corr_comparison(df[df.corr_sig])
-
     # comparison of stability of cNEs in MGB and A1
-=======
     for i, j in [(0, 1), (0, 2), (1, 2)]:
          prc_diff = np.array(sig_prc[i]) - np.array(sig_prc[j])
          p = sum(prc_diff > 0) / len(prc_diff) * 2
          p = min(p, 2 - p)
          print(min(1, p*3))
->>>>>>> Stashed changes
 
     fig.text(0, .955, 'A', fontsize=fontsize_panel_label, weight='bold')
     fig.text(0, .5, 'B', fontsize=fontsize_panel_label, weight='bold')
@@ -3569,7 +3492,6 @@ def figure4(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
     plt.close()
 
 
-<<<<<<< Updated upstream
 def permutation_test(sample1, sample2, nreps=10000):
     diff = np.mean(sample1) - np.mean(sample2)
     sample_all = np.concatenate([sample1, sample2])
@@ -3583,10 +3505,7 @@ def permutation_test(sample1, sample2, nreps=10000):
     return p if p < 1 else 2 - p
 
 
-def figure5(datafolder, figfolder=r'E:\Congcong\Documents\data\comparison\figure\summary'):
-=======
 def figure8(datafolder=r'E:\Congcong\Documents\data\comparison\data-summary', figfolder=r'E:\Congcong\Documents\data\comparison\figure\summary'):
->>>>>>> Stashed changes
     figsize = [figure_size[2][0], 11 * cm]
     fig, axes = plt.subplots(3, 1, figsize=figsize)
 
@@ -3652,13 +3571,9 @@ def figure5(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
     # scatter plot of cNE size vs number of neurons
     print('B')
     ne_size_vs_num_neuron(axes[0][1], datafolder, stim=stim, plot_type='raw')
-<<<<<<< Updated upstream
-    axes[0][1].set_ylim([0, 15])
-=======
     axes[0][1].set_xlim([5, 30])
     axes[0][1].set_ylim([0, 10])
 
->>>>>>> Stashed changes
     # box plot of cNE size vs number of neurons with recordings of certain sizes
     print('C')
     ne_size_vs_num_neuron(axes[0][2], datafolder, stim=stim, plot_type='raw', relative=True, n_neuron_filter=(13, 29))
@@ -3911,13 +3826,8 @@ def figure6(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-summa
     fig.text(0.5, y, 'B', fontsize=fontsize_panel_label, weight='bold')
     fig.text(0.5, .47, 'C', fontsize=fontsize_panel_label, weight='bold')
 
-<<<<<<< Updated upstream
-    plt.savefig(os.path.join(figfolder, 'fig7.jpg'), dpi=300)
-    plt.savefig(os.path.join(figfolder, 'fig7.pdf'), dpi=300)
-=======
     plt.savefig(os.path.join(figfolder, 'fig6.jpg'), dpi=1000)
     plt.savefig(os.path.join(figfolder, 'fig6.pdf'), dpi=1000)
->>>>>>> Stashed changes
 
     plt.close()
 
@@ -3929,12 +3839,6 @@ def add_p_val(ax, x, y, p, c='k'):
         ax.text(x, y, 'p = {:.3f}'.format(p), color=c, fontsize=6)
 
 
-<<<<<<< Updated upstream
-def figure8(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl\up_down_spon',
-            up_down_folder=r'E:\Congcong\Documents\data\comparison\data-pkl\up_down',
-            figfolder=r'E:\Congcong\Documents\data\comparison\figure\summary'):
-    figsize = [figure_size[0][0], 8 * cm]
-=======
 
 def figure7(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-summary',
             figfolder: str = r'E:\Congcong\Documents\data\comparison\figure\summary'):
@@ -4030,10 +3934,45 @@ def figure7(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-summa
     axes[1][3].set_ylabel('NE spike\nSTRF PTD gain')
     axes[1][3].set_ylim([-20, 20])
 
-    y = .945
-    fig.text(0, y, 'A', fontsize=fontsize_panel_label, weight='bold')
-    fig.text(0.37, y, 'B', fontsize=fontsize_panel_label, weight='bold')
-    fig.text(0.37, .47, 'C', fontsize=fontsize_panel_label, weight='bold')
+     print('E')
+    for region in ('MGB', 'A1'):
+        sig1 = df[(df.stim == 'cross') & (df.region == region)]['corr_sig']
+        for stim in ('dmr', 'spon'):
+            sig2 = df[(df.stim == stim) & (df.region == region)]['corr_sig']
+            p = permutation_test(sig1, sig2)
+            print(region, stim, p)
+
+    # test for difference in IC weights correlation values
+    def corr_comparison(df):
+        model = ols('corr ~ C(region) + C(stim) + C(region):C(stim)', data=df).fit()
+        anova_df = sm.stats.anova_lm(model)
+        print(anova_df)
+        print('MGB vs A1')
+        for stim in ('spon', 'dmr', 'cross'):
+            _, p = stats.mannwhitneyu(df[(df.stim == stim) & (df.region == 'MGB')]['corr'],
+                                      df[(df.stim == stim) & (df.region == 'A1')]['corr'])
+            print(stim, p * 7)
+        for region in ('MGB', 'A1'):
+            for stim in ('dmr', 'spon'):
+                new_df = []
+                for dmr_first in (True, False):
+                    data_cross = df[(df.region == region) & (df.stim == 'cross') & (df.dmr_first == dmr_first)]
+                    data_stim = df[(df.region == region) & (df.stim == stim) & (df.dmr_first == dmr_first)]
+                    if (dmr_first and stim == 'dmr') or (not dmr_first and stim == 'spon'):
+                        new_df.append(pd.merge(data_cross, data_stim[['exp', 'idx1', 'idx2', 'corr']],  how='left',
+                                        left_on=['exp', 'idx1'], right_on=['exp', 'idx2']))
+                    elif (dmr_first and stim == 'spon') or (not dmr_first and stim == 'dmr'):
+                        new_df.append(pd.merge(data_cross, data_stim[['exp', 'idx1', 'idx2', 'corr']], how='left',
+                                       left_on=['exp', 'idx2'], right_on=['exp', 'idx1']))
+                new_df = pd.concat(new_df)
+                _, p = stats.wilcoxon(new_df['corr_x'], new_df['corr_y'], nan_policy='omit')
+                print(region, stim, 'vs cross', p*7)
+
+    print('All')
+    corr_comparison(df)
+    print('Sig')
+    corr_comparison(df[df.corr_sig])
+
 
     plt.savefig(os.path.join(figfolder, 'fig7.jpg'), dpi=1000)
     plt.savefig(os.path.join(figfolder, 'fig7.pdf'), dpi=1000)
@@ -4041,13 +3980,10 @@ def figure7(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-summa
     plt.close()
 
 
-
-
 def figure9():
     data_folder = r'E:\Congcong\Documents\data\comparison\data-pkl\up_down_spon'
     up_down_folder = r'E:\Congcong\Documents\data\comparison\data-pkl\up_down'
     figsize = [figure_size[1][0], 10 * cm]
->>>>>>> Stashed changes
     fig = plt.figure(figsize=figsize)
     x_start = .05
     y_start = .1
