@@ -15,14 +15,19 @@ import matplotlib.pyplot as plt
 
 #plots.figure2()
 
+#plots.figure2b()
+
 #plots.figure3()
 
 #plots.figure4()
 
 #plots.figure5()
 
-#plots.figure6()
+# plots.figure6()
 
 plots.figure7()
 
-#plots.figure8()
+#plots.figure8() #[x]
+
+#plots.figure9() #[x]
+

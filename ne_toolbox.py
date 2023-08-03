@@ -112,7 +112,7 @@ def get_pc_thresh(spktrain):
 
 
 def get_member_nonmember_xcorr(files, df=2, maxlag=200):
-    xcorr = {'xcorr': [], 'corr': [], 'member': [], 'stim': [], 'region': [], 'exp': []}
+    xcorr = {'xcorr': [], 'corr': [], 'member': [], 'stim': [], 'region': [], 'exp': [], 'idx1': [], 'idx2': []}
     for idx, file in enumerate(files):
         print('({}/{}) get member and nonmmebers xcorr for {}'.format(idx + 1, len(files), file))
 
@@ -157,6 +157,8 @@ def get_member_nonmember_xcorr(files, df=2, maxlag=200):
                 xcorr['stim'].append(stim)
                 xcorr['region'].append(region)
                 xcorr['exp'].append(session.exp)
+                xcorr['idx1'].append(u1)
+                xcorr['idx2'].append(u2)
             for u1, u2 in nonmember_pairs:
                 c = np.correlate(spktrain[u1], spktrain_shift[u2], mode='valid')
                 xcorr['xcorr'].append(c)
@@ -165,6 +167,8 @@ def get_member_nonmember_xcorr(files, df=2, maxlag=200):
                 xcorr['stim'].append(stim)
                 xcorr['region'].append(region)
                 xcorr['exp'].append(session.exp)
+                xcorr['idx1'].append(u1)
+                xcorr['idx2'].append(u2)
 
     xcorr = pd.DataFrame(xcorr)
     return xcorr
@@ -984,11 +988,15 @@ def get_num_cne_vs_shuffle(datafolder='E:\Congcong\Documents\data\comparison\dat
             n_ne['exp'].append(ne.exp)
             n_ne['n_ne'].append(len(ne.ne_members))
             n_ne['stim'].append(stim)
+            n_ne['shuffled'].append(0)
             # get number of cNEs from shuffled
             file_null = re.sub('{}.pkl'.format(stim), '{}-shuffled.pkl'.format(stim), file)
             with open(file_null, 'rb') as f:
                 data = pickle.load(f)
-            n_ne['shuffled'].append(np.median(data['n_ne']))
+            n_ne['exp'].append(ne.exp)
+            n_ne['n_ne'].append(np.median(data['n_ne']))
+            n_ne['stim'].append(stim)
+            n_ne['shuffled'].append(1)
 
     n_ne = pd.DataFrame(n_ne)
     n_ne.to_json(os.path.join(summary_folder, 'num_ne_data_vs_shuffle.json'))

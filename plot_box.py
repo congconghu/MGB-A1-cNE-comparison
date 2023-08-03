@@ -318,7 +318,7 @@ def plot_strf(ax, strf, taxis, faxis, latency=None, bf=None, smooth=False, vmax=
         strf = strf[:, idx_start:idx_end]
     if flim:
         idx_start = np.where(faxis >= flim[0]*1e3)[0][0] + 1
-        idx_end = np.where(faxis >= flim[1]*1e3)[0][-1] + 1
+        idx_end = np.where(faxis >= flim[1]*1e3)[0][0] + 1
         faxis = faxis[idx_start: idx_end]
         strf = strf[idx_start:idx_end, :]
      
@@ -615,11 +615,11 @@ def plot_crh_ne_and_members(ne, savepath, ri=False):
         plt.close(fig)
 
 
-def plot_ICweight(ax, weights, thresh, direction='h', ylim=None, ylabelpad=None):
+def plot_ICweight(ax, weights, thresh, direction='h', ylim=None, ylabelpad=None, markersize=10):
     """
     stem plot for cNE patterns
     """
-    markersize = 10
+    
     n_neuron = len(weights)
 
     # plot threshold of membership
@@ -655,7 +655,7 @@ def plot_ICweight(ax, weights, thresh, direction='h', ylim=None, ylabelpad=None)
             range(1, n_neuron + 1), weights,
             markerfmt='ok', linefmt='k-', basefmt='k-',
             orientation='horizontal')
-        plt.setp(markerline, markersize=3)
+        plt.setp(markerline, markersize=markersize)
         # plot baseline at 0
         ax.plot([0, 0], [0, n_neuron + 1], 'k-')
 
@@ -666,7 +666,7 @@ def plot_ICweight(ax, weights, thresh, direction='h', ylim=None, ylabelpad=None)
                 members + 1, weights[members],
                 markerfmt='or', linefmt='r-', basefmt='k-',
                 orientation='horizontal')
-            plt.setp(markerline, markersize=3)
+            plt.setp(markerline, markersize=markersize)
 
         ax.set_ylim([0, n_neuron + 1])
         ax.set_yticks(range(5, n_neuron + 1, 5))
@@ -2944,28 +2944,38 @@ def figure1_2(datafolder=r'E:\Congcong\Documents\data\comparison', figfolder: st
     maxlag = 50
 
     def plot_ccg(u1, u2, ax):
+        
         spktrain1 = session.spktrain_dmr[u1, :]
         spktrain2 = np.roll(session.spktrain_dmr[u2, :], -maxlag)
         spktrain2 = spktrain2[:-2 * maxlag]
         xcorr = np.correlate(spktrain1, spktrain2, mode='valid')
         # xcorr = xcorr / (spktrain1.sum() * spktrain2.sum() / 4) * 1e5
         ax.bar(np.arange(-25, 25.1, .5), xcorr, color='k')
+<<<<<<< Updated upstream
 
 
     def plot_ccg_spon(u1, u2, ax):
+=======
+        
+>>>>>>> Stashed changes
         spktrain1 = session.spktrain_spon[u1, :]
         spktrain2 = np.roll(session.spktrain_spon[u2, :], -maxlag)
         spktrain2 = spktrain2[:-2 * maxlag]
         xcorr = np.correlate(spktrain1, spktrain2, mode='valid')
         # xcorr = xcorr / (spktrain1.sum() * spktrain2.sum() / 4) * 1e5
+<<<<<<< Updated upstream
         ax.plot(np.arange(-25, 25.1, .5), xcorr, color='b', linewidth=.6)
+=======
+        ax.plot(np.arange(-25, 25.1, .5), xcorr, color='grey')
+        
+>>>>>>> Stashed changes
         ax.plot([-maxlag / 2, maxlag / 2],
                 np.ones(2) * np.mean((xcorr[0:10] + xcorr[-10:]) / 2),
-                ls='--', color='grey', linewidth=.6)
-        ax.plot([0, 0], [0, 25], ls='-', color='grey', linewidth=.6)
+                ls='--', color='r', linewidth=.6)
+        ax.plot([0, 0], [0, 25], ls='-', color='r', linewidth=.6)
         ax.set_xlim([-maxlag / 2, maxlag / 2])
         ax.set_xlabel('Lag (ms)')
-        ax.set_ylim([0, 25])
+        ax.set_ylim([0, 20])
 
 
     ax = fig.add_axes([x_start, y_start, x_fig, y_fig])
@@ -3215,6 +3225,36 @@ def figure2(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-pkl',
     plt.close()
 
 
+def figure2b(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-pkl',
+            figfolder: str = r'E:\Congcong\Documents\data\comparison\figure\summary'):
+    # E
+    # violin plot for correlation value
+    fig = plt.figure(figsize=[3.5 * cm, 3.5 * cm])
+    ax = fig.add_axes([.17, .17, .8, .8])
+    
+    xcorr = pd.read_json(
+        r'E:\Congcong\Documents\data\comparison\data-summary\member_nonmember_pair_xcorr_filtered.json')
+    xcorr = xcorr[(xcorr['stim'] == 'spon') & (xcorr.region == 'MGB')]
+
+    sns.violinplot(ax=ax, data=xcorr, x='member', y='corr', order=['(w)', '(o)'],
+                   legend=False, palette=list(MGB_color))
+   
+    # significance test for correlation value: within vs outside cNE
+    _, p = stats.mannwhitneyu(x=xcorr[xcorr['member'] == '(w)']['corr'],
+                             y=xcorr[xcorr['member'] == '(o)']['corr'])
+    plot_significance_star(ax, p, [0, 1], 0.4, 0.402)
+    print('B')
+    print('within vs outside cNE: Mann-Witnney U test')
+    print('MGB:',p)
+
+    ax.set_xlabel('')
+    ax.set_ylabel('Pairwise correlation', labelpad=0)
+    ax.set_ylim([-.1, .5])
+    fig.savefig(os.path.join(figfolder, 'fig2b.jpg'), dpi=1000)
+    fig.savefig(os.path.join(figfolder, 'fig2b.pdf'), dpi=1000)
+    plt.close()
+
+
 def figure3(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-pkl',
             figfolder: str = r'E:\Congcong\Documents\data\comparison\figure\summary'):
     mpl.rcParams['lines.markersize'] = 8
@@ -3303,6 +3343,7 @@ def figure3(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-pkl',
 
 
 def figure4(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
+            summaryfolder = r'E:\Congcong\Documents\data\comparison\data-summary',
             figfolder=r'E:\Congcong\Documents\data\comparison\figure'):
     """
     Figure4: stability of cNEs on spantaneous and sensory-evoked activity blocks
@@ -3318,6 +3359,10 @@ def figure4(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
     Return:
         None
     """
+    mpl.rcParams['axes.linewidth'] = .6
+    mpl.rcParams['lines.linewidth'] = .8
+
+
     # use example recording to plot correlation matrix
     ne_file = os.path.join(datafolder, '200821_015617-site6-5655um-25db-dmr-31min-H31x64-fs20000-ne-20dft-split.pkl')
     with open(ne_file, 'rb') as f:
@@ -3383,16 +3428,16 @@ def figure4(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
                handletextpad=1, labelspacing=.1, borderpad=.3, bbox_to_anchor=(1, 1.5))
 
     # distribution of significant correlations
-    df = pd.read_json(os.path.join(datafolder, 'split_cNE.json'))
+    df = pd.read_json(os.path.join(summaryfolder, 'split_cNE.json'))
     x_start = .72
-    fig_y = 0.25
+    fig_y = 0.23
     space_y = .06
     fig_x = 0.25
     bins = np.linspace(0, 1, 26)
     text_x = .1
     axes_f = []
     sig_prc = []
-    for i, stim in enumerate(['dmr', 'spon', 'cross']):
+    for i, stim in enumerate(['cross', 'dmr', 'spon']):
         ax = fig.add_axes([x_start, y_start + i * (fig_y + space_y), fig_x, fig_y])
         axes_f.append(ax)
         ax.set_title(stim, fontsize=8, pad=2)
@@ -3404,6 +3449,7 @@ def figure4(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
         n_ne_sig = np.empty(2)
         n_ne = np.empty(2)
         text_y = 0.25
+<<<<<<< Updated upstream
         corr_sig_all = []
         for ii, region in enumerate(['MGB', 'A1']):
             data = df[(df.stim == stim) & (df.region == region)]
@@ -3426,12 +3472,37 @@ def figure4(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
         p = permutation_test(corr_sig_all[0], corr_sig_all[1])
         ax.text(text_x, text_y - 0.03 * 2, 'p = {:.2f}'.format(p), color='k', fontsize=6)
         print(p)
+=======
+        ii = 0
+        region = 'MGB'
+        data = df[(df.stim == stim) & (df.region == region)]
+        sns.histplot(data=data, x="corr", bins=bins, color=eval('{}_color[0]'.format(region)),
+                     element="step", fill=False, stat='probability', ax=ax, linewidth=.8)
+        n_unit = len(data)
+        ax.hist(data[data.corr_sig]['corr'], bins=bins, weights=(1/n_unit)*np.ones(len(data[data.corr_sig])),
+                color=eval('{}_color[0]'.format(region)))
+        ax.scatter(data[data.corr_sig]['corr'].mean(), .2, 
+                   s=10, marker='v', color=eval('{}_color[1]'.format(region)))
+        ax.scatter(data[data.corr_sig]['corr'].median(), .22, 
+                   s=10, marker='v', color=eval('{}_color[0]'.format(region)))
+        res = stats.bootstrap([np.array(data['corr_sig']).astype(int)], np.mean, random_state=1)
+
+        corr_sig = df[(df.stim == stim) & (df.region == region)]['corr_sig']
+        ratio = corr_sig.mean()
+        sig_prc.append(list(res.bootstrap_distribution) + [ratio])
+        n_ne_sig[ii] = corr_sig.sum()
+        n_ne[ii] = len(corr_sig)
+        ax.text(text_x, text_y - 0.03 * ii, '{:.1f}%'.format(ratio * 100),
+                color=eval('{}_color[0]'.format(region)), fontsize=6)
+        
+>>>>>>> Stashed changes
         if i == 0:
             ax.set_xlabel('|Correlation|')
             ax.set_ylabel('')
         else:
             ax.set_xlabel('')
             ax.set_ylabel('')
+<<<<<<< Updated upstream
 
         if i == 1:
             ax.set_ylabel('Proportion')
@@ -3479,6 +3550,13 @@ def figure4(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
     corr_comparison(df[df.corr_sig])
 
     # comparison of stability of cNEs in MGB and A1
+=======
+    for i, j in [(0, 1), (0, 2), (1, 2)]:
+         prc_diff = np.array(sig_prc[i]) - np.array(sig_prc[j])
+         p = sum(prc_diff > 0) / len(prc_diff) * 2
+         p = min(p, 2 - p)
+         print(min(1, p*3))
+>>>>>>> Stashed changes
 
     fig.text(0, .955, 'A', fontsize=fontsize_panel_label, weight='bold')
     fig.text(0, .5, 'B', fontsize=fontsize_panel_label, weight='bold')
@@ -3491,6 +3569,7 @@ def figure4(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
     plt.close()
 
 
+<<<<<<< Updated upstream
 def permutation_test(sample1, sample2, nreps=10000):
     diff = np.mean(sample1) - np.mean(sample2)
     sample_all = np.concatenate([sample1, sample2])
@@ -3505,6 +3584,9 @@ def permutation_test(sample1, sample2, nreps=10000):
 
 
 def figure5(datafolder, figfolder=r'E:\Congcong\Documents\data\comparison\figure\summary'):
+=======
+def figure8(datafolder=r'E:\Congcong\Documents\data\comparison\data-summary', figfolder=r'E:\Congcong\Documents\data\comparison\figure\summary'):
+>>>>>>> Stashed changes
     figsize = [figure_size[2][0], 11 * cm]
     fig, axes = plt.subplots(3, 1, figsize=figsize)
 
@@ -3557,7 +3639,7 @@ def figure5(datafolder, figfolder=r'E:\Congcong\Documents\data\comparison\figure
     plt.close()
 
 
-def figure6(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
+def figure5(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
             figfolder=r'E:\Congcong\Documents\data\comparison\figure\summary'):
     figsize = [figure_size[0][0], 10 * cm]
     fig, axes = plt.subplots(3, 4, figsize=figsize)
@@ -3565,11 +3647,18 @@ def figure6(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
     # scatter plot of number of cNE vs number of neurons
     print('A')
     num_ne_vs_num_neuron(axes[0][0], datafolder, stim=stim)
-    axes[0][0].set_ylim([0, 10])
+    axes[0][0].set_ylim([0, 8])
+    axes[0][0].set_xlim([5, 30])
     # scatter plot of cNE size vs number of neurons
     print('B')
     ne_size_vs_num_neuron(axes[0][1], datafolder, stim=stim, plot_type='raw')
+<<<<<<< Updated upstream
     axes[0][1].set_ylim([0, 15])
+=======
+    axes[0][1].set_xlim([5, 30])
+    axes[0][1].set_ylim([0, 10])
+
+>>>>>>> Stashed changes
     # box plot of cNE size vs number of neurons with recordings of certain sizes
     print('C')
     ne_size_vs_num_neuron(axes[0][2], datafolder, stim=stim, plot_type='raw', relative=True, n_neuron_filter=(13, 29))
@@ -3655,7 +3744,7 @@ def figure6(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
     plt.close()
 
 
-def figure7(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-summary',
+def figure6(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-summary',
             figfolder: str = r'E:\Congcong\Documents\data\comparison\figure\summary'):
     fig = plt.figure(figsize=[figure_size[1][0], 6 * cm])
     y_start = .115
@@ -3822,8 +3911,13 @@ def figure7(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-summa
     fig.text(0.5, y, 'B', fontsize=fontsize_panel_label, weight='bold')
     fig.text(0.5, .47, 'C', fontsize=fontsize_panel_label, weight='bold')
 
+<<<<<<< Updated upstream
     plt.savefig(os.path.join(figfolder, 'fig7.jpg'), dpi=300)
     plt.savefig(os.path.join(figfolder, 'fig7.pdf'), dpi=300)
+=======
+    plt.savefig(os.path.join(figfolder, 'fig6.jpg'), dpi=1000)
+    plt.savefig(os.path.join(figfolder, 'fig6.pdf'), dpi=1000)
+>>>>>>> Stashed changes
 
     plt.close()
 
@@ -3835,10 +3929,125 @@ def add_p_val(ax, x, y, p, c='k'):
         ax.text(x, y, 'p = {:.3f}'.format(p), color=c, fontsize=6)
 
 
+<<<<<<< Updated upstream
 def figure8(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl\up_down_spon',
             up_down_folder=r'E:\Congcong\Documents\data\comparison\data-pkl\up_down',
             figfolder=r'E:\Congcong\Documents\data\comparison\figure\summary'):
     figsize = [figure_size[0][0], 8 * cm]
+=======
+
+def figure7(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-summary',
+            figfolder: str = r'E:\Congcong\Documents\data\comparison\figure\summary'):
+    
+    fig = plt.figure(figsize=[11.6 * cm, 10 * cm])
+    # plot population result
+    data = pd.read_json(os.path.join(datafolder, 'subsample_ne_neuron_summary.json'))
+    data = data[data.strf_sig > 0]
+    data = data[(data.n_events > 100)]
+    data = data[(data.mi_neuron > 0) & (data.mi_ne_spike > 0)]
+    data['strf_ri_neuron'] = data['strf_ri_neuron_mean']
+    data['strf_ri_ne_spike'] = data['strf_ri_ne_spike_mean']
+
+    y_start = [.5, .75]
+    fig_y = .2
+    for j, param in enumerate(('mi', 'ptd')):
+        gain = {}
+        region = 'A1'
+        data_tmp = data[data.region == region]
+        y = y_start[j]
+        ax = fig.add_axes([.05, y, .2, fig_y])
+        ax.scatter(data_tmp[f'{param}_neuron'], data_tmp[f'{param}_ne_spike'],
+                           s=2, alpha=.6, facecolor=eval(f'{region}_color[0]'), edgecolor="none")
+        _, p = stats.wilcoxon(x=data_tmp[f'{param}_neuron'], y=data_tmp[f'{param}_ne_spike'])
+        diff = data_tmp[f'{param}_ne_spike'] - data_tmp[f'{param}_neuron']
+        n = len(data_tmp[f'{param}_neuron'])
+        if param == 'mi':
+            lim = [0, 3]
+            ax.set_xticks(range(4))
+            ax.set_yticks(range(4))
+            xlabel = 'Neuron STRF MI (bits/spike)'
+            ylabel = 'ne spike STRF MI\n(bits/spike)'
+            add_p_val(ax, .25, 2.5, p)
+        elif param == 'ptd':
+            ax.set_xticks(range(0, 26, 5))
+            ax.set_yticks(range(0, 26, 5))
+            lim = [0, 25]
+            xlabel = 'Neuron STRF PTD'
+            ylabel = 'ne spike STRF PTD'
+            add_p_val(ax, 2, 22, p)
+            ax.text(2, 18, f'n = {n}', color='k', fontsize=6)
+            ax.set_title(region, color=eval(f'{region}_color[0]'))
+        else:
+            lim = [0, 3]
+        ax.set_xlim(lim)
+        ax.set_ylim(lim)
+        ax.plot(lim, lim, 'k')
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        
+        gain = (data_tmp[f'{param}_ne_spike'] - data_tmp[f'{param}_neuron'])
+        print(region, param, 'gain, median=', np.median(gain[region]),
+              'mean=', np.mean(gain[region]), 'std=', np.std(gain[region]))
+
+        # single unit properties
+        plot_data = [list(data[data.region == region][f'{param}_neuron']) for region in ('MGB', 'A1')]
+        v = axes[j][2].violinplot(plot_data,
+                                  points=100, showextrema=False, widths=.8)
+        colors = [MGB_color[0], A1_color[0]]
+        for i, pc in enumerate(v['bodies']):
+            pc.set_facecolor(colors[i])
+            pc.set_alpha(1)
+            pc.set_edgecolor(colors[i])
+        _, p = stats.mannwhitneyu(plot_data[0], plot_data[1])
+        if j == 1:
+            plot_significance_star(axes[j][2], p, [1, 2], 30, 31, linewidth=.8, fontsize=10)
+        else:
+            plot_significance_star(axes[j][2], p, [1, 2], 3.5, 3.6, linewidth=.8, fontsize=10)
+        print('su: p=', p)
+
+        # gain
+        gain = [list(gain[key]) for key in ('MGB', 'A1')]
+        _, p = stats.mannwhitneyu(gain[0], gain[1])
+        print('gain: p=', p)
+        v = axes[j][3].violinplot(gain, points=100, showextrema=False, widths=.8)
+        for i, pc in enumerate(v['bodies']):
+            pc.set_facecolor(colors[i])
+            pc.set_alpha(1)
+            pc.set_edgecolor(colors[i])
+        if j == 1:
+            plot_significance_star(axes[j][3], p, [1, 2], 30, 31, linewidth=.8, fontsize=10)
+        else:
+            plot_significance_star(axes[j][3], p, [1, 2], 3.5, 3.6, linewidth=.8, fontsize=10)
+        axes[j][2].set_xlabel('')
+
+    axes[0][2].set_ylabel('Neuron STRF MI')
+    axes[0][2].set_ylim([0, 4])
+    axes[1][2].set_ylabel('Neuron STRF PTD')
+    axes[1][2].set_ylim([0, 35])
+
+    axes[0][3].set_ylabel('NE spike\nSTRF MI gain')
+    axes[0][3].set_ylim([-1, 2])
+    axes[1][3].set_ylabel('NE spike\nSTRF PTD gain')
+    axes[1][3].set_ylim([-20, 20])
+
+    y = .945
+    fig.text(0, y, 'A', fontsize=fontsize_panel_label, weight='bold')
+    fig.text(0.37, y, 'B', fontsize=fontsize_panel_label, weight='bold')
+    fig.text(0.37, .47, 'C', fontsize=fontsize_panel_label, weight='bold')
+
+    plt.savefig(os.path.join(figfolder, 'fig7.jpg'), dpi=1000)
+    plt.savefig(os.path.join(figfolder, 'fig7.pdf'), dpi=1000)
+
+    plt.close()
+
+
+
+
+def figure9():
+    data_folder = r'E:\Congcong\Documents\data\comparison\data-pkl\up_down_spon'
+    up_down_folder = r'E:\Congcong\Documents\data\comparison\data-pkl\up_down'
+    figsize = [figure_size[1][0], 10 * cm]
+>>>>>>> Stashed changes
     fig = plt.figure(figsize=figsize)
     x_start = .05
     y_start = .1
