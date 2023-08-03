@@ -11,9 +11,9 @@ import scipy
 import numpy as np
 import pandas as pd
 
-from scipy.ndimage.filters import convolve
+from scipy.ndimage import convolve
 from scipy.stats import zscore
-from scipy.stats.stats import pearsonr
+from scipy.stats import pearsonr
 from sklearn.decomposition import PCA, FastICA
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.utils._testing import ignore_warnings
