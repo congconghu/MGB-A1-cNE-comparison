@@ -462,10 +462,17 @@ def get_split_ne_null_df(files, savefolder):
 # ---------------------------------------- single unit properties -----------------------------------------------------
 
 
-def calc_strf(stim_mat, spktrain, nlag=0, nlead=20):
+def calc_strf(stim_mat, spktrain, nlag=0, nlead=20, mdb=40):
     strf = np.zeros((stim_mat.shape[0], nlag + nlead))
+    pp = mdb ** 2 / 8
+    T = stim_mat.shape[-1] * .5 / 1e3
     for i in range(nlead):
         strf[:, i] = stim_mat @ np.roll(spktrain, i - nlead)
+        
+    for i in range(nlag):
+        strf[:, nlead + i] = stim_mat @ np.roll(spktrain, i)
+    
+    strf = strf / pp / T
     return strf
 
 
@@ -561,6 +568,8 @@ def calc_crh_ri(spktrain, stim, method='block', n_block=10, n_sample=1000):
 
 
 def calc_strf_properties(strf, taxis, faxis, sigma_y=2, sigma_x=1):
+    if strf.ndim == 3:
+        strf = np.sum(strf, axis=0)
     idx_t = np.where(taxis < 50)[0]
     strf = strf[:, idx_t]
     taxis = taxis[idx_t]
@@ -960,28 +969,26 @@ def shuffle_spktrain(spktrain):
 def get_num_cne_vs_shuffle(datafolder='E:\Congcong\Documents\data\comparison\data-pkl',
                            summary_folder='E:\Congcong\Documents\data\comparison\data-summary'):
     stims = ('dmr', 'spon')
-    n_ne = {'n_ne': [], 'shuffled': [], 'stim': [], 'region': []}
+    n_ne = {'exp': [], 'n_ne': [], 'shuffled': [], 'stim': [], 'region': []}
     for stim in stims:
         nefiles = glob.glob(os.path.join(datafolder, '*-ne-20dft-{}.pkl'.format(stim)))
         for file_idx, file in enumerate(nefiles):
             print('{}/{} get ne numbers for {}'.format(file_idx + 1, len(nefiles), file))
             if 'H31x64' in file:
-                n_ne['region'].extend(2 * ['MGB'])
+                n_ne['region'].append('MGB')
             else:
-                n_ne['region'].extend(2 * ['A1'])
+                n_ne['region'].append('A1')
             # get number of cNEs from real data
             with open(file, 'rb') as f:
                 ne = pickle.load(f)
+            n_ne['exp'].append(ne.exp)
             n_ne['n_ne'].append(len(ne.ne_members))
-            n_ne['shuffled'].append(0)
             n_ne['stim'].append(stim)
             # get number of cNEs from shuffled
             file_null = re.sub('{}.pkl'.format(stim), '{}-shuffled.pkl'.format(stim), file)
             with open(file_null, 'rb') as f:
                 data = pickle.load(f)
-            n_ne['n_ne'].append(np.median(data['n_ne']))
-            n_ne['shuffled'].append(1)
-            n_ne['stim'].append(stim)
+            n_ne['shuffled'].append(np.median(data['n_ne']))
 
     n_ne = pd.DataFrame(n_ne)
     n_ne.to_json(os.path.join(summary_folder, 'num_ne_data_vs_shuffle.json'))
