@@ -16,6 +16,7 @@ from itertools import combinations
 from copy import deepcopy
 import matplotlib.pyplot as plt
 import plot_box as plots
+import itertools
 
 from helper import strf2rtf
 
@@ -457,6 +458,8 @@ class Session:
                 midpoint = spktrain.shape[1] // 2
                 spktrains = [spktrain[:, :midpoint], spktrain[:, midpoint:]]
                 edges = [edges[:midpoint+1], edges[midpoint:]]
+             
+                # get cNEs on split dataset of the real data
                 for idx, spktrain in enumerate(spktrains):
                     patterns = netools.detect_cell_assemblies(spktrain)
                     ne = NE(self.exp, self.depth, self.probe, df, stim=stim+str(idx), spktrain=spktrain,
@@ -1003,7 +1006,304 @@ class NE(Session):
                 ri_all.append(ri)
         ri_all = pd.DataFrame(ri_all)
         return ri_all
+
+
+    def get_random_group_properties(self, stim_strf=None, nsample=10, max_repeat=1000):
+        session = self.get_session_data()
+        edges = session.edges_dmr
+        if hasattr(stim_strf, 'df'):
+            df = stim_strf.df
+            edges_strf = edges[::df]
+        random.seed(0)
+        strf_all = []
+        n_neuron = len(session.units)
+        strf_sig = [unit.strf_sig for unit in session.units]
+        sig_units = np.where(strf_sig)[0]
+        non_members = NE.get_non_members(n_neuron, self.ne_members, sig_units)
+        member_pairs, _ = self.get_member_pairs()
+        for i, members in self.ne_members.items():
+            print('ne #{}/{}'.format(i + 1, len(self.ne_members)))
+            n_members = len(members)
+            if n_members < 3: continue
+            combinations = []
+            for j, member in enumerate(members):
+                # get all groups include member and other neurons not in the same cNE as the member
+                combinations_tmp = itertools.combinations(non_members[member], n_members - 1)
+                combinations_tmp = np.array(list(combinations_tmp))
+                # check the non-members to see if any of them are in the same cNE, if so, exclude
+                included = np.array([True] * len(combinations_tmp))
+                for k, combination in enumerate(combinations_tmp):
+                    pairs = itertools.combinations(combination, 2)
+                    for pair in pairs:
+                        if pair in member_pairs:
+                            included[k] = False
+                            break
+                combinations_tmp = combinations_tmp[included]
+                combinations_tmp = np.concatenate([np.ones([combinations_tmp.shape[0], 1]) * member,
+                                                   combinations_tmp], axis=1).astype(int)
+                combinations.append(combinations_tmp)
+            combinations = np.concatenate(combinations)
+            
+            # get random group spiketimes
+            if len(combinations) > max_repeat:
+                rand_idx = random.sample(range(len(combinations)), max_repeat)
+                combinations = combinations[rand_idx]
+                nrepeat = max_repeat
+            else:
+                nrepeat = len(combinations)
+            random_group_spiketimes = []
+            for random_group in combinations:
+                random_units = [session.units[unit] for unit in random_group]
+                spiketimes = np.concatenate([unit.spiketimes for unit in random_units])
+                spiketimes  = spiketimes[(spiketimes > edges[0]) & (spiketimes < edges[-1])]
+                spiketimes = sorted(spiketimes)
+                random_group_spiketimes.append(spiketimes)
                 
+            # get cNE group spike times
+            member_units = [session.units[member] for member in members]
+            member_spiketimes = np.concatenate([unit.spiketimes for unit in member_units])
+            member_spiketimes  = member_spiketimes[(member_spiketimes > edges[0]) & (member_spiketimes < edges[-1])]
+            member_spiketimes = sorted(member_spiketimes)
+            
+            n_events = min([len(member_spiketimes)] + [len(spiketimes) for spiketimes in random_group_spiketimes])
+            n_events = int(n_events * .9)
+            
+            strf_members = np.empty([nsample, stim_strf.stim_mat.shape[0], 20])
+            strf_random = np.empty([nrepeat, nsample, stim_strf.stim_mat.shape[0], 20])
+            ptd_members = np.empty(nsample)
+            ptd_random = np.empty([nrepeat, nsample])
+            mi_members = np.empty(nsample)
+            mi_random = np.empty([nrepeat, nsample])
+            for sample in range(nsample):
+                print(sample + 1)
+                # get ne unit strf info
+                member_spiketimes_subsample = random.sample(member_spiketimes , n_events)
+                strf_members[sample, :, :], ptd_members[sample], mi_members[sample] =  \
+                    get_unit_strf_properties(member_spiketimes_subsample, stim_strf, edges_strf)
+                
+                for repeat in range(nrepeat):
+                    spiketimes_subsample = random.sample(random_group_spiketimes[repeat], n_events)
+                    strf_random[repeat, sample, :, :], ptd_random[repeat, sample], mi_random[repeat, sample] =  \
+                        get_unit_strf_properties(spiketimes_subsample, stim_strf, edges_strf)
+          
+            strf = {'exp': session.exp, 'depth': session.depth, 'probe': session.probe, 
+                    'cNE': i, 'members': members, 'n_events': n_events, 
+                    'strf_members': strf_members, 'strf_random': strf_random[:10, 0, :, :],
+                    'ptd_members': ptd_members, 'ptd_random': ptd_random,
+                    'mi_members': mi_members, 'mi_random': mi_random, 'combinations': combinations}
+                    
+            strf_all.append(strf)
+        strf_all = pd.DataFrame(strf_all)
+        return strf_all
+    
+    @classmethod
+    def get_non_members(cls, n_neuron, ne_members, context_units):
+        non_members = []
+        for i in range(n_neuron):
+            members_all = []
+            for _, members in ne_members.items():
+                if i in members:
+                    members_all.extend(members)
+            non_members.append(set(context_units).difference(set(members_all)))
+        return non_members
+        
+    def get_coincident_spike_properties(self, stim_strf=None, nsample=10, max_repeat=1000):
+        session = self.get_session_data()
+        edges = session.edges_dmr
+        if hasattr(stim_strf, 'df'):
+            df = stim_strf.df
+            edges_strf = edges[::df]
+        random.seed(0)
+        strf_all = []
+        n_neuron = len(session.units)
+        strf_sig = [unit.strf_sig for unit in session.units]
+        sig_units = np.where(strf_sig)[0]
+        #sig_units = range(n_neuron)
+        # for each neuron, get neurons without shared membership
+        non_members = NE.get_non_members(n_neuron, self.ne_members, sig_units)
+        
+        def get_coincident_spiketimes(spiketimes, context_spiketimes, window=10):
+            context_spiketimes.sort()
+            coincident_spikes = []
+            p1, p2 = 0, 0
+            while p1 < len(spiketimes):
+                if context_spiketimes[p2] < spiketimes[p1]:
+                    # context spike berfore curent spike
+                    if spiketimes[p1] - context_spiketimes[p2] < window:
+                        coincident_spikes.append(spiketimes[p1])
+                        p1 += 1
+                    else:
+                        if p2 < len(context_spiketimes) - 1:
+                            p2 += 1
+                        else:
+                            p1 += 1
+                        
+                else: # context_spike after current spike
+                    if context_spiketimes[p2] - spiketimes[p1] < window:
+                        coincident_spikes.append(spiketimes[p1])
+                    p1 += 1
+            return np.array(coincident_spikes)
+        
+        for cne, members in self.ne_members.items():
+            print('ne #{}/{}'.format(cne + 1, len(self.ne_members)), end=' ')
+            n_members = len(members)
+            for i, member in enumerate(members):
+                print(f'\n\tmember {i+1}/{n_members}')
+                ne_unit = self.member_ne_spikes[cne][i]
+                if len(ne_unit.spiketimes) < 100:
+                    continue
+                non_member = non_members[member]
+                
+                coincident_spiketimes = []
+                combinations = itertools.combinations(non_member, n_members - 1)
+                combinations = np.array(list(combinations))
+                unit_spiketimes = session.units[member].spiketimes
+                unit_spiketimes = unit_spiketimes[(unit_spiketimes > edges[0]) & (unit_spiketimes < edges[-1])]
+                if len(combinations) > max_repeat * 1.5:
+                    combinations = random.sample(list(combinations), int(max_repeat * 1.5))
+                    combinations = np.array(combinations)
+                for combination in combinations:
+                    context_spiketimes = np.concatenate([session.units[x].spiketimes for x in combination])
+                    coincident_spiketimes.append(sorted(
+                        get_coincident_spiketimes(unit_spiketimes, context_spiketimes)))
+                n_spiketimes = [len(spiketimes) for spiketimes in coincident_spiketimes]
+                combinations = combinations[np.array(n_spiketimes) > 100, :]
+                coincident_spiketimes = [spiketimes for spiketimes in coincident_spiketimes if len(spiketimes) > 100]
+                if len(coincident_spiketimes) == 0: continue
+                n_events = min([len(ne_unit.spiketimes)] + [len(spiketimes) for spiketimes in coincident_spiketimes])
+                n_events = int(n_events * .9)
+                
+                
+                if len(coincident_spiketimes) > max_repeat:
+                    rand_idx = random.sample(range(len(coincident_spiketimes)), max_repeat)
+                    coincident_spiketimes = [coincident_spiketimes[x] for x in rand_idx]
+                    combinations = combinations[rand_idx]
+                    nrepeat = max_repeat
+                else:
+                    nrepeat = len(coincident_spiketimes)
+                strf_members = np.empty([nsample, stim_strf.stim_mat.shape[0], 20])
+                strf_random = np.empty([nrepeat, nsample, stim_strf.stim_mat.shape[0], 20])
+                ptd_members = np.empty(nsample)
+                ptd_random = np.empty([nrepeat, nsample])
+                mi_members = np.empty(nsample)
+                mi_random = np.empty([nrepeat, nsample])
+                ne_unit.spiketimes = sorted(ne_unit.spiketimes)
+                for sample in range(nsample):
+                    print('\t', sample + 1, end=',')
+                    # get ne unit strf info
+                    member_spiketimes_subsample = random.sample(ne_unit.spiketimes , n_events)
+                    strf_members[sample, :, :], ptd_members[sample], mi_members[sample] =  \
+                        get_unit_strf_properties(member_spiketimes_subsample, stim_strf, edges_strf)
+                    
+                    for repeat in range(nrepeat):
+                        spiketimes_subsample = random.sample(coincident_spiketimes[repeat], n_events)
+                        strf_random[repeat, sample, :, :], ptd_random[repeat, sample], mi_random[repeat, sample] =  \
+                            get_unit_strf_properties(spiketimes_subsample, stim_strf, edges_strf)
+              
+                strf = {'exp': session.exp, 'depth': session.depth, 'probe': session.probe, 
+                        'cNE': cne, 'member': member, 'n_events': n_events, 
+                        'strf_members': strf_members, 'strf_random': strf_random[:, 0, :, :],
+                        'ptd_members': ptd_members, 'ptd_random': ptd_random,
+                        'mi_members': mi_members, 'mi_random': mi_random, 'combinations': combinations}
+                    
+                strf_all.append(strf)
+        strf_all = pd.DataFrame(strf_all)
+        return strf_all
+    
+    
+    def get_all_coincident_spike_properties(self, stim_strf=None, nsample=10):
+        session = self.get_session_data()
+        edges = session.edges_dmr
+        if hasattr(stim_strf, 'df'):
+            df = stim_strf.df
+            edges_strf = edges[::df]
+        random.seed(0)
+        strf_all = []
+        n_neuron = len(session.units)
+        strf_sig = [unit.strf_sig for unit in session.units]
+        #sig_units = np.where(strf_sig)[0]
+        sig_units = range(n_neuron)
+        # for each neuron, get neurons without shared membership
+        non_members = []
+        for i in range(n_neuron):
+            members_all = []
+            for _, members in self.ne_members.items():
+                if i in members:
+                    members_all.extend(members)
+            non_members.append(set(sig_units).difference(set(members_all)))
+        
+        def get_coincident_spiketimes(spiketimes, context_spiketimes, window=10):
+            context_spiketimes.sort()
+           
+            coincident_spikes = []
+            p1, p2 = 0, 0
+            while p1 < len(spiketimes):
+                if context_spiketimes[p2] < spiketimes[p1]:
+                    # context spike berfore curent spike
+                    if spiketimes[p1] - context_spiketimes[p2] < window:
+                        coincident_spikes.append(spiketimes[p1])
+                        p1 += 1
+                    else:
+                        if p2 < len(context_spiketimes) - 1:
+                            p2 += 1
+                        else:
+                            p1 += 1
+                        
+                else: # context_spike after current spike
+                    if context_spiketimes[p2] - spiketimes[p1] < window:
+                        coincident_spikes.append(spiketimes[p1])
+                    p1 += 1
+            return np.array(coincident_spikes)
+        
+        for cne, members in self.ne_members.items():
+            print('ne #{}/{}'.format(cne + 1, len(self.ne_members)))
+            n_members = len(members)
+            for i, member in enumerate(members):
+                print(f'\tmember {i+1}/{n_members}')
+                ne_unit = self.member_ne_spikes[cne][i]
+                if len(ne_unit.spiketimes) < 100:
+                    continue
+                non_member = non_members[member]
+                context_spiketimes = np.concatenate([session.units[x].spiketimes for x in non_member])
+                unit_spiketimes = session.units[member].spiketimes
+                unit_spiketimes = unit_spiketimes[(unit_spiketimes > edges[0]) & (unit_spiketimes < edges[-1])]
+                coincident_spiketimes = sorted(get_coincident_spiketimes(unit_spiketimes, context_spiketimes))
+                context_spiketimes  = np.concatenate([session.units[x].spiketimes for x in members if x != member])
+
+                
+                n_events = min(len(ne_unit.spiketimes), len(coincident_spiketimes))
+                n_events = int(n_events * .9)
+                if n_events < 100: continue
+                
+                strf_members = np.empty([nsample, stim_strf.stim_mat.shape[0], 20])
+                strf_random = np.empty([nsample, stim_strf.stim_mat.shape[0], 20])
+                ptd_members = np.empty(nsample)
+                ptd_random = np.empty(nsample)
+                mi_members = np.empty(nsample)
+                mi_random = np.empty(nsample)
+                ne_unit.spiketimes = sorted(ne_unit.spiketimes)
+                for sample in range(nsample):
+                    print('\t', sample + 1)
+                    # get ne unit strf info
+                    member_spiketimes_subsample = random.sample(ne_unit.spiketimes , n_events)
+                    strf_members[sample, :, :], ptd_members[sample], mi_members[sample] =  \
+                        get_unit_strf_properties(member_spiketimes_subsample, stim_strf, edges_strf)
+                    
+                    spiketimes_subsample = random.sample(coincident_spiketimes, n_events)
+                    strf_random[sample, :, :], ptd_random[sample], mi_random[sample] =  \
+                            get_unit_strf_properties(spiketimes_subsample, stim_strf, edges_strf)
+              
+                strf = {'exp': session.exp, 'depth': session.depth, 'probe': session.probe, 
+                        'cNE': cne, 'member': member, 'n_events': n_events, 
+                        'strf_members': strf_members, 'strf_random': strf_random,
+                        'ptd_members': ptd_members, 'ptd_random': ptd_random,
+                        'mi_members': mi_members, 'mi_random': mi_random}
+                    
+                strf_all.append(strf)
+        strf_all = pd.DataFrame(strf_all)
+        return strf_all
+    
+    
     def get_sham_patterns(self, nshift=1000):
         sham_patterns = []
         n_neuron, nt = self.spktrain.shape
@@ -1197,6 +1497,7 @@ def save_matched_ne_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-p
     ne_all = pd.DataFrame(ne_all)
     ne_all.to_json(os.path.join(savefolder, 'cNE_matched-{}.json'.format(key)))
     
+    
 def save_matched_shuffled_ne_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
                savefolder=r'E:\Congcong\Documents\data\comparison\data-summary'):
     
@@ -1265,3 +1566,78 @@ def ne_neuron_subsample_combine(datafolder='E:\Congcong\Documents\data\compariso
             # get ri mean
             subsample_ri[rf+ri+'_mean'] =  subsample_ri[rf+ri].apply(np.nanmean)
 
+
+def get_unit_strf_properties(spiketimes, stim_strf, edges_strf):
+    unit = SingleUnit(0, spiketimes)
+    unit.get_strf(stim_strf, edges_strf)
+    unit.get_strf_ptd()
+    unit.get_strf_mi(edges_strf, stim_strf.stim_mat)
+    return unit.strf, unit.strf_ptd, unit.strf_info
+
+
+def ne_neuron_strf_control(stim, control_type, datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
+                           savefolder=r'E:\Congcong\Documents\data\comparison\data-summary', nrepeat=1000):
+    savefolder = os.path.join(savefolder, control_type)
+    subsample = []
+    
+    files = glob.glob(os.path.join(datafolder, '*-20dft-dmr.pkl'))
+    files = [file for file in files if 'H31x64' in file]
+    files = files[27:]
+    for idx, file in enumerate(files):
+        print('({}/{}) getting random group strf for {}'.format(idx + 1, len(files), file))
+        with open(file, 'rb') as f:
+            ne = pickle.load(f)
+        exp = ne.exp
+        probe = ne.probe
+        if control_type == 'random_group':
+            subsample = ne.get_random_group_properties(stim, max_repeat=nrepeat)
+        elif control_type == 'coincident_spike':
+            subsample = ne.get_coincident_spike_properties(stim, max_repeat=nrepeat)
+        elif control_type == 'coincident_spike_all':
+            subsample = ne.get_all_coincident_spike_properties(stim)
+        subsample.reset_index(drop=True, inplace=True)
+        subsample.to_json(os.path.join(savefolder, f'{exp}-{probe}-{control_type}.json'))
+    
+
+def ne_neuron_strf_control_combine(control_type, datafolder=r'E:\Congcong\Documents\data\comparison\data-summary'):
+    datafolder = os.path.join(datafolder, control_type)
+    files = glob.glob(os.path.join(datafolder, f'*{control_type}.json'))
+    df_all = []
+    for file in files:
+        df = pd.read_json(file)
+        if len(df) < 1:
+            continue
+        df.drop(['strf_members', 'strf_random'], axis=1, inplace=True)
+        df_all.append(df)
+    df = pd.concat(df_all)
+    df.reset_index(drop=True, inplace=True)
+    region = ['MGB' if x == 'H31x64' else 'A1' for x in df.probe]
+    df['region'] = region
+
+        
+    for prop in ('ptd', 'mi'):
+        df[prop + '_members'] = df[prop + '_members'].apply(np.mean)
+        try:
+            df[prop + '_random'] = df[prop + '_random'].apply(lambda x: np.nanmean(x, axis=1))
+        except TypeError:
+            df[prop + '_random'] = df[prop + '_random'].apply(lambda x: np.array(x, dtype=float))
+            df[prop + '_random'] = df[prop + '_random'].apply(lambda x: np.nanmean(x, axis=1))
+        except np.exceptions.AxisError:
+            df[prop + '_random'] = df[prop + '_random'].apply(lambda x: np.nanmean(x))
+
+        df[prop + '_random'] = df[prop + '_random'].apply(np.median)
+        
+    # add cNE stim encoding property
+    data = pd.read_json(r'E:\Congcong\Documents\data\comparison\data-summary\subsample_ne_neuron.json')
+    data = data[data.region == 'MGB']
+    strf_sig = []
+    for i in range(len(df)):
+        exp = df.iloc[i].exp
+        cne = df.iloc[i].cNE
+        strf_sig_tmp = data[(data.exp == exp) & (data.cNE == cne)].strf_sig
+        if len(strf_sig_tmp) > 0:
+            strf_sig.append(strf_sig_tmp.values[0])
+        else:
+            strf_sig.append(False)
+    df['strf_sig'] = strf_sig
+    df.to_json(os.path.join(datafolder, 'ne_strf_{}.json'.format(control_type)))

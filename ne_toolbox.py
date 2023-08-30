@@ -6,6 +6,7 @@ import pickle
 import random as rand
 from itertools import combinations
 from copy import deepcopy
+import random
 
 import scipy
 import numpy as np
@@ -182,17 +183,33 @@ def get_member_pairs(ne):
 
 
 # ------------ get cNE on split activities and related analysis of dmr/spon stability ------------------------
-def get_split_ne_ic_weight_match(ne_split):
+def get_split_ne_ic_weight_match(ne_split, shuffled=False):
     stims = ('dmr', 'spon')
     patterns = {'dmr': [], 'spon': []}
     for stim in stims:
         for idx in range(2):
-            patterns[stim].append(ne_split[stim + str(idx)].patterns)
-
+            if shuffled:
+                n_ne = ne_split[stim + str(idx)].patterns.shape[0]
+                patterns_tmp = ne_split[stim + str(idx)].patterns_shuffled
+                if n_ne < len(patterns_tmp):
+                    # randomly choose patterns to match number of ne in real data
+                    idx = random.sample(range(patterns_tmp.shape[0]), n_ne) 
+                    patterns[stim].append(patterns_tmp[idx,:])
+                else:
+                    patterns[stim].append(patterns_tmp)
+            else:
+                patterns[stim].append(ne_split[stim + str(idx)].patterns)
+    
     # reorder NEs based on within condition correlation value
     orders = {'dmr': [], 'spon': []}
     for stim in stims:
-        _, orders[stim], patterns[stim] = match_ic_weight(*patterns[stim])
+        try:
+            _, orders[stim], patterns[stim] = match_ic_weight(*patterns[stim])
+        except:
+            ne_split['corr_mat_shuffled'] = []
+            ne_split['order_shuffled'] = []
+            return
+            
 
     # get correlation matrix with both conditions
     patterns_all = []
@@ -201,8 +218,12 @@ def get_split_ne_ic_weight_match(ne_split):
     n_ne = patterns_all[0].shape[0]
     corr_mat = np.abs(np.corrcoef(*patterns_all))[:n_ne, n_ne:]
     corr_mat, order = corr_mat_reorder_cross(corr_mat, ne_split['dmr_first'], orders)
-    ne_split['corr_mat'] = corr_mat
-    ne_split['order'] = order
+    if shuffled:
+        ne_split['corr_mat_shuffled'] = corr_mat
+        ne_split['order_shuffled'] = order
+    else:
+        ne_split['corr_mat'] = corr_mat
+        ne_split['order'] = order
 
 
 def match_ic_weight(patterns1, patterns2):
@@ -277,25 +298,35 @@ def get_split_ne_null_ic_weight(ne_split, nshift=1000):
         ne.get_sham_patterns(nshift=nshift)
 
 
-def get_null_ic_weight_corr(ne_split):
+def get_null_ic_weight_corr(ne_split, nshift=1000):
     corr_null = {'dmr': [], 'spon': [], 'cross': []}
     for stim in ('spon', 'dmr'):
-        n_ne = ne_split[stim + '0'].patterns_sham.shape[0]
-        corr = np.abs(np.corrcoef(
-            x=ne_split[stim + '0'].patterns_sham,
-            y=ne_split[stim + '1'].patterns_sham))[:n_ne, n_ne:]
-        corr_null[stim] = corr.flatten()
+        x = ne_split[stim + '0'].patterns_sham
+        y = ne_split[stim + '1'].patterns_sham
+        n_ne_x = ne_split[stim + '0'].patterns.shape[0]
+        n_ne_y = ne_split[stim + '0'].patterns.shape[0]
+        for i in range(nshift):
+            corr = np.abs(np.corrcoef(x=x[i * n_ne_x : (i + 1) * n_ne_x],
+                                      y=y[i * n_ne_y : (i + 1) * n_ne_y]))[:n_ne_x, n_ne_x:]
+            idx_row, idx_col = corr_mat_reorder(corr.copy())
+            corr_null[stim].extend([corr[idx_row[x], idx_col[x]]for x in range(len(idx_row))])
     if ne_split['dmr_first']:
-        n_ne = ne_split['spon0'].patterns_sham.shape[0]
-        corr = np.abs(np.corrcoef(
-            x=ne_split['spon0'].patterns_sham,
-            y=ne_split['dmr1'].patterns_sham))[:n_ne, n_ne:]
+        x = ne_split['spon0'].patterns_sham
+        y = ne_split['dmr1'].patterns_sham
+        n_ne_x = ne_split['spon0'].patterns.shape[0]
+        n_ne_y = ne_split['dmr1'].patterns.shape[0]
     else:
-        n_ne = ne_split['spon1'].patterns_sham.shape[0]
-        corr = np.abs(np.corrcoef(
-            x=ne_split['spon1'].patterns_sham,
-            y=ne_split['dmr0'].patterns_sham))[:n_ne, n_ne:]
-    corr_null['cross'] = corr.flatten()
+        x = ne_split['spon1'].patterns_sham
+        y = ne_split['dmr0'].patterns_sham
+        n_ne_x = ne_split['spon1'].patterns.shape[0]
+        n_ne_y = ne_split['dmr0'].patterns.shape[0]
+    for i in range(nshift):
+        corr = np.abs(np.corrcoef(x=x[i * n_ne_x : (i + 1) * n_ne_x],
+                                  y=y[i * n_ne_y : (i + 1) * n_ne_y]))[:n_ne_x, n_ne_x:]
+        idx_row, idx_col = corr_mat_reorder(corr.copy())
+        corr_null['cross'].extend([corr[idx_row[x], idx_col[x]]for x in range(len(idx_row))])
+    for stim in ('spon', 'dmr', 'cross'):
+        corr_null[stim] = np.array(corr_null[stim])
     ne_split['corr_null'] = corr_null
 
 
@@ -316,7 +347,43 @@ def get_ic_weight_corr(ne_split):
     else:
         corr['cross'] = ne_split['corr_mat'][:n_ne, n_ne:].diagonal()
     ne_split['corr'] = corr
+    
+    
+def get_ic_weight_corr_shuffled(ne_split):
+    corr = {'dmr': [], 'spon': [], 'cross': []}
+    # get whithin stim shuffled correlation:
+    for stim in ('dmr', 'spon'):
+        patterns_shuffled = [ne_split[f'{stim}0'].patterns_shuffled, ne_split[f'{stim}1'].patterns_shuffled]
+        patterns_adjacent = [ne_split[f'{stim}1'].patterns, ne_split[f'{stim}0'].patterns]
+        for i in range(2):
+            patterns1 = patterns_shuffled[0]
+            try:
+                n_ne = patterns1.shape[0]
+            except AttributeError:
+                continue
+            patterns2 = patterns_adjacent[1]
+            corrmat = np.corrcoef(patterns1, patterns2)[:n_ne, n_ne:]
+            corr[stim].extend(np.max(corrmat, axis=1))
+    
+    # get cross stim shuffled correlation:
+    if ne_split['dmr_first']:
+        patterns_shuffled = [ne_split['spon0'].patterns_shuffled, ne_split['dmr1'].patterns_shuffled]
+        patterns_adjacent = [ne_split['dmr1'].patterns, ne_split['spon0'].patterns]
+    else:
+        patterns_shuffled = [ne_split['spon1'].patterns_shuffled, ne_split['dmr0'].patterns_shuffled]
+        patterns_adjacent = [ne_split['dmr0'].patterns, ne_split['spon1'].patterns]
+    for i in range(2):
+        patterns1 = patterns_shuffled[0]
+        try:
+            n_ne = patterns1.shape[0]
+        except AttributeError:
+            continue
+        patterns2 = patterns_adjacent[1]
+        corrmat = np.abs(np.corrcoef(patterns1, patterns2)[:n_ne, n_ne:])
+        corr['cross'].extend(np.max(corrmat, axis=1))
 
+    ne_split['corr_shuffled'] = corr
+    return ne_split
 
 def get_split_ne_df(files, savefolder):
     ne = pd.DataFrame(columns=['exp', 'probe', 'region', 'stim', 'dmr_first', 'idx1', 'idx2',
@@ -476,7 +543,7 @@ def calc_strf(stim_mat, spktrain, nlag=0, nlead=20, mdb=40):
     for i in range(nlag):
         strf[:, nlead + i] = stim_mat @ np.roll(spktrain, i)
     
-    strf = strf / pp / T
+    # strf = strf / pp / T # in unit of spike/db
     return strf
 
 
@@ -693,6 +760,7 @@ def calc_strf_nonlinearity(strf, spktrain, stim):
 
 
 def calc_strf_mi(spiketimes, edges, stim, frac=[90, 92.5, 95, 97.5, 100], nreps=10, nblocks=2):
+    spiketimes = np.array(spiketimes)
     spktrain, _ = np.histogram(spiketimes, edges)
     spiketimes = spiketimes[(spiketimes >= edges[0]) & (spiketimes <= edges[-1])]
     np.random.shuffle(spiketimes)
@@ -906,9 +974,6 @@ def save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, file, dfs):
             dataframe = pd.concat([dataframe, row])
     return dataframe
 
-    return {'df': dfs, 'patterns': patterns_match, 'pearsonr': corr_match}
-
-
 def batch_save_icweight_ccg_binsize(datafolder, jsonfile, savefolder):
     data = pd.read_json(jsonfile)
     data['overlap_prc'] = data['n_member_overlap'] / data['n_member_ref']
@@ -1000,3 +1065,126 @@ def get_num_cne_vs_shuffle(datafolder='E:\Congcong\Documents\data\comparison\dat
 
     n_ne = pd.DataFrame(n_ne)
     n_ne.to_json(os.path.join(summary_folder, 'num_ne_data_vs_shuffle.json'))
+
+
+# ----------------------------- split shuffle test --------------------------------------------------
+
+def get_split_shuffled_ne(file, n_shuffle=10):
+    with open(file, 'rb') as f:
+        ne_split = pickle.load(f)
+    # cNE analysis
+    random.seed(0)
+    for block in ('dmr0', 'dmr1', 'spon0', 'spon1'):
+       
+        ne = ne_split[block]
+        spktrain = ne.spktrain
+        patterns_shuffled = []
+        for i in range(10):
+            spktrain_shuffled = shuffle_spktrain(spktrain)
+            patterns_shuffled.append(detect_cell_assemblies(spktrain_shuffled))
+        patterns_shuffled = [pattern for pattern in patterns_shuffled if np.any(pattern)]
+        if len(patterns_shuffled) >= 1:
+            ne.patterns_shuffled = np.concatenate(patterns_shuffled)
+        else:
+            ne.patterns_shuffled = None
+    return ne_split
+
+def get_num_cne_vs_shuffle_split(datafolder='E:\Congcong\Documents\data\comparison\data-pkl',
+                           summary_folder='E:\Congcong\Documents\data\comparison\data-summary'):
+    stims = ('dmr0', 'dmr1', 'spon0', 'spon1')
+    n_ne = {'exp': [], 'n_ne': [], 'shuffled': [], 'stim': [], 'region': []}
+    nefiles = glob.glob(os.path.join(datafolder, '*-split-shuffled.pkl'))
+    for file_idx, file in enumerate(nefiles):
+        print('{}/{} get ne numbers for {}'.format(file_idx + 1, len(nefiles), file))
+        region = 'MGB' if ('H31x64' in file) else 'A1'
+        # get number of cNEs from real data
+        with open(file, 'rb') as f:
+            ne = pickle.load(f)
+        exp = re.search('\d{6}_\d{6}', file)[0]
+        for stim in stims:
+            n_ne['exp'].append(exp)
+            # real data
+            n_ne['n_ne'].append(ne[stim].patterns.shape[0])
+            n_ne['stim'].append(stim)
+            n_ne['shuffled'].append(0)
+            n_ne['region'].append(region)
+            # get number of cNEs from shuffled
+            n_ne['exp'].append(exp)
+            if ne[stim].patterns_shuffled is not None:
+                n_ne['n_ne'].append(ne[stim].patterns_shuffled.shape[0] / 10)
+            else:
+                n_ne['n_ne'].append(0)
+            n_ne['stim'].append(stim)
+            n_ne['shuffled'].append(1)
+            n_ne['region'].append(region)
+
+    n_ne = pd.DataFrame(n_ne)
+    n_ne.to_json(os.path.join(summary_folder, 'num_ne_data_vs_shuffle_split.json'))
+
+
+def get_ne_split_real_vs_shuffle_corr(datafolder='E:\Congcong\Documents\data\comparison\data-pkl',
+                           summary_folder='E:\Congcong\Documents\data\comparison\data-summary'):
+    stims = ('dmr', 'spon', 'cross')
+    corr = {'exp': [], 'corr': [], 'shuffled': [], 'stim': [], 'region': [], 'sig': []}
+    nefiles = glob.glob(os.path.join(datafolder, '*-split-shuffled.pkl'))
+    for file_idx, file in enumerate(nefiles):
+        print('{}/{} get icweight corr for {}'.format(file_idx + 1, len(nefiles), file))
+        region = 'MGB' if ('H31x64' in file) else 'A1'
+        # get number of cNEs from real data
+        with open(file, 'rb') as f:
+            ne_split = pickle.load(f)
+        exp = re.search('\d{6}_\d{6}', file)[0]
+        for stim in stims:
+            # real data
+            n_ne = len(ne_split['corr'][stim])
+            
+            corr['corr'].extend(ne_split['corr'][stim])
+            corr['exp'].extend([exp] * n_ne)
+            corr['stim'].extend([stim] * n_ne)
+            corr['shuffled'].extend([0] * n_ne)
+            corr['region'].extend([region] * n_ne)
+            corr['sig'].extend(ne_split['corr'][stim] > ne_split['corr_thresh'][stim])
+            # get number of cNEs from shuffled
+            n_ne = len(ne_split['corr_shuffled'][stim])
+            corr['corr'].extend(ne_split['corr_shuffled'][stim])
+            corr['exp'].extend([exp] * n_ne)
+            corr['stim'].extend([stim] * n_ne)
+            corr['shuffled'].extend([1] * n_ne)
+            corr['region'].extend([region] * n_ne)
+            corr['sig'].extend(ne_split['corr_shuffled'][stim] > ne_split['corr_thresh'][stim])
+
+    corr = pd.DataFrame(corr)
+    corr.to_json(os.path.join(summary_folder, 'icweight_corr_data_vs_shuffle_split.json'))
+  
+    
+# ----------------------------- random neuron group test --------------------------------------------------
+def batch_get_random_group_strf(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
+                                savefolder=r'E:\Congcong\Documents\data\comparison\data-pkl'):
+    """
+    For each cNE 
+
+    Parameters
+    ----------
+    datafolder : TYPE, optional
+        DESCRIPTION. The default is r'E:\Congcong\Documents\data\comparison\data-pkl'.
+
+    Returns
+    -------
+    None.
+
+    """
+    files = glob.glob(os.path.join(datafolder, '*20dft-spon.pkl'))
+    for file in files:
+        get_random_group_strf(file)
+
+
+def get_random_group_strf(filepath):
+    """
+    For each cNE, randomly sample neurons with the samE number of neurons x 1000 time
+    calculate the group STRF of cNE and random neurons, compare PTD and MID of
+    cNE group STRF and random neuron group STRF.
+    """
+    pass
+   
+
+    

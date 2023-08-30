@@ -175,6 +175,7 @@ datafolder = r'/Users/hucongcong/Documents/UCSF/data/summary'
 savefolder = r'/Users/hucongcong/Documents/UCSF/data/summary'
 netools.get_split_ne_freq_span(datafolder, savefolder)
 
+
 # ++++++++++++++++++++++++++++++++++++ cNE significanc: data shuffling  +++++++++++++++++++++++++++++++++++++++++++++++
 # ------------------------------------ get cNEs and number of cNEs from shuffled data ---------------------------------
 datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
@@ -279,6 +280,28 @@ corr_thresh = corr_thresh.drop_duplicates()
 ne_shuffled = pd.merge(ne_shuffled, corr_thresh,  how='left', on=['exp', 'probe', 'depth'])
 ne_shuffled['corr_sig'] = ne_shuffled['pattern_corr'] > ne_shuffled['corr_thresh']
 ne_shuffled.to_json(os.path.join(datafolder, 'cNE_matched_shuffled.json'))
+
+
+# ++++++++++++++++++++++++++++++++++++ cNE significanc: data shuffling for ne stability  +++++++++++++++++++++++++++++++++++++++++++++++
+# ------------------------------------  ---------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+files = glob.glob(datafolder + r'\*split.pkl', recursive=False)
+for idx, file in enumerate(files):
+    print('({}/{}) Get shuffled cNEs for {}'.format(idx+1, len(files), file))
+    
+    # cNEs from shuffled data
+    ne_split = netools.get_split_shuffled_ne(file)
+    # get "stability" false positive cNEs
+    ne_split = netools.get_ic_weight_corr_shuffled(ne_split)
+    
+    savefile = re.sub('split', 'split-shuffled', file)
+    with open(savefile, 'wb') as f:
+        pickle.dump(ne_split, f)
+        
+# get number of cNEs from shuffled data
+netools.get_num_cne_vs_shuffle_split()
+# save icweight correlation of real and shuffled data in dataframe
+netools.get_ne_split_real_vs_shuffle_corr()
 
 
 # ++++++++++++++++++++++++++++++++++++++++++++++ cNE stim response ++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -448,3 +471,33 @@ for file in files:
     ne.save_pkl_file()
     
 st.save_matched_ne_df(datafolder=datafolder, key='dmr_up')
+
+
+#++++++++++++++++++++++++++++++++ strf comparison of cNE and random groups of neurons ++++++++++++++++++++
+# ---------------------get strf of random groups of neurons with the same number as cNEs--------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+savefolder = r'E:\Congcong\Documents\data\comparison\data-summary\random_group'
+
+stimfolder = r'E:\Congcong\Documents\stimulus\thalamus'
+# get stimulus for strf calculation (spectrogram)
+stimfile = r'rn1-500flo-40000fhi-0-4SM-0-40TM-40db-96khz-48DF-15min-seed190506_DFt1_DFf5.pkl'
+with open(os.path.join(stimfolder, stimfile), 'rb') as f:
+    stim_strf = pickle.load(f)
+stim_strf.down_sample(df=10)
+
+st.ne_neuron_random_group(stim_strf, datafolder, savefolder)
+st.ne_neuron_random_group_combine()
+
+
+# ------------------------------------- get strf of coincident spikes ------------------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+savefolder = r'E:\Congcong\Documents\data\comparison\data-summary\coincident_spike'
+
+stimfolder = r'E:\Congcong\Documents\stimulus\thalamus'
+# get stimulus for strf calculation (spectrogram)
+stimfile = r'rn1-500flo-40000fhi-0-4SM-0-40TM-40db-96khz-48DF-15min-seed190506_DFt1_DFf5.pkl'
+with open(os.path.join(stimfolder, stimfile), 'rb') as f:
+    stim_strf = pickle.load(f)
+stim_strf.down_sample(df=10)
+savefolder = r'E:\Congcong\Documents\data\comparison\data-summary';
+st.ne_neuron_strf_control(stim_strf, 'coincident_spike', savefolder=savefolder)
