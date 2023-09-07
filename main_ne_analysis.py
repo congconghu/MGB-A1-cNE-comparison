@@ -362,6 +362,20 @@ with open(os.path.join(stimfolder, stimfile), 'rb') as f:
 
 st.ne_neuron_subsample(stim_strf, stim_crh, datafolder, savefolder)
 
+# ------------------------------- get strf of random groups of neurons / coincident spikes -------------------------------------
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
+savefolder = r'E:\Congcong\Documents\data\comparison\data-summary'
+
+stimfolder = r'E:\Congcong\Documents\stimulus\thalamus'
+# get stimulus for strf calculation (spectrogram)
+stimfile = r'rn1-500flo-40000fhi-0-4SM-0-40TM-40db-96khz-48DF-15min-seed190506_DFt1_DFf5.pkl'
+with open(os.path.join(stimfolder, stimfile), 'rb') as f:
+    stim_strf = pickle.load(f)
+stim_strf.down_sample(df=10)
+for control in ('random_group', 'coincident_spike'):
+    st.ne_neuron_strf_control(stim_strf, control, savefolder=os.path.join(savefolder, control), nrepeat=1000)
+    st.ne_neuron_strf_control_combine(control, datafolder=savefolder)
+
 
 # ++++++++++++++++++++++++++++++++++++++++++++++ cNE stability across binsize ++++++++++++++++++++++++++++++++++++++++++
 # -------------------------------------------- get cNE under different binsizes ----------------------------------------
@@ -471,33 +485,3 @@ for file in files:
     ne.save_pkl_file()
     
 st.save_matched_ne_df(datafolder=datafolder, key='dmr_up')
-
-
-#++++++++++++++++++++++++++++++++ strf comparison of cNE and random groups of neurons ++++++++++++++++++++
-# ---------------------get strf of random groups of neurons with the same number as cNEs--------------------------
-datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
-savefolder = r'E:\Congcong\Documents\data\comparison\data-summary\random_group'
-
-stimfolder = r'E:\Congcong\Documents\stimulus\thalamus'
-# get stimulus for strf calculation (spectrogram)
-stimfile = r'rn1-500flo-40000fhi-0-4SM-0-40TM-40db-96khz-48DF-15min-seed190506_DFt1_DFf5.pkl'
-with open(os.path.join(stimfolder, stimfile), 'rb') as f:
-    stim_strf = pickle.load(f)
-stim_strf.down_sample(df=10)
-
-st.ne_neuron_random_group(stim_strf, datafolder, savefolder)
-st.ne_neuron_random_group_combine()
-
-
-# ------------------------------------- get strf of coincident spikes ------------------------------------------
-datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl'
-savefolder = r'E:\Congcong\Documents\data\comparison\data-summary\coincident_spike'
-
-stimfolder = r'E:\Congcong\Documents\stimulus\thalamus'
-# get stimulus for strf calculation (spectrogram)
-stimfile = r'rn1-500flo-40000fhi-0-4SM-0-40TM-40db-96khz-48DF-15min-seed190506_DFt1_DFf5.pkl'
-with open(os.path.join(stimfolder, stimfile), 'rb') as f:
-    stim_strf = pickle.load(f)
-stim_strf.down_sample(df=10)
-savefolder = r'E:\Congcong\Documents\data\comparison\data-summary';
-st.ne_neuron_strf_control(stim_strf, 'coincident_spike', savefolder=savefolder)
