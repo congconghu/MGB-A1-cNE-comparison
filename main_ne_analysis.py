@@ -395,17 +395,19 @@ for idx, file in enumerate(files):
                 ne.save_pkl_file(savefile_path)
 
 # ------------------------------------------- match cNE patterns in each recording -------------------------------------
-# match cNE patterns to 10ms bin
+# match cNE patterns to different bin sizes
 stim = 'spon'
-datafolder = r'/Users/hucongcong/Documents/UCSF/data/data-pkl-binsize/{}'.format(stim)
-files = glob.glob(datafolder + r'/*-20dft-{}.pkl'.format(stim), recursive=False)
+datafolder = r'E:\Congcong\Documents\data\comparison\data-pkl\binsize\{}'.format(stim)
+savefolder = r'E:\Congcong\Documents\data\comparison\data-pkl\binsize\ic_match_tbins'
 dfs = np.array([2, 5, 10, 20, 40, 80, 160])*2
-for idx, file in enumerate(files):
-    print(r'{}/{} Matching time bins for {}'.format(idx+1, len(files), file))
-    ic_matched = netools.ICweight_match_binsize(datafolder, file, dfs)
-    savefile = re.sub(f'{stim}.pkl', f'{stim}-ic_match_tbins.pkl', file)
-    with open(savefile, 'wb') as f:
-        pickle.dump(ic_matched, f)
+for df in dfs:
+    files = glob.glob(datafolder + r'/*-{}dft-{}.pkl'.format(df, stim), recursive=False)
+    for idx, file in enumerate(files):
+        savefile = re.sub(f'{stim}.pkl', f'{stim}-ic_match_tbins.pkl',os.path.basename(file))
+        print(r'{}/{} Matching time bins for {}'.format(idx+1, len(files), savefile))
+        ic_matched = netools.ICweight_match_binsize(datafolder, file, dfs)
+        with open(os.path.join(savefolder, savefile), 'wb') as f:
+            pickle.dump(ic_matched, f)
 
 # -------------------------------------------- data summary saved to dataframe -----------------------------------------
 datafolder = r'/Users/hucongcong/Documents/UCSF/data/data-pkl-binsize'

@@ -2310,6 +2310,56 @@ def plot_icweight_match_binsize_summary(ax, stim, probe,
     ax.set_title(region, color=eval(f'{region}_color[0]'), weight='bold')
 
 
+def plot_icweight_corr_vs_binsize_summary_2d(fig, ax, datafolder, property='corr', stim='spon', region='MGB'):
+    """
+    violin plot of icweight corr for different binsizes. The 2 halves of violins represent MGB and A1.
+    """
+    print(property)
+    files = glob.glob(os.path.join(datafolder, r'icweight_corr_binsize-*dft.json'))
+    dfs =list(map(int, [re.search('\d{1,3}(?=dft)', x).group(0) for x in files]))
+    dfs.sort()
+    mat2d = np.zeros((len(files), len(files)))
+    nne = np.zeros((len(files), len(files)))
+    for i, df in enumerate(dfs):
+        file = glob.glob(os.path.join(datafolder, f'icweight_corr_binsize-{df}dft.json'))[0]
+        data = pd.read_json(file)
+        data = data[data.stim == stim]
+        if region == 'MGB':
+            data = data[data.probe == 'H31x64']
+        elif region == 'A1':
+            data = data[data.probe == 'H22x32']
+        if property == 'corr':
+            data = data.groupby('df')['corr'].apply(list)
+        else:
+            if property == 'member_overlap_prc':
+                data['overlap_prc'] = data['n_member_overlap'] / data['n_member']
+            elif property == 'member_overlap_prc_ref':
+                data['overlap_prc'] = data['n_member_overlap'] / data['n_member_ref']
+            elif property == 'member_overlap_prc_all':
+                data['overlap_prc'] = data['n_member_overlap'] / data['n_member_all']
+            data = data.groupby('df')['overlap_prc'].apply(list)
+        positions = [x for x in range(len(files)) if x != i]
+   
+        for j, (df_match, vals) in enumerate(data.items()):
+            mat2d[i, positions[j]] = np.median(vals)
+            nne[i, positions[j]] = len(vals)
+    dfs = np.array(dfs)
+    mat2d += np.eye(len(mat2d))
+    # plot heatmap
+    im = ax.imshow(mat2d, vmin=.5, vmax=1, aspect='auto')
+    ax.set_xticks(np.arange(len(mat2d)), labels=(dfs/2).astype(int))
+    ax.set_yticks(np.arange(len(mat2d)), labels=(dfs/2).astype(int))
+    ax.set_ylabel('Reference binsize (ms)')
+    ax.set_xlabel('Binsize (ms)')
+    # Loop over data dimensions and create text annotations.
+    for i in range(len(mat2d)):
+        for j in range(len(mat2d)):
+            if i == j: continue
+            ax.text(j, i, '{:.2f}'.format(mat2d[i, j]),
+                           ha="center", va="center", color="k", fontsize=5)
+    fig.colorbar(im, ax=ax)
+    
+
 def plot_icweight_corr_vs_binsize_summary(ax, jsonfile, property='corr', stim='spon'):
     """
     violin plot of icweight corr for different binsizes. The 2 halves of violins represent MGB and A1.
@@ -3248,7 +3298,8 @@ def figure2b(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-pkl'
     plt.close()
 
 
-def figure3(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-pkl',
+def figure3(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-pkl\binsize\ic_match_tbins',
+            summaryfolder: str = r'E:\Congcong\Documents\data\comparison\data-summary',
             figfolder: str = r'E:\Congcong\Documents\data\comparison\figure\summary'):
     mpl.rcParams['lines.markersize'] = 8
 
@@ -3291,21 +3342,21 @@ def figure3(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-pkl',
     axes[0].annotate('0.5', xy=(-1.25, .05), xycoords=trans,
                      ha="center", va="center", fontsize=6)
 
-    # violin plot of correlation values
-    jsonfile = r'E:\Congcong\Documents\data\comparison\data-summary\icweight_corr_binsize.json'
+    # 2D plot of correlation value
     print('B')
     # correlation values
     x_start = .07
-    y_start = .45
-    x_fig = .4
-    y_fig = .2
+    y_start = .4
+    x_fig = .3
+    y_fig = .25
     ax = fig.add_axes([x_start, y_start, x_fig, y_fig])
-    plot_icweight_corr_vs_binsize_summary(ax, jsonfile, 'corr')
+    plot_icweight_corr_vs_binsize_summary_2d(fig, ax, summaryfolder, 'corr')
     # member matching percentage
     x_start = .57
     print('C')
     ax = fig.add_axes([x_start, y_start, x_fig, y_fig])
-    plot_icweight_corr_vs_binsize_summary(ax, jsonfile, 'member_overlap_prc')
+    plot_icweight_corr_vs_binsize_summary_2d(fig, ax, summaryfolder, 'member_overlap_prc')
+    plt.savefig(os.path.join(figfolder, 'fig3.pdf'), dpi=300)
 
     # ccg of members
     jsonfile = r'E:\Congcong\Documents\data\comparison\data-summary\member_pair_ccg_binsize.json'
@@ -3332,8 +3383,8 @@ def figure3(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-pkl',
     axes[2].set_ylabel('')
     axes[1].set_xlabel('Lag (ms)')
 
-    plt.savefig(os.path.join(figfolder, 'fig3.jpg'), dpi=300)
-    #plt.savefig(os.path.join(figfolder, 'fig3.pdf'), dpi=300)
+    #plt.savefig(os.path.join(figfolder, 'fig3.jpg'), dpi=300)
+    plt.savefig(os.path.join(figfolder, 'fig3.pdf'), dpi=300)
     plt.close()
 
 

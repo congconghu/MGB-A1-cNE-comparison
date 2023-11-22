@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import plot_box as plots
 import itertools
 
-from helper import strf2rtf
+from helper import strf2rtf, get_coincident_spiketimes
 
 
 
@@ -129,6 +129,17 @@ class SingleUnit:
         self.amps = amps
         self.adjacent_chan = adjacent_chan
         self.template = template
+        
+    def split_dmr_spon_spiketimes(self, triggers):
+        spiketimes = self.spiketimes
+        spiketimes_dmr = []
+        for trigger in triggers:
+            start, end = trigger[0] / 20, trigger[-1] / 20
+            end += np.max(np.diff(trigger)) / 20
+            spiketimes_dmr.extend(spiketimes[(start < spiketimes) & ( spiketimes < end)])
+        spiketimes_spon =list(set(spiketimes).difference(set(spiketimes_dmr)))
+        self.spiketimes_spon = np.array(spiketimes_spon)
+        self.spiketimes_dmr = np.array(spiketimes_spon)
 
     def get_strf(self, stim, edges, nlead=20, nlag=0):
         spiketimes = self.spiketimes
@@ -328,7 +339,13 @@ class Session:
             self.file_path = savefile_path
         with open(savefile_path, 'wb') as output:
             pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
-
+    
+    def split_dmr_spon_spiketimes(self):
+        trigger = self.trigger
+        for unit in self.units:
+            unit.split_dmr_spon_spiketimes(trigger)
+    
+    
     def save_spktrain_from_stim(self, stim_len):
         trigger = self.trigger
         trigger_ms = trigger / self.fs * 1e3
@@ -1121,28 +1138,6 @@ class NE(Session):
         #sig_units = range(n_neuron)
         # for each neuron, get neurons without shared membership
         non_members = NE.get_non_members(n_neuron, self.ne_members, sig_units)
-        
-        def get_coincident_spiketimes(spiketimes, context_spiketimes, window=10):
-            context_spiketimes.sort()
-            coincident_spikes = []
-            p1, p2 = 0, 0
-            while p1 < len(spiketimes):
-                if context_spiketimes[p2] < spiketimes[p1]:
-                    # context spike berfore curent spike
-                    if spiketimes[p1] - context_spiketimes[p2] < window:
-                        coincident_spikes.append(spiketimes[p1])
-                        p1 += 1
-                    else:
-                        if p2 < len(context_spiketimes) - 1:
-                            p2 += 1
-                        else:
-                            p1 += 1
-                        
-                else: # context_spike after current spike
-                    if context_spiketimes[p2] - spiketimes[p1] < window:
-                        coincident_spikes.append(spiketimes[p1])
-                    p1 += 1
-            return np.array(coincident_spikes)
         
         for cne, members in self.ne_members.items():
             print('ne #{}/{}'.format(cne + 1, len(self.ne_members)), end=' ')

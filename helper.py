@@ -108,7 +108,34 @@ def get_stim(stimfile,
     return stim_strf, stim_crh
     
 
+def batch_split_dmr_spon_spiketimes(spkfiles):
+    for file in spkfiles:
+        with open(file, 'rb') as f:
+            session = pickle.load(f)
+        session.split_dmr_spon_spiketimes()
+        session.save_pkl_file()
 
+def get_coincident_spiketimes(spiketimes, context_spiketimes, window=10):
+    context_spiketimes.sort()
+    coincident_spikes = []
+    p1, p2 = 0, 0
+    while p1 < len(spiketimes):
+        if context_spiketimes[p2] < spiketimes[p1]:
+            # context spike berfore curent spike
+            if spiketimes[p1] - context_spiketimes[p2] < window:
+                coincident_spikes.append(spiketimes[p1])
+                p1 += 1
+            else:
+                if p2 < len(context_spiketimes) - 1:
+                    p2 += 1
+                else:
+                    p1 += 1
+                
+        else: # context_spike after current spike
+            if context_spiketimes[p2] - spiketimes[p1] < window:
+                coincident_spikes.append(spiketimes[p1])
+            p1 += 1
+    return np.array(coincident_spikes)
 
 
 

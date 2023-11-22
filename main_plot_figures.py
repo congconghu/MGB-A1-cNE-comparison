@@ -17,13 +17,13 @@ import matplotlib.pyplot as plt
 
 #plots.figure2b()
 
-#plots.figure3()
+plots.figure3()
 
 #plots.figure4()
 
 #plots.figure5()
 
-plots.figure6()
+#plots.figure6()
 
 #plots.figure7()
 

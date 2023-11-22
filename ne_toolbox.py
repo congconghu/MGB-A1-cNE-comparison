@@ -910,7 +910,11 @@ def ICweight_match_binsize(datafolder, file, dfs):
     patterns_match = np.zeros([patterns_ref.shape[0], len(dfs), patterns_ref.shape[1]])
     corr_match = np.zeros([patterns_ref.shape[0], len(dfs)])
     for i, df in enumerate(dfs):
-        file = glob.glob('{}-*-{}{}'.format(base, df, suffix))[0]
+        try:
+            file = glob.glob('{}-*-{}{}'.format(base, df, suffix))[0]
+        except IndexError:
+            # when no cNE detected using the time bine size
+            continue
         with open(file, 'rb') as f:
             ne = pickle.load(f)
         patterns = ne.patterns
@@ -925,16 +929,19 @@ def ICweight_match_binsize(datafolder, file, dfs):
 
 
 def batch_save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, dfs):
-    dataframe = pd.DataFrame()
-    for stim in ('spon', 'dmr'):
-        files = glob.glob(datafolder + r'/{}/*-20dft-{}.pkl'.format(stim, stim), recursive=False)
-        for idx, file in enumerate(files):
-            print('({}/{}) save icweight binsize match summary data for {}'.format(idx, len(files), file))
-            dataframe_tmp = save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, file, dfs)
-            dataframe_tmp['stim'] = stim
-            dataframe = pd.concat([dataframe, dataframe_tmp])
-    dataframe.reset_index(inplace=True, drop=True)
-    dataframe.to_json(os.path.join(savefolder, 'icweight_corr_binsize.json'))
+    for df in dfs:
+        dataframe = pd.DataFrame()
+        for stim in ('spon', 'dmr'):
+            files = glob.glob(datafolder + r'\*-{}dft-{}.pkl'.format(df, stim), recursive=False)
+            for idx, file in enumerate(files):
+                print('({}/{}) save icweight binsize match summary data for {}'.format(idx, len(files), file))
+                dfs_tmp = [x for x in dfs if x != df]
+                assert(len(dfs_tmp) == len(dfs) - 1)
+                dataframe_tmp = save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, file, dfs_tmp)
+                dataframe_tmp['stim'] = stim
+                dataframe = pd.concat([dataframe, dataframe_tmp])
+        dataframe.reset_index(inplace=True, drop=True)
+        dataframe.to_json(os.path.join(savefolder, f'icweight_corr_binsize-{df}dft.json'))
 
 
 def save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, file, dfs):
@@ -949,7 +956,10 @@ def save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, file, dfs):
     thresh = 1 / np.sqrt(patterns_ref.shape[1])
 
     for i, df in enumerate(dfs):
-        file = glob.glob('{}-*-{}{}'.format(base, df, suffix))[0]
+        try:
+            file = glob.glob('{}-*-{}{}'.format(base, df, suffix))[0]
+        except IndexError:
+            continue
         with open(file, 'rb') as f:
             ne = pickle.load(f)
         patterns = ne.patterns
@@ -967,7 +977,8 @@ def save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, file, dfs):
             member_ref_only = members_ref.difference(members)
             member_extra = members.difference(members_ref)
             n_member_all = len(members.union(members_ref))
-            row = pd.DataFrame({'exp': exp, 'probe': probe, 'df': df, 'corr': abs(corr[match_idx]),
+            row = pd.DataFrame({'exp': exp, 'probe': probe, 'df': df, 
+                                'cne': i, 'corr': abs(corr[match_idx]),
                           'member_overlap': [member_overlap], 'member_extra': [member_extra],
                           'member_ref_only': [member_ref_only], 'n_member': n_member, 'n_member_ref': n_member_ref,
                           'n_member_all': n_member_all, 'n_member_overlap': n_member_overlap})
