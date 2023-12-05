@@ -928,18 +928,21 @@ def ICweight_match_binsize(datafolder, file, dfs):
     return {'df': dfs, 'patterns': patterns_match, 'pearsonr': corr_match}
 
 
-def batch_save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, dfs):
+def batch_save_icweight_binsize_corr_to_dataframe(
+        datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl\binsize\spon', 
+        savefolder='E:\Congcong\Documents\data\comparison\data-summary', 
+        dfs=[4, 10, 20, 40, 80, 160, 320]):
+    stim = 'spon'
     for df in dfs:
         dataframe = pd.DataFrame()
-        for stim in ('spon', 'dmr'):
-            files = glob.glob(datafolder + r'\*-{}dft-{}.pkl'.format(df, stim), recursive=False)
-            for idx, file in enumerate(files):
-                print('({}/{}) save icweight binsize match summary data for {}'.format(idx, len(files), file))
-                dfs_tmp = [x for x in dfs if x != df]
-                assert(len(dfs_tmp) == len(dfs) - 1)
-                dataframe_tmp = save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, file, dfs_tmp)
-                dataframe_tmp['stim'] = stim
-                dataframe = pd.concat([dataframe, dataframe_tmp])
+        files = glob.glob(datafolder + r'\*-{}dft-{}.pkl'.format(df, stim), recursive=False)
+        for idx, file in enumerate(files):
+            print('({}/{}) save icweight binsize match summary data for {}'.format(idx, len(files), file))
+            dfs_tmp = [x for x in dfs if x != df]
+            assert(len(dfs_tmp) == len(dfs) - 1)
+            dataframe_tmp = save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, file, dfs_tmp)
+            dataframe_tmp['stim'] = stim
+            dataframe = pd.concat([dataframe, dataframe_tmp])
         dataframe.reset_index(inplace=True, drop=True)
         dataframe.to_json(os.path.join(savefolder, f'icweight_corr_binsize-{df}dft.json'))
 
@@ -954,7 +957,8 @@ def save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, file, dfs):
         ne = pickle.load(f)
     patterns_ref = ne.patterns
     thresh = 1 / np.sqrt(patterns_ref.shape[1])
-
+    patterns_sham = ne.patterns_sham
+    patterns_sham = patterns_sham.reshape(-1, patterns_sham.shape[-1])
     for i, df in enumerate(dfs):
         try:
             file = glob.glob('{}-*-{}{}'.format(base, df, suffix))[0]
@@ -967,6 +971,7 @@ def save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, file, dfs):
             corr = np.corrcoef(pattern, patterns_ref)[0][1:]
             match_idx = np.argmax(abs(corr))
             pattern_ref = patterns_ref[match_idx]
+            corr = abs(corr[match_idx])
 
             members_ref = set(np.where(pattern_ref > thresh)[0])
             n_member_ref = len(members_ref)
@@ -977,13 +982,30 @@ def save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, file, dfs):
             member_ref_only = members_ref.difference(members)
             member_extra = members.difference(members_ref)
             n_member_all = len(members.union(members_ref))
+            pattern = pattern.reshape(1, -1)
+            corr_null = corr2_coeff(pattern, patterns_sham)
+            corr_null = abs(corr_null.reshape(-1, 1000)).max(axis=0)
+            p = sum(corr_null > corr) / 1e3
             row = pd.DataFrame({'exp': exp, 'probe': probe, 'df': df, 
-                                'cne': i, 'corr': abs(corr[match_idx]),
+                                'cne': i, 'corr': corr, 'p': p,
                           'member_overlap': [member_overlap], 'member_extra': [member_extra],
                           'member_ref_only': [member_ref_only], 'n_member': n_member, 'n_member_ref': n_member_ref,
                           'n_member_all': n_member_all, 'n_member_overlap': n_member_overlap})
             dataframe = pd.concat([dataframe, row])
     return dataframe
+
+
+def corr2_coeff(A, B):
+    # Rowwise mean of input arrays & subtract from input arrays themeselves
+    A_mA = A - A.mean(1)[:, None]
+    B_mB = B - B.mean(1)[:, None]
+
+    # Sum of squares across rows
+    ssA = (A_mA**2).sum(1)
+    ssB = (B_mB**2).sum(1)
+
+    # Finally get corr coeff
+    return np.dot(A_mA, B_mB.T) / np.sqrt(np.dot(ssA[:, None],ssB[None]))
 
 def batch_save_icweight_ccg_binsize(datafolder, jsonfile, savefolder):
     data = pd.read_json(jsonfile)
@@ -1196,6 +1218,11 @@ def get_random_group_strf(filepath):
     cNE group STRF and random neuron group STRF.
     """
     pass
-   
 
+    
+# -------------------------------- revision1 ----------------------------------------------------------------
+def get_binsize_significance_prc(filepath=r'E:\Congcong\Documents\data\comparison\data-pkl\binsize\spon'):
+    binsizes = np.array([2, 5, 10, 20, 40, 80, 160]) * 2
+    for binsize in binsizes:
+        reference_files = glob.glob(os.path.join())
     

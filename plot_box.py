@@ -2360,49 +2360,43 @@ def plot_icweight_corr_vs_binsize_summary_2d(fig, ax, datafolder, property='corr
     fig.colorbar(im, ax=ax)
     
 
-def plot_icweight_corr_vs_binsize_summary(ax, jsonfile, property='corr', stim='spon'):
+def plot_icweight_corr_vs_binsize_summary(ax, df, param='corr', stim='spon',
+                                          summary_folder='E:\Congcong\Documents\data\comparison\data-summary'):
     """
     violin plot of icweight corr for different binsizes. The 2 halves of violins represent MGB and A1.
     """
-    print(property)
+    jsonfile = os.path.join(summary_folder, f'icweight_corr_binsize-{df}dft.json')
+    print(param)
     data = pd.read_json(jsonfile)
     data = data[data.stim == stim]
-    if property == 'corr':
-        data_MGB = data[data.probe == 'H31x64'].groupby('df')['corr'].apply(list)
-        data_A1 = data[data.probe == 'H22x32'].groupby('df')['corr'].apply(list)
-        thresh = 0.9
+    if param == 'corr':
+        data_sig = data[(data.probe == 'H31x64') & (data.p < .01)].groupby('df')['corr'].apply(list)
+        data = data[data.probe == 'H31x64'].groupby('df')['corr'].apply(list)
     else:
-        if property == 'member_overlap_prc':
+        if param == 'member_overlap_prc':
             data['overlap_prc'] = data['n_member_overlap'] / data['n_member']
-        elif property == 'member_overlap_prc_ref':
+        elif param == 'member_overlap_prc_ref':
             data['overlap_prc'] = data['n_member_overlap'] / data['n_member_ref']
-        elif property == 'member_overlap_prc_all':
+        elif param == 'member_overlap_prc_all':
             data['overlap_prc'] = data['n_member_overlap'] / data['n_member_all']
-        data_MGB = data[data.probe == 'H31x64'].groupby('df')['overlap_prc'].apply(list)
-        data_A1 = data[data.probe == 'H22x32'].groupby('df')['overlap_prc'].apply(list)
-        thresh = 0.8
-    positions = [0, 1, 3, 4, 5, 6]
-
-    for region in ('MGB', 'A1'):
-        print(region)
-        data = eval(f'data_{region}')
-        for df, vals in data.items():
-            print(f'{df/2}ms', np.mean(np.array(vals) >= thresh))
-    v1 = ax.violinplot(data_MGB, points=100, positions=positions, showextrema=False, widths=.8)
+        data_sig = data[(data.probe == 'H31x64') & (data.p < .01)].groupby('df')['overlap_prc'].apply(list)
+        data = data[data.probe == 'H31x64'].groupby('df')['overlap_prc'].apply(list)
+    
+    if df == 20:
+        positions = [0, 1, 3, 4, 5, 6]
+    elif df == 320:
+        positions = [0, 1, 2, 3, 4, 5]
+    
+    v1 = ax.violinplot(data, points=100, positions=positions, showextrema=False, widths=.8)
     set_violin_half(v1, half='l', color=MGB_color[0])
-
-    v2 = ax.violinplot(data_A1, points=100, positions=positions, showextrema=False, widths=.8)
-    set_violin_half(v2, half='r', color=A1_color[0])
+    v2 = ax.violinplot(data_sig, points=100, positions=positions, showextrema=False, widths=.8)
+    set_violin_half(v2, half='r', color=MGB_color[0])
+        
     ax.set_ylim([0, 1])
     plt.setp(ax.collections, alpha=1)
-    ax.legend([v1['bodies'][0], v2['bodies'][0]], ['MGB', 'A1'],
-              fontsize=6, fancybox=False, edgecolor='black', loc='lower left')
     ax.set_xticks(range(7))
     ax.set_xticklabels([2, 5, 10, 20, 40, 80, 160])
     ax.set_xlabel('Bin size (ms)')
-    for binsize in [4, 10, 40, 80, 160, 320]:
-        _, p = stats.mannwhitneyu(data_MGB[binsize], data_A1[binsize])
-        print('binsize', binsize/2, 'ms', p*6)
 
 
 def set_violin_half(v, half='l', color='r'):
@@ -3298,20 +3292,47 @@ def figure2b(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-pkl'
     plt.close()
 
 
+def plot_binsizes_matching_prc(ax, summaryfolder: str = r'E:\Congcong\Documents\data\comparison\data-summary',
+                               dfs=[4, 10, 20, 40, 80, 160, 320]):
+    dfs = np.array(dfs)
+    n_total = [108, 114, 115, 116, 104, 98, 94]
+    n_sigs = []
+    for i, df in enumerate(dfs):
+        data = pd.read_json(os.path.join(summaryfolder, f'icweight_corr_binsize-{df}dft.json'))
+        n_sig = data[(data.probe=='H31x64') & (data.p < .01)]['df'].value_counts()
+        n_sig = n_sig.reset_index()
+        n = n_sig.sort_values('df')['count'].values
+        n_sigs.append(np.concatenate([n[:i], [n_total[i]], n[i:]]))
+    n_sigs = np.array(n_sigs)
+    prc_sig = n_sigs / n_total
+    
+    im = ax.imshow(prc_sig, vmin=.4, vmax=1, aspect='auto')
+    ax.set_xticks(np.arange(len(prc_sig)), labels=(dfs/2).astype(int))
+    ax.set_yticks(np.arange(len(prc_sig)), labels=(dfs/2).astype(int))
+    ax.set_ylabel('Reference binsize (ms)')
+    ax.set_xlabel('Binsize (ms)')
+    # Loop over data dimensions and create text annotations.
+    for i in range(len(dfs)):
+        for j in range(len(dfs)):
+            if i == j: continue
+            ax.text(j, i, '{:.2f}'.format(prc_sig[i, j]),
+                           ha="center", va="center", color="k", fontsize=5)
+    return im
+
+
 def figure3(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-pkl\binsize\ic_match_tbins',
             summaryfolder: str = r'E:\Congcong\Documents\data\comparison\data-summary',
             figfolder: str = r'E:\Congcong\Documents\data\comparison\figure\summary'):
     mpl.rcParams['lines.markersize'] = 8
 
-    figsize = [figure_size[1][0], 12 * cm]
+    figsize = [figure_size[0][0], 12 * cm]
     fig = plt.figure(figsize=figsize)
 
-    x_start = .07
+    x_start = .05
     y_start = .7
-    x_space = .01
-    x_fig = .05
+    x_space = .006
+    x_fig = .03
     y_fig = .25
-    y_space = .1
     # plot example - 1
     file = os.path.join(datafolder,
                         '210120_003822-site3-4800um-20db-dmr-31min-H31x64-fs20000-ne-20dft-spon-ic_match_tbins.pkl')
@@ -3325,7 +3346,7 @@ def figure3(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-pkl\b
     axes[0].yaxis.set_label_coords(-.5, 0.5)
 
     # plot example - 2
-    x_start = .57
+    x_start = .35
     file = os.path.join(datafolder,
                         '201005_213847-site5-5105um-20db-dmr-32min-H31x64-fs20000-ne-20dft-spon-ic_match_tbins.pkl')
     with open(file, 'rb') as f:
@@ -3341,23 +3362,28 @@ def figure3(datafolder: str = r'E:\Congcong\Documents\data\comparison\data-pkl\b
                      ha="center", va="center", fontsize=6)
     axes[0].annotate('0.5', xy=(-1.25, .05), xycoords=trans,
                      ha="center", va="center", fontsize=6)
-
-    # 2D plot of correlation value
-    print('B')
-    # correlation values
-    x_start = .07
-    y_start = .4
-    x_fig = .3
-    y_fig = .25
-    ax = fig.add_axes([x_start, y_start, x_fig, y_fig])
-    plot_icweight_corr_vs_binsize_summary_2d(fig, ax, summaryfolder, 'corr')
-    # member matching percentage
-    x_start = .57
+    
+    x_start = .75
+    ax = fig.add_axes([x_start, y_start, .2, y_fig])
+    im = plot_binsizes_matching_prc(ax)
+    fig.colorbar(im, ax=ax)
+    
+    # plot of correlation value
     print('C')
-    ax = fig.add_axes([x_start, y_start, x_fig, y_fig])
-    plot_icweight_corr_vs_binsize_summary_2d(fig, ax, summaryfolder, 'member_overlap_prc')
-    plt.savefig(os.path.join(figfolder, 'fig3.pdf'), dpi=300)
+    # correlation values
+    x_start = .05
+    y_start = .4
+    x_fig = .2
+    x_space = .05
+    y_fig = .18
+    for param in ('corr', 'member_overlap_prc'):
+        for df in [20, 320]:
+            ax = fig.add_axes([x_start, y_start, x_fig, y_fig])
+            plot_icweight_corr_vs_binsize_summary(ax, df, param)
+            x_start += x_fig + x_space
 
+    plt.savefig(os.path.join(figfolder, 'fig3.pdf'), dpi=300)
+     
     # ccg of members
     jsonfile = r'E:\Congcong\Documents\data\comparison\data-summary\member_pair_ccg_binsize.json'
     x_start = .07
@@ -4433,3 +4459,133 @@ def plot_ne_strf_control(taxis, faxis, control_type,
             strf_sig = data_summary[(data_summary.exp == cne.exp) & (data_summary.cNE == cne.cNE)].strf_sig.values[0]
             plt.savefig(os.path.join(figfolder, f'{strf_sig}_{cne.exp}_cne{cne.cNE}_neuron{cne.member}.jpg'), dpi=300)
             plt.close()
+
+def plot_fr(ax, datafolder=r'E:\Congcong\Documents\data\comparison\data-summary'):
+    bins = np.arange(-3, 3, .05)
+
+    data = pd.read_csv(os.path.join(datafolder, 'unit_properties_all.csv'))
+    sns.histplot(data=data, x='firing_rate', hue='probe',  stat='proportion', bins=bins, element='step',
+                palette=[MGB_color[1], A1_color[1]], hue_order=['H31x64', 'H22x32'],
+                common_norm=False, log_scale=True, kde=True, ax=ax, legend=False)
+    
+    data = pd.read_json(os.path.join(datafolder, 'single_units.json'))
+    sns.histplot(data=data, x='peak_snr',  bins=bins, element='step',
+                 stat='proportion', ax=ax, kde=True, common_norm=False,
+                 hue='probe', palette=[MGB_color[0], A1_color[0]], hue_order=['H31x64', 'H22x32'])
+    
+    ax.plot([.1, .1], [0, 1], '--k')
+    ax.set_xlim([0.01, 100])
+    ax.set_xticks([.01, .1, 1, 10, 100])
+    ax.set_ylim([0, 0.25])
+    ax.set_yticks(np.arange(0, .26, .05))
+    ax.set_xlabel('Firing rate (Hz)')
+
+
+def plot_pr(ax, datafolder=r'E:\Congcong\Documents\data\comparison\data-summary'):
+    binsize = .05
+    bins = np.arange(0, 1.01, binsize)
+    n = []
+    
+    data = pd.read_json(os.path.join(datafolder, 'single_units.json'))
+    x = np.arange(0, 1, binsize)
+    x -= binsize/4
+    for probe in ('H31x64', 'H22x32'):
+        
+        if probe == 'H31x64':
+            color = MGB_color[0]
+        elif probe == 'H22x32':
+            color = A1_color[0]
+        pr, _ = np.histogram(data[data.probe == probe].presence_ratio, bins)
+        pr = pr / sum(pr)
+        x +=  binsize / 2
+        ax.bar(x, pr, color=color, width= binsize/2)
+        
+    data =  pd.read_csv(os.path.join(datafolder, 'unit_properties_all.csv'))
+    x = np.arange(0, 1, binsize)
+    x -= binsize/4
+    for probe in ('H31x64', 'H22x32'):
+        if probe == 'H31x64':
+            color = MGB_color[1]
+        elif probe == 'H22x32':
+            color = A1_color[1]
+        pr, _ = np.histogram(data[data.probe == probe].presence_ratio, bins)
+        pr = pr / sum(pr)
+        x +=  binsize / 2
+        ax.plot(x, pr, color=color,  lw=.6)    
+    
+    ax.set_xlim([0, 1])
+    ax.set_ylim([0, 1])
+    ax.set_xticks(np.arange(0, 1.1, .2))
+    ax.set_yticks(np.arange(0, 1.1, .2))
+    ax.set_xlabel('Presence Ratio')
+
+def plot_isi_vio(ax, datafolder=r'E:\Congcong\Documents\data\comparison\data-summary'):
+    bins = np.arange(0, 12.1, 0.5)
+    n = []
+    
+    data = pd.read_json(os.path.join(datafolder, 'single_units.json'))
+    x = np.arange(0, 5.1, .5)
+    x -= .125
+    for probe in ('H31x64', 'H22x32'):
+        x += .25
+        if probe == 'H31x64':
+            color = MGB_color[0]
+        elif probe == 'H22x32':
+            color = A1_color[0]
+        isi_vio, _ = np.histogram(data[data.probe == probe].isi_vio, bins)
+        n.append(sum(isi_vio))
+        isi_vio[10] = sum(isi_vio[10:])
+        isi_vio = isi_vio[:11] / sum(isi_vio)
+        ax.bar(x, isi_vio, color=color, width=.25)
+    
+    data =  pd.read_csv(os.path.join(datafolder, 'unit_properties_all.csv'))
+    x = np.arange(0, 5.1, .5)
+    x -= .125
+    for probe in ('H31x64', 'H22x32'):
+        x += .25
+        if probe == 'H31x64':
+            color = MGB_color[1]
+        elif probe == 'H22x32':
+            color = A1_color[1]
+        isi_vio, _ = np.histogram(data[data.probe == probe].isi_vio, bins)
+        n.append(sum(isi_vio))
+        isi_vio[10] = sum(isi_vio[10:])
+        isi_vio = isi_vio[:11] / sum(isi_vio)
+        ax.plot(x, isi_vio, color=color, lw=.6)
+    ax.plot([1.5, 1.5], [0, 1], '--k')
+    
+    ax.set_xlim([0, 5])
+    ax.set_ylim([0, 1])
+    ax.set_xticks(range(6))
+    ax.set_xlabel('ISI violation (%)')
+    print('number of units:', n)
+    
+def plot_snr(ax, datafolder=r'E:\Congcong\Documents\data\comparison\data-summary'):
+    bins=np.arange(0, 30, .5)
+
+    data = pd.read_json(os.path.join(datafolder, 'single_units.json'))
+    sns.histplot(data=data, x='peak_snr',  bins=bins, alpha=.75,  element='step',
+                 stat='proportion', ax=ax, kde=True, common_norm=False,
+                 hue='probe', palette=[MGB_color[0], A1_color[0]], hue_order=['H31x64', 'H22x32'])
+    
+    data =  pd.read_csv(os.path.join(datafolder, 'unit_properties_all.csv'))
+    h = sns.histplot(data=data, x='peak_snr',  bins=bins, element='step',
+                 stat='proportion', ax=ax, kde=True, common_norm=False,
+                 hue='probe', palette=[MGB_color[1], A1_color[1]], hue_order=['H31x64', 'H22x32'])
+    ax.plot([1.5, 1.5], [0, 1], '--k')
+    ax.set_xlim([0, 15])
+    ax.set_ylim([0, .3])
+    ax.set_yticks(np.arange(0, .31, .05))
+    ax.set_xlabel('Peak SNR')
+
+def figure_sup(figfolder: str = r'E:\Congcong\Documents\data\comparison\figure\summary'):
+      figsize = [figure_size[2][0], 8.5 * cm]
+      fig, axes = plt.subplots(2, 2, figsize=figsize)
+      axes = axes.flatten()
+      plot_isi_vio(axes[0])
+      plot_snr(axes[1])
+      plot_fr(axes[2])
+      plot_pr(axes[3])
+      fig.tight_layout()
+      fig.savefig(os.path.join(figfolder, 'sup1.pdf'), dpi=300)
+    

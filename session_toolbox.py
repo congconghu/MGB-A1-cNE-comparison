@@ -281,6 +281,7 @@ class SingleUnit:
         strf = self.strf
         plots.plot_strf(ax, self.strf, self.strf_taxis, self.strf_faxis)
     
+    
 class Session:
 
     def __init__(self, exp=None, site=None, depth=None, filt_params=None, fs=None, probe=None, probdata=None, units=[],
@@ -671,6 +672,37 @@ class Session:
         position_idx = np.argsort(order)
         for i, unit in enumerate(units):
             unit.position_idx = position_idx[i]
+
+    #-----------spike sorting matrices---------------------------------
+    def get_fr(self):
+        units = self.units
+        dur = 0
+        nspk = 0
+        for stim in ('dmr', 'spon'):
+            if hasattr(self, f'spktrain_{stim}'):
+                spktrain = eval(f'self.spktrain_{stim}')
+                dur += spktrain.shape[1] * .5 / 1000 # duration in s
+                nspk += np.sum(spktrain, axis=1)
+        fr = nspk / dur
+        for i, unit in enumerate(units):
+                unit.fr = fr[i]
+    
+    def get_presence_ratio(self):
+        units = self.units
+        nblocks = 100
+        for stim in ('dmr', 'spon'):
+            if hasattr(self, f'spktrain_{stim}'):
+                try:
+                    spktrain = np.concatenate([spktrain, eval(f'self.spktrain_{stim}')], axis=1)
+                except NameError:
+                    spktrain = eval(f'self.spktrain_{stim}')
+        n_neuron, nt = spktrain.shape
+        
+        spktrain = np.reshape(spktrain[:, :nt//nblocks * nblocks], [n_neuron, nt//nblocks, nblocks])
+        spktrain = np.sum(spktrain, axis=1)
+        presence_ratio = np.sum((spktrain > 0), axis=1) / nblocks
+        for i, unit in enumerate(units):
+                unit.presence_ratio = presence_ratio[i]
 
 class NE(Session):
     def __init__(self, exp, depth, probe, df, stim=None, spktrain=None, patterns=None, edges=None):
@@ -1309,7 +1341,7 @@ class NE(Session):
             for i in range(n_neuron):
                 spktrain_z[i] = np.roll(spktrain_z[i], shift_size[i])
 
-            sham_patterns.extend(netools.fast_ica(spktrain_z, num_ne, niter=500))
+            sham_patterns.append(netools.fast_ica(spktrain_z, num_ne, niter=500))
         sham_patterns = np.array(sham_patterns)
         self.patterns_sham = sham_patterns
 
@@ -1364,7 +1396,7 @@ def save_su_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
     :return:
     """
     droplist = ['spiketimes', 'isi_bin', 'waveforms', 'waveforms_mean', 'waveforms_std', 'amps',
-                'adjacent_chan', 'template', 'peak_snr', 'strf_nonlinearity', 'si_null', 'si_spk', 
+                'adjacent_chan', 'template', 'strf_nonlinearity', 'si_null', 'si_spk', 
                 'nonlin_t_bins', 'nonlin_nspk_bins', 'strf_ifrac', 'strf_info_xcenters']
     files = glob.glob(datafolder + r'\*fs20000.pkl', recursive=False)
     units_all = []
@@ -1384,7 +1416,7 @@ def save_su_df(datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl',
         units_all.append(units)
 
     units = pd.concat(units_all)
-    units = units.astype({'unit': 'int16', 'chan': 'int8', 'depth': 'int16'})
+    units = units.astype({'unit': 'int16', 'chan': 'int8', 'depth': 'int16', 'peak_snr':'float'})
     units.reset_index(inplace=True)
     units.to_json(os.path.join(savefolder, 'single_units.json'))
 
