@@ -112,7 +112,7 @@ def get_pc_thresh(spktrain):
     return thresh
 
 
-def get_member_nonmember_xcorr(files, df=2, maxlag=200):
+def get_member_nonmember_xcorr(files, df=2, maxlag=200, ne_df=20):
     xcorr = {'xcorr': [], 'corr': [], 'member': [], 'stim': [], 'region': [], 'exp': [], 'idx1': [], 'idx2': []}
     for idx, file in enumerate(files):
         print('({}/{}) get member and nonmmebers xcorr for {}'.format(idx + 1, len(files), file))
@@ -123,7 +123,7 @@ def get_member_nonmember_xcorr(files, df=2, maxlag=200):
         n_neuron = len(session.units)
         all_pairs = set(combinations(range(n_neuron), 2))
 
-        ne_file_path = re.sub('fs20000', 'fs20000-ne-20dft*', session.file_path)
+        ne_file_path = re.sub('fs20000', f'fs20000-ne-{ne_df}dft*', session.file_path)
         nefiles = glob.glob(ne_file_path)
         for nefile in nefiles:
 
@@ -901,8 +901,12 @@ def ICweight_match_binsize_adjacent(datafolder, file, dfs):
 
 
 def ICweight_match_binsize(datafolder, file, dfs):
-    base = re.findall('.*fs20000', file)[0]
-    suffix = re.findall('dft-.*', file)[0]
+    try:
+        base = re.findall('.*fs20000', file)[0]
+        suffix = re.findall('dft-.*', file)[0]
+    except IndexError:
+        base = re.findall('.*ne', file)[0]
+        suffix = re.findall('dft.*', file)[0]
 
     with open(file, 'rb') as f:
         ne = pickle.load(f)
@@ -911,7 +915,7 @@ def ICweight_match_binsize(datafolder, file, dfs):
     corr_match = np.zeros([patterns_ref.shape[0], len(dfs)])
     for i, df in enumerate(dfs):
         try:
-            file = glob.glob('{}-*-{}{}'.format(base, df, suffix))[0]
+            file = glob.glob('{}-{}{}'.format(base, df, suffix))[0]
         except IndexError:
             # when no cNE detected using the time bine size
             continue
@@ -931,11 +935,14 @@ def ICweight_match_binsize(datafolder, file, dfs):
 def batch_save_icweight_binsize_corr_to_dataframe(
         datafolder=r'E:\Congcong\Documents\data\comparison\data-pkl\binsize\spon', 
         savefolder='E:\Congcong\Documents\data\comparison\data-summary', 
-        dfs=[4, 10, 20, 40, 80, 160, 320]):
-    stim = 'spon'
+        dfs=[4, 10, 20, 40, 80, 160, 320], stim='spon'):
     for df in dfs:
         dataframe = pd.DataFrame()
-        files = glob.glob(datafolder + r'\*-{}dft-{}.pkl'.format(df, stim), recursive=False)
+        if stim is None:
+            files = glob.glob(datafolder + r'\*-{}dft.pkl'.format(df), recursive=False)
+        else:
+            files = glob.glob(datafolder + r'\*-{}dft-{}.pkl'.format(df, stim), recursive=False)
+        
         for idx, file in enumerate(files):
             print('({}/{}) save icweight binsize match summary data for {}'.format(idx, len(files), file))
             dfs_tmp = [x for x in dfs if x != df]
@@ -949,10 +956,17 @@ def batch_save_icweight_binsize_corr_to_dataframe(
 
 def save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, file, dfs):
     dataframe = pd.DataFrame()
-    base = re.findall('.*fs20000', file)[0]
-    suffix = re.findall('dft-.*', file)[0]
-    exp = re.search('\d{6}_\d{6}', file).group(0)
-    probe = re.search('H\d{2}x\d{2}', file).group(0)
+    try:
+        base = re.findall('.*fs20000', file)[0]
+        suffix = re.findall('dft-.*', file)[0]
+        exp = re.search('\d{6}_\d{6}', file).group(0)
+        probe = re.search('H\d{2}x\d{2}', file).group(0)
+    except IndexError:
+        base = re.findall('.*ne', file)[0]
+        suffix = re.findall('dft.*', file)[0]
+        exp = re.search('\d{12}', file).group(0)
+        exp = exp[:6] + '_' + exp[6:]
+        probe = None
     with open(file, 'rb') as f:
         ne = pickle.load(f)
     patterns_ref = ne.patterns
@@ -960,10 +974,8 @@ def save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, file, dfs):
     patterns_sham = ne.patterns_sham
     patterns_sham = patterns_sham.reshape(-1, patterns_sham.shape[-1])
     for i, df in enumerate(dfs):
-        try:
-            file = glob.glob('{}-*-{}{}'.format(base, df, suffix))[0]
-        except IndexError:
-            continue
+        file = glob.glob('{}*{}{}'.format(base, df, suffix))[0]
+       
         with open(file, 'rb') as f:
             ne = pickle.load(f)
         patterns = ne.patterns
@@ -984,7 +996,10 @@ def save_icweight_binsize_corr_to_dataframe(datafolder, savefolder, file, dfs):
             n_member_all = len(members.union(members_ref))
             pattern = pattern.reshape(1, -1)
             corr_null = corr2_coeff(pattern, patterns_sham)
-            corr_null = abs(corr_null.reshape(-1, 1000)).max(axis=0)
+            if not patterns_sham.shape[0] % 1000:   
+                corr_null = abs(corr_null.reshape(-1, 1000)).max(axis=0)
+            elif not patterns_sham.shape[0] % 100:   
+                corr_null = abs(corr_null.reshape(-1, 100)).max(axis=0)
             p = sum(corr_null > corr) / 1e3
             row = pd.DataFrame({'exp': exp, 'probe': probe, 'df': df, 
                                 'cne': i, 'corr': corr, 'p': p,

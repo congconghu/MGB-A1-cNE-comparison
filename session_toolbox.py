@@ -332,6 +332,20 @@ class Session:
                               waveforms_std=unit['waveforms_std'], amps=unit['amps'],
                               adjacent_chan=unit['adjacent_chan'])
             self.units.append(su)
+    
+    def read_mat_file_from_cne_ftc(self, datafile_path):
+        """Read .mat files of the recording and convert data to Session object"""
+        # load stimulus file
+        data_dict = mat73.loadmat(datafile_path)
+        exp = ''.join(re.findall(r'\d+', datafile_path))[-12:]
+        self.exp = exp
+        self.units = []
+      
+        for unit in data_dict['cne_data'].keys():
+            if re.match('unit\d{3}', unit):
+                spktimes = data_dict['cne_data'][unit]['tspk'] * 1e3 # spike times in ms
+                su = SingleUnit(unit=int(unit[4:]), spiketimes=spktimes)
+                self.units.append(su)
 
     def save_pkl_file(self, savefile_path=None):
         if savefile_path is None:
@@ -417,18 +431,34 @@ class Session:
             self.spktrain_spon = spktrain_all
             self.edges_spon = edges
         self.save_pkl_file(self.file_path)
+        
+    
+    def save_spktrain(self):
+        spiketimes_max = max([unit.spiketimes[-1] for unit in self.units])
+        edges = np.arange(0, spiketimes_max + 0.5, 0.5) 
+        spktrain = np.zeros([len(self.units), len(edges) - 1], 'int8')
+        for idx, unit in enumerate(self.units):
+            spktrain[idx], _ = np.histogram(unit.spiketimes, edges)
+                           
+        self.spktrain = spktrain
+        self.edges = edges
+        self.save_pkl_file(self.file_path)
 
     def downsample_spktrain(self, df=20, stim=None):
         """down sample the time resolution of spike trains
         input:
         df: down sample factor
-        stim: 'dmr' or 'spon'
+        stim: 'dmr' or 'spon' or None
         """
-        try:
-            spktrain = eval('self.spktrain_{}'.format(stim))
-            edges = eval('self.edges_{}'.format(stim))
-        except AttributeError:
-            return np.array([]), np.array([])
+        if stim is None:
+            spktrain = self.spktrain
+            edges = self.edges
+        else:
+            try:
+                spktrain = eval('self.spktrain_{}'.format(stim))
+                edges = eval('self.edges_{}'.format(stim))
+            except AttributeError:
+                return np.array([]), np.array([])
         
         
         if type(spktrain) == np.ndarray and spktrain.ndim == 2:
@@ -461,7 +491,10 @@ class Session:
             if patterns is None:
                 return None
             else:
-                ne = NE(self.exp, self.depth, self.probe, df, stim=stim, spktrain=spktrain, patterns=patterns, edges=edges)
+                try:
+                    ne = NE(self.exp, self.depth, self.probe, df, stim=stim, spktrain=spktrain, patterns=patterns, edges=edges)
+                except AttributeError:
+                    ne = NE(self.exp, df=df, stim=stim, spktrain=spktrain, patterns=patterns, edges=edges)
                 return ne
         else:
             return None
@@ -678,14 +711,22 @@ class Session:
         units = self.units
         dur = 0
         nspk = 0
+        fr = {'all': [], 'dmr': [], 'spon': []}
         for stim in ('dmr', 'spon'):
             if hasattr(self, f'spktrain_{stim}'):
                 spktrain = eval(f'self.spktrain_{stim}')
-                dur += spktrain.shape[1] * .5 / 1000 # duration in s
-                nspk += np.sum(spktrain, axis=1)
-        fr = nspk / dur
+                dur_tmp =  spktrain.shape[1] * .5 / 1000
+                nspk_tmp = np.sum(spktrain, axis=1)
+                dur += dur_tmp# duration in s
+                nspk += nspk_tmp
+                fr[stim] = nspk / dur
+        fr['all'] = nspk / dur
         for i, unit in enumerate(units):
-                unit.fr = fr[i]
+                unit.fr = fr['all'][i]
+                if any(fr['dmr']):
+                    unit.fr_dmr = fr['dmr'][i]
+                if any(fr['spon']):
+                    unit.fr_spon = fr['spon'][i]
     
     def get_presence_ratio(self):
         units = self.units
@@ -705,7 +746,7 @@ class Session:
                 unit.presence_ratio = presence_ratio[i]
 
 class NE(Session):
-    def __init__(self, exp, depth, probe, df, stim=None, spktrain=None, patterns=None, edges=None):
+    def __init__(self, exp, depth=None, probe=None, df=None, stim=None, spktrain=None, patterns=None, edges=None):
         self.exp = exp
         self.depth = depth
         self.probe = probe
@@ -1336,6 +1377,7 @@ class NE(Session):
         n_neuron, nt = self.spktrain.shape
         num_ne = self.patterns.shape[0]
         for shift in range(nshift):
+            print(f'{shift+1}/{nshift}')
             shift_size = np.random.randint(low=1, high=nt-1, size=n_neuron)
             spktrain_z = zscore(self.spktrain, axis=1)
             for i in range(n_neuron):
